@@ -25,12 +25,13 @@ const groceriesDec = await page.locator('.cat-row', { hasText: 'Groceries' }).lo
 if (groceriesDec !== groceriesNov) fail(`Groceries should carry ${groceriesNov} into December, got ${groceriesDec}`);
 // December's paychecks repeat on the 1st, so income is already ticked; planning is next.
 await page.locator('.new-month', { hasText: 'New month: December 2026' }).waitFor();
-if (!(await page.locator('.nm-steps li.done', { hasText: 'income' }).count())) fail('Repeating paychecks should tick off the income step');
+// The repeating paychecks are added on arrival and show up a moment later, as on a phone.
+await page.locator('.nm-steps li.done', { hasText: 'income' }).waitFor({ timeout: 5000 }).catch(() => fail('Repeating paychecks should tick off the income step'));
 if (await page.locator('.nm-steps li.done', { hasText: 'Plan money' }).count()) fail('Planning is not done yet');
 if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/new-month.png` });
 await page.locator('.nm-steps a', { hasText: 'Plan money' }).click();
 await page.locator('[data-action=plan-copy]').click();
 await page.locator('.topbar a.btn').click();
-if (await page.locator('.new-month').count()) fail('Checklist should go once income is in and money is planned');
+await page.locator('.new-month').waitFor({ state: 'detached', timeout: 5000 }).catch(() => fail('Checklist should go once income is in and money is planned'));
 await browser.close();
 console.log('Rollover test passed');
