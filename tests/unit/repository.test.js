@@ -156,3 +156,41 @@ test('joining asks first; an admin lets people in or turns them away', async () 
   assert.equal((await backend.get(`budgets/${budget.id}`)).requests.alex, undefined);
   assert.equal((await backend.get(`users/alex/pending/${budget.id}`)).declined, true);
 });
+
+test('people and weekly use are counted once each, and budgets once each', async () => {
+  const { backend, repo } = fresh();
+  await repo.noteVisit(new Date(2026, 10, 7));
+  await repo.noteVisit(new Date(2026, 10, 8));
+  let s = await backend.get('stats/usage');
+  assert.equal(s.people, 1);
+  assert.equal(s.weeks['2026-W45'], 1, 'a second visit the same week does not count again');
+  await repo.noteVisit(new Date(2026, 10, 10));
+  s = await backend.get('stats/usage');
+  assert.equal(s.people, 1);
+  assert.equal(s.weeks['2026-W46'], 1);
+  const { written } = repo.createBudget({ name: 'A' });
+  await written;
+  const { written: w2 } = repo.createBudget({ name: 'B' });
+  await w2;
+  assert.equal((await backend.get('stats/usage')).budgets, 2);
+  assert.deepEqual(Object.keys(await backend.get('users/preview-you')).sort(), ['at', 'lastWeek', 'uid'], 'nothing personal is kept');
+});
+
+test('a deleted budget can be restored', async () => {
+  const { backend, repo } = fresh();
+  const { budget, written } = repo.createBudget({ name: 'Home' });
+  await written;
+  await repo.deleteBudget(budget.id);
+  assert.equal((await backend.get(`budgets/${budget.id}`)).deleted, true);
+  await repo.restoreBudget(budget.id);
+  const b = await backend.get(`budgets/${budget.id}`);
+  assert.equal(b.deleted, false);
+  assert.equal(b.deletedAt, undefined);
+});
+
+test('a batch that fails changes nothing', async () => {
+  const { backend } = fresh();
+  await backend.set('a/1', { x: 1 });
+  await assert.rejects(backend.batch([{ op: 'update', path: 'a/1', value: { x: 2 } }, { op: 'update', path: 'a/missing', value: { y: 1 } }]));
+  assert.equal((await backend.get('a/1')).x, 1);
+});

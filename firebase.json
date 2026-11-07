@@ -1,0 +1,5 @@
+{
+  "firestore": { "rules": "firestore.rules" },
+  "hosting": { "public": "_site", "ignore": ["firebase.json", "**/.*"] },
+  "emulators": { "firestore": { "port": 8181 }, "auth": { "port": 9099 }, "ui": { "enabled": false } }
+}

@@ -7,10 +7,13 @@
   "scripts": {
     "test": "node --test \"tests/unit/*.test.js\"",
     "test:smoke": "node tests/e2e/smoke.e2e.js && node tests/e2e/rollover.e2e.js",
-    "preview": "node tools/build-preview.mjs . preview.html"
+    "preview": "node tools/build-preview.mjs . preview.html",
+    "test:rules": "firebase-tools emulators:exec --only firestore,auth --project demo-wmm \"node tests/emulator/rules.emulator.js\""
   },
   "devDependencies": {
     "esbuild": "^0.25.0",
+    "firebase": "^11.10.0",
+    "firebase-admin": "^13.10.0",
     "playwright": "^1.63.0"
   }
 }

@@ -10,4 +10,84 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
       - run: npm test
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:smoke
+      - name: Database rules, as several different people, in the Firebase emulators
+        run: npx --yes firebase-tools@15 emulators:exec --only firestore,auth --project demo-wmm "node tests/emulator/rules.emulator.js"
+
+  # Publishes firestore.rules to the live project, only from main and only after every test above passed.
+  publish-rules:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Publish the database rules
+        env:
+          FIREBASE_DEPLOY_KEY: ${{ secrets.FIREBASE_DEPLOY_KEY }}
+        run: |
+          if [ -z "$FIREBASE_DEPLOY_KEY" ]; then
+            echo "::notice::FIREBASE_DEPLOY_KEY isn't set, so the rules were not published."
+            exit 0
+          fi
+          KEY_FILE="$(mktemp)"
+          trap 'rm -f "$KEY_FILE"' EXIT
+          printf '%s' "$FIREBASE_DEPLOY_KEY" > "$KEY_FILE"
+          GOOGLE_APPLICATION_CREDENTIALS="$KEY_FILE" npx --yes firebase-tools@15 deploy --only firestore:rules --project wheres-my-61a75 --non-interactive
+
+  # Publishes the test branch to the staging project (fake data only) after the tests pass, then tries it for real.
+  publish-staging:
+    needs: test
+    if: github.ref == 'refs/heads/test' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    env:
+      GOOGLE_APPLICATION_CREDENTIALS: /tmp/staging-key.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Prepare the staging key
+        env:
+          STAGING_DEPLOY_KEY: ${{ secrets.STAGING_DEPLOY_KEY }}
+        run: |
+          if [ -z "$STAGING_DEPLOY_KEY" ]; then
+            echo "::error::STAGING_DEPLOY_KEY isn't set."
+            exit 1
+          fi
+          printf '%s' "$STAGING_DEPLOY_KEY" > "$GOOGLE_APPLICATION_CREDENTIALS"
+      - name: Build the staging site
+        run: |
+          cp config/firebase.staging.js js/config/firebase.js
+          # The staging test owner replaces the real one, only for this publish to the staging project.
+          sed -i -E "s/request\.auth\.uid == '[^']+'/request.auth.uid == 'stagingOwnerTestAccount01'/" firestore.rules
+          grep -q "stagingOwnerTestAccount01" firestore.rules
+          mkdir _site
+          cp -r index.html manifest.webmanifest css js icons _site/
+          if [ -f sw.js ]; then cp sw.js _site/; fi
+      - name: Publish to staging
+        run: npx --yes firebase-tools@15 deploy --only firestore:rules,hosting --project wheres-my-money-staging --non-interactive
+      - run: npx playwright install --with-deps chromium
+      - name: Try the published site
+        run: |
+          if [ -f tests/staging/staging.e2e.js ]; then node tests/staging/staging.e2e.js; else echo "No staging check yet."; fi
+      - name: Keep a screenshot of any failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-failure
+          path: staging-failure.png
+          if-no-files-found: ignore
+      - name: Remove the key
+        if: always()
+        run: rm -f "$GOOGLE_APPLICATION_CREDENTIALS"

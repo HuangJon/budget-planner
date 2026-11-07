@@ -1,21 +1,31 @@
 /**
  * Every read and write of budget data, on top of either backend. Writes change only the fields
- * they mean to, so two people in a shared budget don't undo each other.
+ * they mean to, so two people in a shared budget don't undo each other. Changes that belong
+ * together go in one batch, so they land together or not at all.
  *
  * Paths:
- *   budgets/{id}                         name, kind, members, categories, assigned
+ *   budgets/{id}                         name, kind, members, requests, categories, assigned, recurring
  *   budgets/{id}/transactions/{tid}      one transaction; deleting only marks it
  *   budgets/{id}/transactions/{tid}/revisions/{rid}   the version an edit replaced
+ *   users/{uid}                          first seen and the last week you used the app (for counting)
  *   users/{uid}/budgets/{id}             your own list of budgets
+ *   users/{uid}/pending/{id}             budgets you've asked to join
  *   invites/{code}                       which budget an invite link opens; the code can be reset
+ *   stats/usage                          counts only: people, budgets, people active each week
+ *   errorLog/{id}                        scrubbed error reports, readable only by the app's owner
  */
 import { SCHEMA_VERSION, STARTER_CATEGORIES } from '../config/app.js';
 import { randomId } from '../core/ids.js';
 import { isValidTransaction } from '../core/budget.js';
+import { isoWeek } from '../core/usage.js';
+import { increment } from './fields.js';
 
 const budgetPath = id => `budgets/${id}`;
 const txCol = id => `budgets/${id}/transactions`;
 const txPath = (id, tid) => `${txCol(id)}/${tid}`;
+export const STATS = 'stats/usage';
+/** A deleted budget can be brought back for this long. */
+export const RESTORE_DAYS = 30;
 
 /** Categories for a new budget: the ticked starter ones, or the given names, in checklist order. */
 export function starterCategories(picked = null) {
@@ -32,9 +42,11 @@ export function starterCategories(picked = null) {
 export function createRepository(backend, now = () => Date.now()) {
   const uid = () => backend.uid?.() || 'none';
   const mine = id => `users/${uid()}/budgets/${id}`;
+  const batch = writes => backend.batch(writes);
 
   return {
     kind: backend.kind,
+    auth: backend.auth,
     watchMyBudgets: (cb, err) => backend.watchCollection(`users/${uid()}/budgets`, list => cb(list.map(b => b.budgetId)), err),
     watchBudget: (id, cb, err) => backend.watchDoc(budgetPath(id), cb, err),
     /** Calls back with readable transactions and how many were too damaged to use. */
@@ -43,23 +55,57 @@ export function createRepository(backend, now = () => Date.now()) {
       cb(good, list.length - good.length);
     }, err),
 
+    /* ---------- Counting, for the owner page ---------- */
+    /**
+     * The first time an account is seen it counts as one more person; the first time each week it
+     * counts as active that week. Nothing else about the person is recorded.
+     */
+    async noteVisit(date = new Date()) {
+      const week = isoWeek(date);
+      const me = `users/${uid()}`;
+      const profile = await backend.get(me).catch(() => null);
+      if (!profile) {
+        return batch([
+          { op: 'set', path: me, value: { uid: uid(), at: now(), lastWeek: week } },
+          { op: 'merge', path: STATS, value: { people: increment(1), weeks: { [week]: increment(1) } } },
+        ]);
+      }
+      if (profile.lastWeek === week) return null;
+      return batch([
+        { op: 'update', path: me, value: { lastWeek: week } },
+        { op: 'merge', path: STATS, value: { weeks: { [week]: increment(1) } } },
+      ]);
+    },
+    readStats: () => backend.get(STATS),
+    listErrors: () => backend.list('errorLog', { orderBy: 'at', limit: 100 }),
+    logError: record => backend.set(`errorLog/${record.id}`, record),
+
+    /* ---------- Budgets ---------- */
     createBudget({ name, kind = 'personal', myName = 'You', categories = starterCategories(), startingMoney = 0, today = '' }) {
       const id = randomId(24);
       const budget = {
-        id, schemaVersion: SCHEMA_VERSION, name, kind, categories, assigned: {},
-        members: { [uid()]: { name: myName, admin: true, joinedAt: now() } }, createdAt: now(), changedBy: uid(),
+        id, schemaVersion: SCHEMA_VERSION, name, kind, categories, assigned: {}, recurring: {}, requests: {}, settings: {},
+        members: { [uid()]: { name: myName, admin: true, joinedAt: now() } }, createdAt: now(), changedBy: uid(), deleted: false,
       };
-      const writes = [backend.set(budgetPath(id), budget), backend.set(mine(id), { budgetId: id, at: now() })];
+      const writes = [
+        { op: 'set', path: budgetPath(id), value: budget },
+        { op: 'set', path: mine(id), value: { budgetId: id, at: now() } },
+        // One more budget for the owner's count; the rules check this budget is really new.
+        { op: 'merge', path: STATS, value: { budgets: increment(1), lastBudget: id } },
+      ];
       // Money already in the bank goes in as income, so it's ready to assign straight away.
       if (Number.isInteger(startingMoney) && startingMoney > 0 && today) {
         const tid = randomId();
-        writes.push(backend.set(txPath(id, tid), { id: tid, budgetId: id, kind: 'income', amount: startingMoney, date: today, description: 'Starting money', categoryId: null, createdBy: uid(), createdAt: now() }));
+        writes.push({ op: 'set', path: txPath(id, tid), value: { id: tid, budgetId: id, kind: 'income', amount: startingMoney, date: today, description: 'Starting money', note: '', categoryId: null, createdBy: uid(), createdAt: now() } });
       }
-      return { budget, written: Promise.all(writes) };
+      return { budget, written: batch(writes) };
     },
     renameBudget: (id, name) => backend.update(budgetPath(id), { name, changedBy: uid() }),
     /** Budget-wide settings everyone in it shares, like showing spending by person. */
     setSetting: (id, key, value) => backend.update(budgetPath(id), { [`settings.${key}`]: value, changedBy: uid() }),
+    /** Admins only. Marks it deleted; it can be restored for RESTORE_DAYS. */
+    deleteBudget: id => backend.update(budgetPath(id), { deleted: true, deletedAt: now(), deletedBy: uid(), changedBy: uid() }),
+    restoreBudget: id => backend.update(budgetPath(id), { deleted: false, deletedAt: undefined, deletedBy: undefined, changedBy: uid() }),
 
     /** Sets what's assigned to some categories in one month. Pass { catId: cents }. */
     setAssigned: (id, month, byCategory) => backend.update(budgetPath(id), {
@@ -83,9 +129,12 @@ export function createRepository(backend, now = () => Date.now()) {
         fields[`assigned.${m}.${catId}`] = undefined;
       }
       for (const [rid, r] of Object.entries(b?.recurring || {})) if (r.categoryId === catId) fields[moveTo ? `recurring.${rid}.categoryId` : `recurring.${rid}.stopped`] = moveTo || true;
-      const mine = transactions.filter(t => t.categoryId === catId);
-      if (mine.length && !moveTo) throw Object.assign(new Error('Category still has transactions'), { code: 'in-use' });
-      await Promise.all(mine.map(t => backend.update(txPath(id, t.id), { categoryId: moveTo, movedFrom: catId, updatedAt: now(), updatedBy: uid() })));
+      const moving = transactions.filter(t => t.categoryId === catId);
+      if (moving.length && !moveTo) throw Object.assign(new Error('Category still has transactions'), { code: 'in-use' });
+      // Batches hold up to 500 writes; move transactions in chunks, then remove the category.
+      for (let i = 0; i < moving.length; i += 400) {
+        await batch(moving.slice(i, i + 400).map(t => ({ op: 'update', path: txPath(id, t.id), value: { categoryId: moveTo, movedFrom: catId, updatedAt: now(), updatedBy: uid() } })));
+      }
       await backend.update(budgetPath(id), fields);
     },
     /** Renames a group by moving every category in it, hidden ones included. */
@@ -99,37 +148,42 @@ export function createRepository(backend, now = () => Date.now()) {
       return { catId, written: backend.update(budgetPath(id), { [`categories.${catId}`]: { name, group, order }, changedBy: uid() }) };
     },
 
+    /* ---------- Transactions ---------- */
     addTransaction(id, fields, tid = randomId()) {
-      const t = { ...fields, id: tid, budgetId: id, createdBy: uid(), createdAt: now() };
+      const t = { note: '', ...fields, id: tid, budgetId: id, createdBy: uid(), createdAt: now() };
       return { transaction: t, written: backend.set(txPath(id, tid), t) };
     },
     /** Keeps the version it replaces, so any edit can be undone. */
-    async updateTransaction(id, before, fields) {
+    updateTransaction(id, before, fields) {
       const rid = randomId();
-      await backend.set(`${txPath(id, before.id)}/revisions/${rid}`, { id: rid, at: now(), by: uid(), transaction: before });
-      return backend.update(txPath(id, before.id), { ...fields, updatedAt: now(), updatedBy: uid() });
+      return batch([
+        { op: 'set', path: `${txPath(id, before.id)}/revisions/${rid}`, value: { id: rid, at: now(), by: uid(), transaction: before } },
+        { op: 'update', path: txPath(id, before.id), value: { ...fields, updatedAt: now(), updatedBy: uid() } },
+      ]);
     },
     /** Only marks it, so it can be restored. */
     deleteTransaction: (id, tid) => backend.update(txPath(id, tid), { deleted: true, deletedAt: now(), deletedBy: uid() }),
     restoreTransaction: (id, tid) => backend.update(txPath(id, tid), { deleted: false, restoredAt: now(), restoredBy: uid() }),
 
-    /* ---------- Repeating every month ---------- */
+    /* ---------- Repeats ---------- */
     newRuleId: () => randomId(10),
     saveRule: (id, rule) => backend.update(budgetPath(id), { [`recurring.${rule.id}`]: rule, changedBy: uid() }),
     stopRule: (id, ruleId) => backend.update(budgetPath(id), { [`recurring.${ruleId}.stopped`]: true, changedBy: uid() }),
     /** Starting again from `month` means months it was stopped aren't filled in afterwards. */
     resumeRule: (id, ruleId, month) => backend.update(budgetPath(id), { [`recurring.${ruleId}.stopped`]: false, ...(month ? { [`recurring.${ruleId}.start`]: month } : {}), changedBy: uid() }),
-    /** Adds this month's copies. Each has a fixed id, so two phones doing this at once agree. */
-    addRecurringCopies: (id, list) => Promise.all(list.map(t => backend.set(txPath(id, t.id), { ...t, budgetId: id, createdBy: uid(), createdAt: now(), automatic: true }))),
+    /** Adds the copies that are due. Each has a fixed id, so two phones doing this at once agree. */
+    addRecurringCopies: (id, list) => batch(list.slice(0, 400).map(t => ({ op: 'set', path: txPath(id, t.id), value: { note: '', ...t, budgetId: id, createdBy: uid(), createdAt: now(), automatic: true } }))),
 
     /* ---------- People ---------- */
     /** Makes a new invite link and retires the old one, so a shared link can be cut off. */
     async resetInvite(id, oldCode, budgetName = '') {
       const code = randomId(20);
-      if (oldCode) await backend.remove(`invites/${oldCode}`);
-      // The budget's name rides along so the join screen can say what you're joining before you're in.
-      await backend.set(`invites/${code}`, { code, budgetId: id, budgetName, by: uid(), at: now() });
-      await backend.update(budgetPath(id), { invite: { code, at: now() }, changedBy: uid() });
+      await batch([
+        ...(oldCode ? [{ op: 'remove', path: `invites/${oldCode}` }] : []),
+        // The budget's name rides along so the join screen can say what you're joining before you're in.
+        { op: 'set', path: `invites/${code}`, value: { code, budgetId: id, budgetName: String(budgetName).slice(0, 60), by: uid(), at: now() } },
+        { op: 'update', path: budgetPath(id), value: { invite: { code, at: now() }, changedBy: uid() } },
+      ]);
       return code;
     },
     lookUpInvite: code => backend.get(`invites/${code}`),
@@ -140,8 +194,10 @@ export function createRepository(backend, now = () => Date.now()) {
     async requestToJoin(code, myName) {
       const invite = await backend.get(`invites/${code}`);
       if (!invite) throw Object.assign(new Error('No such invite'), { code: 'not-found' });
-      await backend.update(budgetPath(invite.budgetId), { [`requests.${uid()}`]: { name: myName, at: now(), invite: code } });
-      await backend.set(`users/${uid()}/pending/${invite.budgetId}`, { budgetId: invite.budgetId, budgetName: invite.budgetName || '', at: now() });
+      await batch([
+        { op: 'update', path: budgetPath(invite.budgetId), value: { [`requests.${uid()}`]: { name: myName, at: now(), invite: code } } },
+        { op: 'set', path: `users/${uid()}/pending/${invite.budgetId}`, value: { budgetId: invite.budgetId, budgetName: invite.budgetName || '', at: now() } },
+      ]);
       return invite.budgetId;
     },
     watchMyPending: (cb, err) => backend.watchCollection(`users/${uid()}/pending`, cb, err),
@@ -155,20 +211,28 @@ export function createRepository(backend, now = () => Date.now()) {
       const b = await backend.get(budgetPath(id));
       const req = b?.requests?.[memberUid];
       if (!req) throw Object.assign(new Error('No such request'), { code: 'not-found' });
-      await backend.update(budgetPath(id), { [`members.${memberUid}`]: { name: req.name, joinedAt: now(), invite: req.invite, approvedBy: uid() }, [`requests.${memberUid}`]: undefined, changedBy: uid() });
-      await backend.set(`users/${memberUid}/budgets/${id}`, { budgetId: id, at: now() });
-      await backend.remove(`users/${memberUid}/pending/${id}`);
+      await batch([
+        { op: 'update', path: budgetPath(id), value: { [`members.${memberUid}`]: { name: req.name, joinedAt: now(), invite: req.invite, approvedBy: uid() }, [`requests.${memberUid}`]: undefined, changedBy: uid() } },
+        { op: 'set', path: `users/${memberUid}/budgets/${id}`, value: { budgetId: id, at: now() } },
+        { op: 'remove', path: `users/${memberUid}/pending/${id}` },
+      ]);
     },
     async declineRequest(id, memberUid) {
-      await backend.update(budgetPath(id), { [`requests.${memberUid}`]: undefined, changedBy: uid() });
-      await backend.update(`users/${memberUid}/pending/${id}`, { declined: true }).catch(() => {});
+      await batch([
+        { op: 'update', path: budgetPath(id), value: { [`requests.${memberUid}`]: undefined, changedBy: uid() } },
+        { op: 'merge', path: `users/${memberUid}/pending/${id}`, value: { declined: true } },
+      ]);
     },
-    removeMember: (id, memberUid) => backend.update(budgetPath(id), { [`members.${memberUid}`]: undefined, [`removed.${memberUid}`]: now(), changedBy: uid() }),
+    /** Removes someone and takes the budget off their list; what they added stays. */
+    removeMember: (id, memberUid) => batch([
+      { op: 'update', path: budgetPath(id), value: { [`members.${memberUid}`]: undefined, [`removed.${memberUid}`]: now(), changedBy: uid() } },
+      { op: 'remove', path: `users/${memberUid}/budgets/${id}` },
+    ]),
     setAdmin: (id, memberUid, admin) => backend.update(budgetPath(id), { [`members.${memberUid}.admin`]: admin, changedBy: uid() }),
     renameMe: (id, name) => backend.update(budgetPath(id), { [`members.${uid()}.name`]: name, changedBy: uid() }),
-    async leaveBudget(id) {
-      await backend.update(budgetPath(id), { [`members.${uid()}`]: undefined, changedBy: uid() });
-      await backend.remove(mine(id));
-    },
+    leaveBudget: id => batch([
+      { op: 'update', path: budgetPath(id), value: { [`members.${uid()}`]: undefined, changedBy: uid() } },
+      { op: 'remove', path: mine(id) },
+    ]),
   };
 }

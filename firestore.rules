@@ -1,0 +1,265 @@
+rules_version = '2';
+// Where's my money: who can read and write what.
+//
+// - Nothing is visible without a verified email (Google, or an email account after tapping the link).
+// - A budget is readable only by its members. Nothing can be listed or searched.
+// - Every member can change anything in a budget (an edit keeps the old version). Only admins
+//   change who's in it, let people in, reset the invite link, or delete the budget.
+// - Someone with a live invite code can ask to join. They see nothing until an admin lets them in.
+// - The app's owner reads only running counts (people, budgets, people active each week) and
+//   error reports. The owner has no access to any budget. Error reports with any digit or "@" are refused.
+// - Nothing is deleted outright except your own list entries, retired invite codes and join requests.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // The app's owner. Publishing to the staging project swaps in a test account.
+    function isOwner() { return signedIn() && request.auth.uid == 'OWNER_NOT_SET_YET'; }
+    function signedIn() { return request.auth != null && request.auth.token.email_verified == true; }
+    function me() { return request.auth.uid; }
+    function short(v, n) { return v is string && v.size() <= n; }
+    function okId(id) { return id.matches('^[a-z0-9]{20,40}$'); }
+
+    function budgetPath(id) { return /databases/$(database)/documents/budgets/$(id); }
+    function userPath(uid) { return /databases/$(database)/documents/users/$(uid); }
+    function invitePath(code) { return /databases/$(database)/documents/invites/$(code); }
+    function budgetNow(id) { return get(budgetPath(id)).data; }
+    function budgetAfter(id) { return getAfter(budgetPath(id)).data; }
+    function memberOf(b) { return b.members.keys().hasAny([me()]); }
+    function adminOf(b) { return memberOf(b) && b.members[me()].get('admin', false) == true; }
+
+    function validBudget(d, id) {
+      return d.keys().hasOnly(['id', 'schemaVersion', 'name', 'kind', 'categories', 'assigned', 'recurring', 'requests', 'settings',
+          'members', 'createdAt', 'changedBy', 'deleted', 'deletedAt', 'deletedBy', 'invite', 'removed'])
+        && d.id == id
+        && short(d.name, 60) && d.name.size() > 0
+        && d.kind in ['personal', 'shared']
+        && d.schemaVersion is int
+        && d.categories is map && d.categories.size() <= 100
+        && d.assigned is map && d.assigned.size() <= 240
+        && d.recurring is map && d.recurring.size() <= 100
+        && d.requests is map && d.requests.size() <= 50
+        && d.members is map && d.members.size() <= 20
+        && d.createdAt is number
+        && d.deleted is bool;
+    }
+    function validRequest(q, budgetId) {
+      return q.keys().hasOnly(['name', 'at', 'invite'])
+        && short(q.name, 40) && q.name.size() > 0
+        && q.at is number
+        && q.invite is string && q.invite.size() <= 40
+        && exists(invitePath(q.invite))
+        && get(invitePath(q.invite)).data.budgetId == budgetId;
+    }
+
+    // ---------- Budgets ----------
+    match /budgets/{budgetId} {
+      allow get: if signedIn() && okId(budgetId) && memberOf(resource.data);
+      allow list: if false;
+      allow create: if signedIn() && okId(budgetId)
+        && validBudget(request.resource.data, budgetId)
+        && request.resource.data.members.keys().hasOnly([me()])
+        && request.resource.data.members[me()].admin == true
+        && request.resource.data.requests.size() == 0
+        && request.resource.data.deleted == false
+        && request.resource.data.changedBy == me();
+      allow update: if signedIn() && okId(budgetId)
+        && validBudget(request.resource.data, budgetId)
+        && request.resource.data.createdAt == resource.data.createdAt
+        && (adminEdit() || memberEdit() || leaving() || asking());
+      allow delete: if false;
+
+      function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
+      function membersDiff() { return request.resource.data.members.diff(resource.data.members); }
+
+      // Admins change anything, but can only add people who asked to join.
+      function adminEdit() {
+        return adminOf(resource.data)
+          && request.resource.data.changedBy == me()
+          && !changed().hasAny(['id', 'createdAt', 'schemaVersion'])
+          && membersDiff().addedKeys().hasOnly(resource.data.requests.keys());
+      }
+      // Everyone else changes the money and categories, and only their own name in the member list.
+      function memberEdit() {
+        return memberOf(resource.data)
+          && resource.data.deleted == false
+          && request.resource.data.changedBy == me()
+          && changed().hasOnly(['name', 'categories', 'assigned', 'recurring', 'settings', 'changedBy', 'members'])
+          && (!changed().hasAny(['members']) || (
+            membersDiff().affectedKeys().hasOnly([me()])
+            && request.resource.data.members.keys().hasAny([me()])
+            && request.resource.data.members[me()].get('admin', false) == resource.data.members[me()].get('admin', false)
+            && request.resource.data.members[me()].get('joinedAt', 0) == resource.data.members[me()].get('joinedAt', 0)
+          ));
+      }
+      // Any member can leave.
+      function leaving() {
+        return memberOf(resource.data)
+          && changed().hasOnly(['members', 'changedBy'])
+          && membersDiff().affectedKeys().hasOnly([me()])
+          && !request.resource.data.members.keys().hasAny([me()]);
+      }
+      // Someone outside asks to join with a live invite code, or takes their request back.
+      function asking() {
+        return !memberOf(resource.data)
+          && resource.data.deleted == false
+          && changed().hasOnly(['requests'])
+          && request.resource.data.requests.diff(resource.data.requests).affectedKeys().hasOnly([me()])
+          && (!request.resource.data.requests.keys().hasAny([me()])
+            || validRequest(request.resource.data.requests[me()], budgetId));
+      }
+
+      function validTx(d, tid) {
+        return d.keys().hasOnly(['id', 'budgetId', 'kind', 'amount', 'date', 'description', 'note', 'categoryId',
+            'createdBy', 'createdAt', 'updatedAt', 'updatedBy', 'deleted', 'deletedAt', 'deletedBy', 'restoredAt', 'restoredBy',
+            'recurringId', 'automatic', 'movedFrom'])
+          && d.id == tid && tid.size() <= 60
+          && d.budgetId == budgetId
+          && d.kind in ['income', 'spend', 'refund']
+          && d.amount is int && d.amount > 0 && d.amount <= 100000000000
+          && d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+          && short(d.description, 80)
+          && short(d.get('note', ''), 500)
+          && (d.kind == 'income' ? d.categoryId == null : (d.categoryId is string && d.categoryId.size() <= 20))
+          && d.createdAt is number && d.createdBy is string;
+      }
+
+      match /transactions/{tid} {
+        allow read: if signedIn() && memberOf(budgetNow(budgetId));
+        // getAfter, so a new budget and its starting money can be saved together.
+        allow create: if signedIn() && memberOf(budgetAfter(budgetId)) && budgetAfter(budgetId).deleted == false
+          && validTx(request.resource.data, tid)
+          && request.resource.data.createdBy == me();
+        allow update: if signedIn() && memberOf(budgetNow(budgetId)) && budgetNow(budgetId).deleted == false
+          && validTx(request.resource.data, tid)
+          && request.resource.data.createdBy == resource.data.createdBy
+          && request.resource.data.createdAt == resource.data.createdAt;
+        allow delete: if false;
+
+        // The version an edit replaced, kept so any change can be undone.
+        match /revisions/{rid} {
+          allow read: if signedIn() && memberOf(budgetNow(budgetId));
+          allow create: if signedIn() && memberOf(budgetNow(budgetId))
+            && request.resource.data.keys().hasOnly(['id', 'at', 'by', 'transaction'])
+            && request.resource.data.id == rid && request.resource.data.by == me();
+          allow update, delete: if false;
+        }
+      }
+    }
+
+    // ---------- You ----------
+    // Only what's needed to count you once: when you were first seen, and the last week you used the app.
+    match /users/{uid} {
+      allow get: if signedIn() && uid == me();
+      allow create: if signedIn() && uid == me()
+        && request.resource.data.keys().hasOnly(['uid', 'at', 'lastWeek'])
+        && request.resource.data.uid == me() && request.resource.data.at is number
+        && short(request.resource.data.lastWeek, 10);
+      allow update: if signedIn() && uid == me()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastWeek'])
+        && short(request.resource.data.lastWeek, 10);
+      allow delete: if false;
+
+      // Your list of budgets. An admin adds a budget to someone's list when letting them in,
+      // and takes it off when removing them.
+      match /budgets/{budgetId} {
+        allow read: if signedIn() && uid == me();
+        allow create, update: if signedIn() && okId(budgetId)
+          && request.resource.data.keys().hasOnly(['budgetId', 'at'])
+          && request.resource.data.budgetId == budgetId
+          && ((uid == me() && memberOf(budgetAfter(budgetId)))
+            || (adminOf(budgetAfter(budgetId)) && budgetAfter(budgetId).members.keys().hasAny([uid])));
+        allow delete: if signedIn() && (uid == me()
+          || (adminOf(budgetNow(budgetId)) && !budgetAfter(budgetId).members.keys().hasAny([uid])));
+      }
+
+      // Budgets you've asked to join. An admin can mark a request turned away, or clear it when letting you in.
+      match /pending/{budgetId} {
+        allow read: if signedIn() && uid == me();
+        function ownRequest() {
+          return uid == me() && okId(budgetId)
+            && request.resource.data.keys().hasOnly(['budgetId', 'budgetName', 'at'])
+            && request.resource.data.budgetId == budgetId
+            && short(request.resource.data.budgetName, 60);
+        }
+        allow create: if signedIn() && ownRequest();
+        // Asking again after being turned away replaces your old request.
+        allow update: if signedIn() && (ownRequest() || (adminOf(budgetNow(budgetId))
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['declined'])
+          && request.resource.data.declined == true));
+        allow delete: if signedIn() && (uid == me() || adminOf(budgetNow(budgetId)));
+      }
+    }
+
+    // ---------- Invite links ----------
+    // Looking up one code is allowed; listing them never is. Only admins make or retire codes.
+    match /invites/{code} {
+      allow get: if signedIn();
+      allow list: if false;
+      allow create: if signedIn() && code.matches('^[a-z0-9]{16,40}$')
+        && request.resource.data.keys().hasOnly(['code', 'budgetId', 'budgetName', 'by', 'at'])
+        && request.resource.data.code == code
+        && request.resource.data.by == me()
+        && short(request.resource.data.budgetName, 60)
+        && request.resource.data.at is number
+        && adminOf(budgetAfter(request.resource.data.budgetId));
+      allow delete: if signedIn() && adminOf(budgetNow(resource.data.budgetId));
+      allow update: if false;
+    }
+
+    // ---------- Counts for the owner ----------
+    // Each change adds exactly 1, and only when it's really true: a new account seen for the first
+    // time, an account's first visit in a week, or a budget being created in the same write.
+    match /stats/usage {
+      allow get: if isOwner();
+      allow list: if false;
+      allow create, update: if signedIn() && (newPerson() || activeThisWeek() || newBudget());
+      allow delete: if false;
+
+      function old() { return resource == null ? {} : resource.data; }
+      function countChanged() { return request.resource.data.diff(old()).affectedKeys(); }
+      function weekAfter() { return getAfter(userPath(me())).data.lastWeek; }
+      function weekBumped() {
+        return request.resource.data.weeks is map
+          && request.resource.data.weeks.diff(old().get('weeks', {})).affectedKeys().hasOnly([weekAfter()])
+          && request.resource.data.weeks[weekAfter()] == old().get('weeks', {}).get(weekAfter(), 0) + 1;
+      }
+      function newPerson() {
+        return countChanged().hasOnly(['people', 'weeks'])
+          && request.resource.data.people == old().get('people', 0) + 1
+          && !exists(userPath(me())) && existsAfter(userPath(me()))
+          && weekBumped();
+      }
+      function activeThisWeek() {
+        return countChanged().hasOnly(['weeks'])
+          && exists(userPath(me()))
+          && get(userPath(me())).data.lastWeek != weekAfter()
+          && weekBumped();
+      }
+      function newBudget() {
+        return countChanged().hasOnly(['budgets', 'lastBudget'])
+          && request.resource.data.budgets == old().get('budgets', 0) + 1
+          && request.resource.data.lastBudget is string && okId(request.resource.data.lastBudget)
+          && !exists(budgetPath(request.resource.data.lastBudget))
+          && existsAfter(budgetPath(request.resource.data.lastBudget))
+          && memberOf(budgetAfter(request.resource.data.lastBudget));
+      }
+    }
+
+    // ---------- Error reports ----------
+    // A short note when something breaks: what kind, which screen, which version, which kind of
+    // device. No account, no budget, and the rules refuse any digit or "@" in the message.
+    match /errorLog/{id} {
+      allow get, list: if isOwner();
+      allow create: if request.auth != null && id.matches('^[a-z0-9]{10,40}$')
+        && request.resource.data.keys().hasOnly(['id', 'kind', 'message', 'screen', 'version', 'platform', 'at'])
+        && request.resource.data.keys().hasAll(['id', 'kind', 'message', 'screen', 'version', 'platform', 'at'])
+        && request.resource.data.id == id
+        && request.resource.data.kind in ['failed-save', 'refused-save', 'app-error']
+        && short(request.resource.data.message, 200) && request.resource.data.message.matches('^[^0-9@]*$')
+        && request.resource.data.screen in ['home', 'budget', 'plan', 'transactions', 'trends', 'people', 'join', 'owner', 'sign-in', 'other']
+        && short(request.resource.data.version, 20) && request.resource.data.version.matches('^[A-Za-z0-9.-]*$')
+        && request.resource.data.platform in ['iphone', 'android', 'computer']
+        && request.resource.data.at is number;
+      allow update, delete: if false;
+    }
+  }
+}
