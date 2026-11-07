@@ -89,25 +89,77 @@ await page.locator('.sheet-head h2').tap(); // tap away to close the keyboard
 await tap('[data-action=tx-save]');
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
 
-// Income has no category.
-await tap('.spend-tab');
-await tap('[data-action=tx-kind][data-id=income]');
+// Income comes in from the Ready to assign card, with last paycheck one tap away.
+const beforeIncome = await ready();
+await tap('[data-action=add-income]');
+await page.locator('.sheet-head h2', { hasText: 'Add income' }).waitFor();
 if (await page.locator('#fCat').count()) fail('Income should not ask for a category');
-await page.fill('#fAmount', '100');
-await page.fill('#fDesc', 'Gift');
+await tap('[data-action=tx-quick]');
+if (!(await page.locator('#fAmount').inputValue())) fail('Tapping a recent paycheck did not fill the amount');
+await shot('income-form');
 await page.locator('.sheet-head h2').tap();
 await tap('[data-action=tx-save]');
+await page.locator('dialog[open]').waitFor({ state: 'detached' });
+if ((await ready()) === beforeIncome) fail('Income did not add to Ready to assign');
+
+// The Spend form only spends: usual ones are one tap, refunds are a switch, and it can repeat monthly.
+await tap('.spend-tab');
+if (await page.locator('[data-action=tx-kind]').count()) fail('Spend form should not offer income');
+await tap('[data-action=tx-quick]');
+if (!(await page.locator('#fDesc').inputValue()) || !(await page.locator('#fCat').inputValue())) fail('Quick add did not fill description and category');
+await page.fill('#fAmount', '9.99');
+await page.fill('#fDesc', 'Music app');
+await page.locator('#fCat').selectOption({ label: 'Subscriptions' });
+await page.locator('#fRepeat').check();
+await page.locator('#repeatHint').filter({ hasText: 'on the' }).waitFor();
+await page.locator('.sheet-head h2').tap();
+await tap('[data-action=tx-save]');
+await page.locator('dialog[open]').waitFor({ state: 'detached' });
 
 // Activity, edit and delete with undo.
 await tap('a.tab[href$="-activity"]');
 await page.locator('.tx-row').first().waitFor();
+if (!(await page.locator('[data-action=open-rule]', { hasText: 'Music app' }).count())) fail('New repeat missing from Every month');
 await shot('activity');
-const count = await page.locator('.tx-row').count();
-await tap('.tx-row');
+const count = await page.locator('.tx-list:not(:first-of-type) .tx-row, [data-action=edit-tx].tx-row').count();
+await tap('[data-action=edit-tx].tx-row');
 await tap('[data-action=tx-delete]');
-if (await page.locator('.tx-row').count() !== count - 1) fail('Delete did not remove the row');
+if (await page.locator('[data-action=edit-tx].tx-row').count() !== count - 1) fail('Delete did not remove the row');
 await tap('#toast [data-action=undo]');
-if (await page.locator('.tx-row').count() !== count) fail('Undo did not restore the row');
+if (await page.locator('[data-action=edit-tx].tx-row').count() !== count) fail('Undo did not restore the row');
+
+// Stop a repeat from the Every month list.
+await page.locator('[data-action=open-rule]', { hasText: 'Music app' }).click();
+await tap('[data-action=rule-stop]');
+if (await page.locator('[data-action=open-rule]', { hasText: 'Music app' }).count()) fail('Stopped repeat still listed');
+
+// Trends.
+await tap('a.tab[href$="-trends"]');
+await page.getByRole('heading', { name: 'Where it went' }).waitFor();
+for (const h of ['Worth a look', 'Month by month', 'Plan vs real', 'Saving']) await page.getByRole('heading', { name: h }).waitFor();
+if (!(await page.locator('.cols .col').count())) fail('No month columns');
+await shot('trends');
+if (await page.locator('[data-action=plan-usual]').count()) {
+  await tap('[data-action=plan-usual]');
+  await page.locator('#toast').filter({ hasText: 'planned' }).waitFor();
+}
+
+// People: invite link, a new link replaces it, removing someone asks first.
+await tap('a.tab[href$="-people"]');
+const link1 = await page.locator('#inviteLink').innerText();
+await tap('[data-action=invite-reset]');
+await page.waitForFunction(old => document.getElementById('inviteLink')?.textContent !== old, link1);
+const link2 = await page.locator('#inviteLink').innerText();
+await tap('[data-action=person-ask]');
+await page.getByText('They lose access').waitFor();
+await shot('people');
+await tap('[data-action=person-cancel]');
+
+// Old invite links stop working; the current one sends members straight to the budget.
+await page.goto(pathToFileURL(resolve('preview-test.html')).href + '#join-' + link1.split('#join-')[1]);
+await page.getByText('doesn\u2019t work any more').waitFor();
+await page.goto(pathToFileURL(resolve('preview-test.html')).href + '#join-' + link2.split('#join-')[1]);
+await page.locator('[data-testid=ready]').waitFor();
 
 // Months.
 await tap('[data-action=month][data-id="-1"]');

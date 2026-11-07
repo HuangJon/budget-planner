@@ -124,3 +124,59 @@ a.hero-btn { display:inline-grid; place-items:center; text-decoration:none; whit
 
 /* Setup steps and chips */
 .chips .chip[aria-pressed="true"]::before { content:"\2713"; font-weight:700 }
+
+/* ---------- Round 3 ---------- */
+.hero-actions { display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap; margin-top:4px }
+.hero-actions .hero-btn { flex:1 1 0; min-width:0 }
+.hero-btn.ghost { background:transparent; color:var(--hero-ink); box-shadow:inset 0 0 0 1.5px var(--hero-tear) }
+:root:is([data-look="dark"],[data-look="light"]) .hero-btn.ghost { background:transparent; color:#F3EDE1; box-shadow:inset 0 0 0 1.5px rgba(243,237,225,.4) }
+:root[data-look="light"] .hero-btn.ghost { color:#F2EEE5 }
+:root[data-look="pride"] .hero-btn.ghost { background:transparent; color:#FFFFFF }
+.quick { display:grid; gap:6px }
+.quick-row { display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; margin-inline:-4px; padding-inline:4px; scrollbar-width:none }
+.quick-row::-webkit-scrollbar { display:none }
+.quick-row .chip { flex:none; white-space:nowrap }
+.switch-row input[type=checkbox] { width:44px; height:26px; appearance:none; -webkit-appearance:none; border-radius:13px; background:var(--sunken); border:1px solid var(--line); position:relative; cursor:pointer; flex:none; transition:background-color .15s ease }
+.switch-row input[type=checkbox]::after { content:""; position:absolute; top:2px; left:2px; width:20px; height:20px; border-radius:50%; background:var(--surface); box-shadow:0 1px 2px var(--shadow); transition:transform .15s ease }
+.switch-row input[type=checkbox]:checked { background:var(--accent); border-color:var(--accent) }
+.switch-row input[type=checkbox]:checked::after { transform:translateX(18px) }
+.switch-row { cursor:pointer }
+
+/* Trends */
+.cmp-list, .change-list { list-style:none; margin:0; padding:0; display:grid; gap:14px }
+.cmp-list li { display:grid; gap:4px }
+.cmp-track { position:relative; height:10px; border-radius:5px; background:var(--sunken) }
+.cmp-track i { display:block; height:100%; border-radius:5px; background:var(--owe); opacity:.85 }
+.cmp-track.over i { background:var(--owe) }
+.cmp-list .cmp-track i { max-width:100% }
+.cmp-track b { position:absolute; top:-3px; bottom:-3px; width:3px; margin-left:-1.5px; border-radius:2px; background:var(--ink) }
+.key-tick { display:inline-block; width:3px; height:11px; border-radius:2px; background:var(--ink); vertical-align:-1px; margin-right:2px }
+.change-list li { padding-top:12px; border-top:1px solid var(--line) }
+.change-list li:first-child { padding-top:0; border-top:0 }
+.change-list .btn.small { justify-self:start; margin-top:4px }
+.cols { display:grid; grid-auto-flow:column; grid-auto-columns:1fr; gap:8px; height:150px; align-items:end }
+.col { display:grid; grid-template-rows:1fr auto; height:100%; justify-items:center; gap:6px; min-width:0 }
+.col-bars { display:flex; align-items:flex-end; gap:3px; height:100%; width:100% ; justify-content:center }
+.col-bars i { display:block; width:42%; max-width:16px; min-height:2px; border-radius:4px 4px 0 0 }
+.col-bars .in, .legend .in { background:var(--owed) }
+.col-bars .out, .legend .out { background:var(--owe) }
+.legend { display:flex; gap:16px; color:var(--muted) }
+.legend span { display:inline-flex; align-items:center; gap:6px }
+.legend i { width:10px; height:10px; border-radius:3px; display:inline-block }
+.mini-table { width:100%; border-collapse:collapse; font-size:.875rem }
+.mini-table th { text-align:left; font-weight:600; padding:8px 0; border-top:1px solid var(--line) }
+.mini-table td { text-align:right; padding:8px 0 8px 8px; border-top:1px solid var(--line); white-space:nowrap }
+.mini-table tfoot td { border-top:0; padding-top:0 }
+@media (max-width:380px) { .mini-table th { font-size:.8125rem } .mini-table td { padding-left:4px } }
+
+/* People */
+.screen-title { padding:4px 4px 0 }
+.people-list { overflow:hidden }
+.person { display:flex; flex-wrap:wrap; align-items:center; gap:12px; padding:14px 16px; border-top:1px solid var(--line) }
+.person:first-child { border-top:0 }
+.person .ava { width:38px; height:38px; font-size:1rem }
+.person-tools { flex-basis:100%; display:flex; flex-wrap:wrap; gap:8px 16px; align-items:center; padding-left:50px }
+.danger-link { color:var(--owe) }
+.linkbox { padding:10px 12px; border-radius:10px; background:var(--sunken); font-family:var(--mono); font-size:.8125rem; overflow-wrap:anywhere; user-select:all; -webkit-user-select:all }
+.join h2 { font-size:1.5rem }
+.cmp-track.save i { background:var(--accent); opacity:1 }

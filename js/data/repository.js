@@ -7,6 +7,7 @@
  *   budgets/{id}/transactions/{tid}      one transaction; deleting only marks it
  *   budgets/{id}/transactions/{tid}/revisions/{rid}   the version an edit replaced
  *   users/{uid}/budgets/{id}             your own list of budgets
+ *   invites/{code}                       which budget an invite link opens; the code can be reset
  */
 import { SCHEMA_VERSION, STARTER_CATEGORIES } from '../config/app.js';
 import { randomId } from '../core/ids.js';
@@ -72,8 +73,7 @@ export function createRepository(backend, now = () => Date.now()) {
       return { catId, written: backend.update(budgetPath(id), { [`categories.${catId}`]: { name, group, order }, changedBy: uid() }) };
     },
 
-    addTransaction(id, fields) {
-      const tid = randomId();
+    addTransaction(id, fields, tid = randomId()) {
       const t = { ...fields, id: tid, budgetId: id, createdBy: uid(), createdAt: now() };
       return { transaction: t, written: backend.set(txPath(id, tid), t) };
     },
@@ -86,5 +86,40 @@ export function createRepository(backend, now = () => Date.now()) {
     /** Only marks it, so it can be restored. */
     deleteTransaction: (id, tid) => backend.update(txPath(id, tid), { deleted: true, deletedAt: now(), deletedBy: uid() }),
     restoreTransaction: (id, tid) => backend.update(txPath(id, tid), { deleted: false, restoredAt: now(), restoredBy: uid() }),
+
+    /* ---------- Repeating every month ---------- */
+    newRuleId: () => randomId(10),
+    saveRule: (id, rule) => backend.update(budgetPath(id), { [`recurring.${rule.id}`]: rule, changedBy: uid() }),
+    stopRule: (id, ruleId) => backend.update(budgetPath(id), { [`recurring.${ruleId}.stopped`]: true, changedBy: uid() }),
+    /** Starting again from `month` means months it was stopped aren't filled in afterwards. */
+    resumeRule: (id, ruleId, month) => backend.update(budgetPath(id), { [`recurring.${ruleId}.stopped`]: false, ...(month ? { [`recurring.${ruleId}.start`]: month } : {}), changedBy: uid() }),
+    /** Adds this month's copies. Each has a fixed id, so two phones doing this at once agree. */
+    addRecurringCopies: (id, list) => Promise.all(list.map(t => backend.set(txPath(id, t.id), { ...t, budgetId: id, createdBy: uid(), createdAt: now(), automatic: true }))),
+
+    /* ---------- People ---------- */
+    /** Makes a new invite link and retires the old one, so a shared link can be cut off. */
+    async resetInvite(id, oldCode, budgetName = '') {
+      const code = randomId(20);
+      if (oldCode) await backend.remove(`invites/${oldCode}`);
+      // The budget's name rides along so the join screen can say what you're joining before you're in.
+      await backend.set(`invites/${code}`, { code, budgetId: id, budgetName, by: uid(), at: now() });
+      await backend.update(budgetPath(id), { invite: { code, at: now() }, changedBy: uid() });
+      return code;
+    },
+    lookUpInvite: code => backend.get(`invites/${code}`),
+    async joinWithCode(code, myName) {
+      const invite = await backend.get(`invites/${code}`);
+      if (!invite) throw Object.assign(new Error('No such invite'), { code: 'not-found' });
+      await backend.update(budgetPath(invite.budgetId), { [`members.${uid()}`]: { name: myName, joinedAt: now(), invite: code }, changedBy: uid() });
+      await backend.set(mine(invite.budgetId), { budgetId: invite.budgetId, at: now() });
+      return invite.budgetId;
+    },
+    removeMember: (id, memberUid) => backend.update(budgetPath(id), { [`members.${memberUid}`]: undefined, [`removed.${memberUid}`]: now(), changedBy: uid() }),
+    setAdmin: (id, memberUid, admin) => backend.update(budgetPath(id), { [`members.${memberUid}.admin`]: admin, changedBy: uid() }),
+    renameMe: (id, name) => backend.update(budgetPath(id), { [`members.${uid()}.name`]: name, changedBy: uid() }),
+    async leaveBudget(id) {
+      await backend.update(budgetPath(id), { [`members.${uid()}`]: undefined, changedBy: uid() });
+      await backend.remove(mine(id));
+    },
   };
 }

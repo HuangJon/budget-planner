@@ -30,7 +30,8 @@ function hero(b, s) {
     <span class="label">Ready to assign</span>
     <span class="big ${negative ? 'down' : ''}" data-testid="ready">${money(s.readyToAssign)}</span>
     <p>${esc(say)}</p>
-    <div class="hero-line"><span>${needed > 0 ? `Bills and targets need <strong class="amt">${money(needed)}</strong>` : hasTargets(b) ? 'Bills and targets are covered' : 'Decide where it all goes'}</span><a class="hero-btn" href="#b-${b.id}-plan">Plan money</a></div>
+    <div class="hero-line"><span>${needed > 0 ? `Bills and targets need <strong class="amt">${money(needed)}</strong>` : hasTargets(b) ? 'Bills and targets are covered' : 'Decide where it all goes'}</span></div>
+    <div class="hero-actions"><button type="button" class="hero-btn ghost" data-action="add-income">Add income</button><a class="hero-btn" href="#b-${b.id}-plan">Plan money</a></div>
   </section>`;
 }
 

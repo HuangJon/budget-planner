@@ -1,20 +1,20 @@
 /**
- * Adding or editing a transaction. Amount and description first, then matching rows
- * (category, date), with a note behind one link and one save button pinned at the bottom.
+ * Adding or editing spending or income. Amount and description first, then matching rows
+ * (category, date, repeat), a note behind one link, and one save button pinned at the bottom.
+ * Spending offers your frequent ones as one-tap buttons; income offers your recent paychecks.
  */
 import { A, actions, inputs, changes } from './state.js';
-import { esc, openSheet, closeSheet, sheetHead, toast, send, today, fmtDate } from './dom.js';
-import { groupedCategories, isValidTransaction } from '../core/budget.js';
+import { esc, openSheet, closeSheet, sheetHead, toast, send, today, fmtDate, ordinal } from './dom.js';
+import { groupedCategories, isValidTransaction, liveTransactions } from '../core/budget.js';
 import { suggestCategory } from '../core/categorize.js';
+import { recurringId, DAY_MAX } from '../core/recurring.js';
 import { toCents, fromCents, money } from '../core/money.js';
 import { LIMITS } from '../config/app.js';
 
-const KINDS = [['spend', 'Spending'], ['income', 'Income'], ['refund', 'Refund']];
-
 export function openTxForm(budgetId, editing = null, preset = {}) {
   A.form = editing
-    ? { budgetId, editing, kind: editing.kind, amount: fromCents(editing.amount), description: editing.description || '', categoryId: editing.categoryId || '', date: editing.date, note: editing.note || '', showNote: Boolean(editing.note), touchedCat: true }
-    : { budgetId, editing: null, kind: 'spend', amount: '', description: '', categoryId: preset.categoryId || '', date: today(), note: '', showNote: false, touchedCat: Boolean(preset.categoryId) };
+    ? { budgetId, editing, kind: editing.kind, amount: fromCents(editing.amount), description: editing.description || '', categoryId: editing.categoryId || '', date: editing.date, note: editing.note || '', showNote: Boolean(editing.note), touchedCat: true, repeat: false }
+    : { budgetId, editing: null, kind: preset.kind || 'spend', amount: '', description: '', categoryId: preset.categoryId || '', date: today(), note: '', showNote: false, touchedCat: Boolean(preset.categoryId), repeat: false };
   A.sheet = { kind: 'tx' };
   drawForm();
   if (!editing) setTimeout(() => document.getElementById('fAmount')?.focus(), 50);
@@ -22,20 +22,55 @@ export function openTxForm(budgetId, editing = null, preset = {}) {
 
 const catOptions = (b, selected) => `<option value="" ${selected ? '' : 'selected'} disabled>Pick one</option>${groupedCategories(b).map(g => `<optgroup label="${esc(g.name)}">${g.categories.map(c => `<option value="${c.id}" ${c.id === selected ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</optgroup>`).join('')}${selected && b.categories[selected]?.hidden ? `<option value="${selected}" selected>${esc(b.categories[selected].name)} (hidden)</option>` : ''}`;
 
+/** Your most used description and category pairs from the last 90 days, most frequent first. */
+export function frequentSpending(b, list, limit = 6) {
+  const since = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
+  const seen = new Map();
+  for (const t of liveTransactions(list)) {
+    if (t.kind !== 'spend' || !t.description || t.date < since || !b.categories[t.categoryId] || b.categories[t.categoryId].hidden) continue;
+    const key = `${t.description.trim().toLowerCase()}|${t.categoryId}`;
+    const row = seen.get(key) || { description: t.description.trim(), categoryId: t.categoryId, count: 0, last: '' };
+    row.count += 1;
+    if (t.date > row.last) row.last = t.date;
+    seen.set(key, row);
+  }
+  return [...seen.values()].sort((a, b2) => b2.count - a.count || b2.last.localeCompare(a.last)).slice(0, limit);
+}
+/** Your recent income, newest first, without repeats, for one-tap paychecks. */
+export function recentIncome(list, limit = 3) {
+  const out = new Map();
+  for (const t of liveTransactions(list).filter(x => x.kind === 'income' && x.description !== 'Starting money').sort((a, b) => b.date.localeCompare(a.date))) {
+    const key = `${t.description.trim().toLowerCase()}|${t.amount}`;
+    if (!out.has(key)) out.set(key, { description: t.description.trim() || 'Income', amount: t.amount });
+  }
+  return [...out.values()].slice(0, limit);
+}
+
 function drawForm() {
   const F = A.form, b = A.budgets[F.budgetId];
-  const income = F.kind === 'income';
-  openSheet(`<form class="sheet tx-form" id="txForm" novalidate>${sheetHead(F.editing ? 'Edit' : F.kind === 'income' ? 'Add income' : F.kind === 'refund' ? 'Add a refund' : 'Add spending')}
+  const income = F.kind === 'income', refund = F.kind === 'refund';
+  const list = A.transactions[F.budgetId];
+  const day = Number(F.date.slice(8, 10));
+  const isRepeatCopy = Boolean(F.editing?.recurringId);
+  const rule = isRepeatCopy ? b.recurring?.[F.editing.recurringId] : null;
+  const quick = F.editing ? [] : income ? recentIncome(list) : frequentSpending(b, list);
+  const title = F.editing ? (income ? 'Edit income' : 'Edit spending') : income ? 'Add income' : 'Add spending';
+  openSheet(`<form class="sheet tx-form" id="txForm" novalidate>${sheetHead(title)}
     <div class="sheet-body">
-      <div class="seg" role="group" aria-label="Kind">${KINDS.map(([k, label]) => `<button type="button" data-action="tx-kind" data-id="${k}" aria-pressed="${F.kind === k}">${label}</button>`).join('')}</div>
+      ${quick.length ? `<div class="quick" aria-label="${income ? 'Recent income' : 'Your usual spending'}"><span class="label">${income ? 'Same as before' : 'Your usual'}</span><div class="quick-row">${quick.map((q, i) => `<button type="button" class="chip" data-action="tx-quick" data-id="${i}">${esc(q.description)}${income ? ` · ${money(q.amount)}` : ` · <span class="muted">${esc(b.categories[q.categoryId].name)}</span>`}</button>`).join('')}</div></div>` : ''}
       <label class="money-in big"><span class="sr">Amount</span><span aria-hidden="true">$</span><input id="fAmount" class="amount-input" inputmode="decimal" autocomplete="off" placeholder="0.00" value="${esc(F.amount)}" data-input="tx-amount"></label>
-      <label class="f"><span class="sr">Description</span><input id="fDesc" maxlength="${LIMITS.description}" autocomplete="off" placeholder="${income ? 'Paycheck, gift, side job…' : F.kind === 'refund' ? 'What was returned?' : 'What was it for?'}" value="${esc(F.description)}" data-input="tx-desc"></label>
+      <label class="f"><span class="sr">Description</span><input id="fDesc" maxlength="${LIMITS.description}" autocomplete="off" placeholder="${income ? 'Paycheck, gift, side job…' : refund ? 'What was returned?' : 'What was it for?'}" value="${esc(F.description)}" data-input="tx-desc"></label>
       <div class="form-rows">
         ${income
           ? '<div class="form-row"><span class="form-row-label">Goes to</span><span class="form-row-value">Ready to assign</span></div>'
           : `<label class="form-row"><span class="form-row-label">Category <span class="tiny muted" id="catHint">${F.suggested ? 'Suggested' : ''}</span></span><select id="fCat" data-change="tx-cat">${catOptions(b, F.categoryId)}</select></label>`}
         <label class="form-row form-row-date"><span class="form-row-label">Date</span><span class="form-row-value" id="fDateShown">${esc(fmtDate(F.date))}</span><input id="fDate" type="date" required value="${esc(F.date)}" data-change="tx-date"></label>
+        ${income ? '' : `<label class="form-row switch-row"><span class="form-row-label">This was a refund</span><input type="checkbox" id="fRefund" role="switch" ${refund ? 'checked' : ''} data-change="tx-refund"></label>`}
+        ${F.editing
+          ? (isRepeatCopy ? `<div class="form-row"><span class="form-row-label">Repeats every month</span>${rule && !rule.stopped ? '<button type="button" class="link small" data-action="tx-stop-repeat">Stop repeating</button>' : '<span class="small muted">Stopped</span>'}</div>` : '')
+          : refund ? '' : `<label class="form-row switch-row"><span class="form-row-label">Repeat every month <span class="tiny muted" id="repeatHint">${F.repeat ? `on the ${ordinal(Math.min(day, DAY_MAX))}` : ''}</span></span><input type="checkbox" id="fRepeat" role="switch" ${F.repeat ? 'checked' : ''} data-change="tx-repeat"></label>`}
       </div>
+      ${F.repeat && day > DAY_MAX ? `<p class="small muted">Repeats on the ${ordinal(DAY_MAX)}, so it lands in every month.</p>` : ''}
       ${F.showNote
         ? `<label class="f"><span>Note</span><textarea id="fNote" maxlength="${LIMITS.note}" data-input="tx-note">${esc(F.note)}</textarea></label>`
         : '<button type="button" class="link" data-action="tx-note">Add a note</button>'}
@@ -44,6 +79,15 @@ function drawForm() {
     <div class="sheet-foot"><button type="submit" class="btn primary" data-action="tx-save">${F.editing ? 'Save changes' : 'Save'}</button></div>
   </form>`);
 }
+
+/** Keeps what's typed before redrawing the form. */
+const keepTyped = () => {
+  const F = A.form;
+  for (const [id, key] of [['fAmount', 'amount'], ['fDesc', 'description'], ['fNote', 'note']]) {
+    const el = document.getElementById(id);
+    if (el) F[key] = el.value;
+  }
+};
 
 inputs['tx-amount'] = el => { A.form.amount = el.value; };
 inputs['tx-note'] = el => { A.form.note = el.value; };
@@ -64,11 +108,28 @@ changes['tx-cat'] = el => {
 changes['tx-date'] = el => {
   A.form.date = el.value || today();
   const shown = document.getElementById('fDateShown'); if (shown) shown.textContent = fmtDate(A.form.date);
+  if (A.form.repeat) { keepTyped(); drawForm(); }
 };
-actions['tx-kind'] = el => { A.form.kind = el.dataset.id; drawForm(); };
-actions['tx-note'] = () => { A.form.showNote = true; drawForm(); document.getElementById('fNote')?.focus(); };
+changes['tx-refund'] = el => { keepTyped(); A.form.kind = el.checked ? 'refund' : 'spend'; if (el.checked) A.form.repeat = false; drawForm(); };
+changes['tx-repeat'] = el => { keepTyped(); A.form.repeat = el.checked; drawForm(); };
+actions['tx-note'] = () => { keepTyped(); A.form.showNote = true; drawForm(); document.getElementById('fNote')?.focus(); };
+actions['tx-quick'] = el => {
+  keepTyped();
+  const F = A.form, b = A.budgets[F.budgetId];
+  if (F.kind === 'income') {
+    const q = recentIncome(A.transactions[F.budgetId])[Number(el.dataset.id)];
+    Object.assign(F, { description: q.description, amount: fromCents(q.amount) });
+  } else {
+    const q = frequentSpending(b, A.transactions[F.budgetId])[Number(el.dataset.id)];
+    Object.assign(F, { description: q.description, categoryId: q.categoryId, touchedCat: true, suggested: false });
+  }
+  drawForm();
+  const amount = document.getElementById('fAmount');
+  if (amount) { amount.focus(); amount.select?.(); }
+};
 
 actions['tx-save'] = () => {
+  keepTyped();
   const F = A.form;
   const amount = toCents(F.amount);
   if (amount <= 0) { toast('Type an amount.'); document.getElementById('fAmount')?.focus(); return; }
@@ -85,12 +146,24 @@ actions['tx-save'] = () => {
     closeSheet();
     const { id, budgetId: _b, createdBy, createdAt, updatedAt, updatedBy, ...old } = before;
     toast('Saved', () => send(A.repo.updateTransaction(budgetId, { ...before, ...fields }, { note: '', ...old, categoryId: old.categoryId ?? null })));
-  } else {
-    const { transaction, written } = A.repo.addTransaction(budgetId, fields);
-    send(written);
-    closeSheet();
-    toast(`${F.kind === 'income' ? 'Added' : 'Saved'} ${money(amount)}`, () => send(A.repo.deleteTransaction(budgetId, transaction.id)));
+    return;
   }
+  let tid;
+  if (F.repeat) {
+    // This copy is the rule's first, so it isn't added a second time automatically.
+    const rule = { id: A.repo.newRuleId(), kind: F.kind, amount, description: fields.description, day: Math.min(Number(F.date.slice(8, 10)), DAY_MAX), start: F.date.slice(0, 7), ...(F.kind === 'income' ? {} : { categoryId: F.categoryId }) };
+    send(A.repo.saveRule(budgetId, rule));
+    tid = recurringId(rule.id, rule.start);
+    fields.recurringId = rule.id;
+  }
+  const { transaction, written } = A.repo.addTransaction(budgetId, fields, tid);
+  send(written);
+  closeSheet();
+  const message = F.kind === 'income' ? `Added ${money(amount)} to Ready to assign` : F.kind === 'refund' ? `Refund saved: ${money(amount)}` : `Saved ${money(amount)}`;
+  toast(`${message}${F.repeat ? ', repeats monthly' : ''}`, () => {
+    send(A.repo.deleteTransaction(budgetId, transaction.id));
+    if (fields.recurringId) send(A.repo.stopRule(budgetId, fields.recurringId));
+  });
 };
 actions['tx-delete'] = () => {
   const F = A.form, budgetId = F.budgetId, id = F.editing.id;
@@ -98,7 +171,15 @@ actions['tx-delete'] = () => {
   closeSheet();
   toast('Deleted', () => send(A.repo.restoreTransaction(budgetId, id)));
 };
+actions['tx-stop-repeat'] = () => {
+  keepTyped();
+  const F = A.form, ruleId = F.editing.recurringId;
+  send(A.repo.stopRule(F.budgetId, ruleId));
+  toast('Stopped repeating. This one stays.', () => send(A.repo.resumeRule(F.budgetId, ruleId, today().slice(0, 7))));
+  drawForm();
+};
 actions['add-tx'] = () => openTxForm(A.route.id);
+actions['add-income'] = () => openTxForm(A.route.id, null, { kind: 'income' });
 actions['edit-tx'] = el => {
   const t = (A.transactions[A.route.id] || []).find(x => x.id === el.dataset.id);
   if (t) openTxForm(A.route.id, t);

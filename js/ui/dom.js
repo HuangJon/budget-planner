@@ -11,7 +11,7 @@ export const ICON = {
   check: '<path d="M5 12.500l4.500 4.500L19 7.500"/>', list: '<path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/>',
   wallet: '<path d="M4 7.500A2.500 2.500 0 0 1 6.500 5H18v3"/><rect x="4" y="8" width="16" height="11" rx="2.500"/><circle cx="16" cy="13.500" r="1.200"/>',
   people: '<circle cx="12" cy="8" r="3.5"/><path d="M5 20c.8-3.800 3.500-5.500 7-5.500s6.200 1.700 7 5.500"/>',
-  swap: '<path d="M4 8h14l-4-4M20 16H6l4 4"/>', bolt: '<path d="M13 3L5 13h6l-1 8 8-10h-6z"/>',
+  swap: '<path d="M4 8h14l-4-4M20 16H6l4 4"/>', chart: '<path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/>', bolt: '<path d="M13 3L5 13h6l-1 8 8-10h-6z"/>',
   target: '<circle cx="12" cy="12" r="8.500"/><circle cx="12" cy="12" r="4.500"/><circle cx="12" cy="12" r="1" fill="currentColor"/>',
 };
 

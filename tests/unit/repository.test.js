@@ -64,3 +64,37 @@ test('the starter checklist picks the ticked categories by default, or exactly t
   assert.ok(!names(starterCategories()).includes('Pets'));
   assert.deepEqual(names(starterCategories(['Pets', 'Rent'])), ['Rent', 'Pets']);
 });
+
+test('recurring copies have fixed ids, so adding twice makes one', async () => {
+  const { backend, repo } = fresh();
+  const { budget, written } = repo.createBudget({ name: 'Mine', categories: { r: { name: 'Rent' } } });
+  await written;
+  const copy = { id: 'r-rule1-2026-11', kind: 'spend', amount: 100, date: '2026-11-01', categoryId: 'r', recurringId: 'rule1' };
+  await repo.addRecurringCopies(budget.id, [copy]);
+  await repo.addRecurringCopies(budget.id, [copy]);
+  let list;
+  repo.watchTransactions(budget.id, l => { list = l; });
+  await new Promise(r => setTimeout(r));
+  assert.equal(list.length, 1);
+  assert.equal(list[0].automatic, true);
+});
+
+test('an invite link adds you to the budget, and resetting it cuts the old link off', async () => {
+  const { backend, repo } = fresh();
+  const { budget, written } = repo.createBudget({ name: 'Home', kind: 'shared' });
+  await written;
+  const first = await repo.resetInvite(budget.id);
+  const second = await repo.resetInvite(budget.id, first);
+  assert.equal(await repo.lookUpInvite(first), null);
+  assert.equal((await repo.lookUpInvite(second)).budgetId, budget.id);
+  await assert.rejects(repo.joinWithCode(first, 'Sam'), { code: 'not-found' });
+});
+
+test('leaving removes the budget from your list', async () => {
+  const { backend, repo } = fresh();
+  const { budget, written } = repo.createBudget({ name: 'Home' });
+  await written;
+  await repo.leaveBudget(budget.id);
+  assert.equal(await backend.get(`users/preview-you/budgets/${budget.id}`), null);
+  assert.equal((await backend.get(`budgets/${budget.id}`)).members['preview-you'], undefined);
+});

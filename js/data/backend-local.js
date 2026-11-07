@@ -3,7 +3,7 @@
  * where the app relies on it: paths, update() with dotted field names, failure when updating a
  * missing document, and live listeners. Sign-in is simulated; real sign-in only happens through Firebase.
  */
-const KEY = 'wmm:localdb:v2';
+const KEY = 'wmm:localdb:v3';
 const parentOf = p => p.split('/').slice(0, -1).join('/');
 const clone = v => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
 

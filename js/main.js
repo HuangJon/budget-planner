@@ -1,17 +1,20 @@
 /** Starts the app: picks the backend, follows the link, keeps data live and draws the screens. */
 import { A, actions, inputs, changes, setRender } from './ui/state.js';
-import { esc, svg, ICON, closeSheet } from './ui/dom.js';
+import { esc, svg, ICON, closeSheet, today } from './ui/dom.js';
 import { applyLook } from './ui/look.js';
 import { homeScreen } from './ui/home.js';
 import { budgetScreen, catSheet } from './ui/budget.js';
 import { transactionsScreen } from './ui/transactions.js';
 import { planScreen } from './ui/plan.js';
+import { trendsScreen } from './ui/trends.js';
+import { peopleScreen, joinScreen, openJoin } from './ui/people.js';
 import { openTxForm } from './ui/tx-form.js';
 import { openCatEditor } from './ui/cat-edit.js';
 import { createLocalBackend } from './data/backend-local.js';
 import { createRepository } from './data/repository.js';
 import { exampleData } from './data/example.js';
 import { thisMonth } from './core/budget.js';
+import { dueTransactions } from './core/recurring.js';
 import { APP_NAME } from './config/app.js';
 
 applyLook();
@@ -25,10 +28,20 @@ if (A.preview && backend.isEmpty()) backend.reset(exampleData(A.user.uid));
 
 /* ---------- Live data ---------- */
 const stops = new Map();
+/** Adds any monthly copies that are due, once both the budget and its transactions have arrived. */
+const adding = new Set();
+function addDueCopies(id) {
+  const b = A.budgets[id], list = A.transactions[id];
+  if (!b || !list || !b.members?.[A.user?.uid] || adding.has(id)) return;
+  const due = dueTransactions(b.recurring, list.map(t => t.id), today());
+  if (!due.length) return;
+  adding.add(id);
+  A.repo.addRecurringCopies(id, due).catch(() => {}).finally(() => adding.delete(id));
+}
 function follow(id) {
   if (stops.has(id)) return;
-  const s1 = A.repo.watchBudget(id, b => { A.budgets[id] = b; render(); });
-  const s2 = A.repo.watchTransactions(id, list => { A.transactions[id] = list; render(); });
+  const s1 = A.repo.watchBudget(id, b => { A.budgets[id] = b; addDueCopies(id); render(); });
+  const s2 = A.repo.watchTransactions(id, list => { A.transactions[id] = list; addDueCopies(id); render(); });
   stops.set(id, () => { s1(); s2(); });
 }
 A.repo.watchMyBudgets(ids => {
@@ -40,8 +53,12 @@ A.repo.watchMyBudgets(ids => {
 
 /* ---------- Routes ---------- */
 function readRoute() {
-  const m = /^#b-([a-z0-9]{20,40})(?:-(activity|plan))?$/.exec(location.hash);
-  A.route = m ? { name: m[2] === 'activity' ? 'transactions' : m[2] === 'plan' ? 'plan' : 'budget', id: m[1] } : { name: 'home' };
+  const join = /^#join-([a-z0-9]{12,40})$/.exec(location.hash);
+  if (join) { A.route = { name: 'join', code: join[1] }; openJoin(join[1]); return; }
+  const m = /^#b-([a-z0-9]{20,40})(?:-(activity|plan|trends|people))?$/.exec(location.hash);
+  const names = { activity: 'transactions', plan: 'plan', trends: 'trends', people: 'people' };
+  A.route = m ? { name: names[m[2]] || 'budget', id: m[1] } : { name: 'home' };
+  A.confirmRemove = null; A.confirmLeave = false;
   if (m) follow(m[1]);
 }
 addEventListener('hashchange', () => { closeSheet(); readRoute(); render(); scrollTo(0, 0); });
@@ -62,10 +79,13 @@ function drawTabs(b) {
   if (!b || A.route.name === 'plan') { tabs.hidden = true; return; }
   const here = A.route.name;
   tabs.hidden = false;
-  tabs.innerHTML = `<div class="tabs-in tabs-3">
-    <a class="tab" href="#b-${b.id}" ${here === 'budget' ? 'aria-current="page"' : ''}>${svg(ICON.wallet)}<span>Budget</span></a>
+  const tab = (route, suffix, icon, label) => `<a class="tab" href="#b-${b.id}${suffix}" ${here === route ? 'aria-current="page"' : ''}>${svg(icon)}<span>${label}</span></a>`;
+  tabs.innerHTML = `<div class="tabs-in">
+    ${tab('budget', '', ICON.wallet, 'Budget')}
+    ${tab('transactions', '-activity', ICON.list, 'Activity')}
     <button type="button" class="tab add-tab spend-tab" data-action="add-tx">${svg(ICON.plus)}<span>Spend</span></button>
-    <a class="tab" href="#b-${b.id}-activity" ${here === 'transactions' ? 'aria-current="page"' : ''}>${svg(ICON.list)}<span>Activity</span></a>
+    ${tab('trends', '-trends', ICON.chart, 'Trends')}
+    ${tab('people', '-people', ICON.people, 'People')}
   </div>`;
 }
 
@@ -76,7 +96,10 @@ function render() {
   const keep = active && app.contains(active) && active.id && /INPUT|TEXTAREA/.test(active.tagName)
     ? { id: active.id, value: active.value, start: active.selectionStart, end: active.selectionEnd } : null;
   const b = A.route.id ? A.budgets[A.route.id] : null;
-  if (A.route.name === 'home') {
+  if (A.route.name === 'join') {
+    document.title = APP_NAME;
+    app.innerHTML = joinScreen();
+  } else if (A.route.name === 'home') {
     document.title = APP_NAME;
     app.innerHTML = homeScreen();
   } else if (b === undefined) {
@@ -85,7 +108,7 @@ function render() {
     app.innerHTML = `<section class="panel empty"><h2>This budget can't be opened</h2><p class="muted">It may have been removed, or you weren't added to it.</p><a class="btn" href="#home">See your budgets</a></section>`;
   } else {
     document.title = `${b.name} · ${APP_NAME}`;
-    app.innerHTML = A.route.name === 'plan' ? planScreen(b) : topbar(b) + (A.route.name === 'transactions' ? transactionsScreen(b) : budgetScreen(b));
+    app.innerHTML = A.route.name === 'plan' ? planScreen(b) : topbar(b) + ({ transactions: transactionsScreen, trends: trendsScreen, people: peopleScreen }[A.route.name] || budgetScreen)(b);
   }
   drawTabs(b);
   if (keep) {
