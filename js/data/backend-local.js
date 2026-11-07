@@ -5,7 +5,7 @@
  */
 import { isIncrement } from './fields.js';
 
-const KEY = 'wmm:localdb:v5';
+const KEY = 'wmm:localdb:v6';
 const parentOf = p => p.split('/').slice(0, -1).join('/');
 const clone = v => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
 
