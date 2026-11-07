@@ -115,3 +115,140 @@ export function targetProgress(budget, transactionList, month) {
         : { id, name: c.name, type: 'byDate', amount: t.amount, done: t.saved, date: t.date, label: 'saved' };
     });
 }
+
+/* ---------- Round 5 ---------- */
+
+export const daysInMonth = month => { const [y, m] = month.split('-').map(Number); return new Date(y, m, 0).getDate(); };
+const isSpendingCat = c => c && !c.hidden && !isSavingGroup(c.group);
+/**
+ * Bills are paid in one go, so they'd make a pace projection run wild: a $1,800 rent on the 1st
+ * isn't $54,000 a month. A bill is a category with a monthly target, one a monthly repeat pays
+ * from, or one in a group whose name starts with "Bill".
+ */
+export const isBillCategory = (budget, id) => {
+  const c = budget.categories?.[id];
+  if (!c) return false;
+  if (/^bill/i.test(String(c.group || '').trim()) || targetType(c.target) === 'monthly') return true;
+  return Object.values(budget.recurring || {}).some(r => r && !r.stopped && r.kind === 'spend' && r.categoryId === id);
+};
+
+/** Months for a range: '3', '6', '12' back from `month`, or 'year' for January through `month`. */
+export function rangeMonths(range, month) {
+  if (range === 'year') { const n = Number(month.slice(5, 7)); return Array.from({ length: n }, (_, i) => `${month.slice(0, 4)}-${String(i + 1).padStart(2, '0')}`); }
+  const n = Number(range) || 6;
+  return Array.from({ length: n }, (_, i) => addMonths(month, i - n + 1));
+}
+
+/**
+ * How everyday spending is going against the plan this month, leaving bills and saving out.
+ * `budgeted` is what spending categories had to spend this month (carried in plus planned).
+ * For a month that's over, the whole month counts as gone.
+ */
+export function pace(budget, transactionList, month, today, { minCents = 2000, margin = 0.25 } = {}) {
+  const s = monthSummary(budget, transactionList, month);
+  const days = daysInMonth(month);
+  const elapsed = !today || monthOf(today) > month ? 1 : monthOf(today) < month ? 0 : dayOf(today) / days;
+  let budgeted = 0, spent = 0;
+  const ahead = [];
+  for (const [id, c] of Object.entries(budget.categories || {})) {
+    if (!isSpendingCat(c) || isBillCategory(budget, id)) continue;
+    const x = s.categories[id];
+    const funds = Math.max(0, x.carried + x.assigned), used = Math.max(0, -x.activity);
+    budgeted += funds; spent += used;
+    if (elapsed < 1 && funds > 0 && used >= minCents && used / funds > elapsed + margin) {
+      ahead.push({ id, name: c.name, used, funds, share: used / funds });
+    }
+  }
+  ahead.sort((a, b) => b.share - a.share);
+  return {
+    elapsed, budgeted, spent, usedShare: budgeted ? spent / budgeted : null,
+    projected: elapsed > 0 && elapsed < 1 ? Math.round(spent / elapsed) : spent,
+    ahead: ahead.slice(0, 4),
+  };
+}
+
+/**
+ * Repeats coming up in the next `days` days, oldest first, each marked covered when its category
+ * has enough to spend for it (counting earlier upcoming bills in the same category first).
+ */
+export function upcomingBills(budget, transactionList, today, days = 30) {
+  const have = new Set((transactionList || []).map(t => t.id));
+  const end = new Date(`${today}T12:00:00`); end.setDate(end.getDate() + days);
+  const endDate = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`;
+  const list = [];
+  for (const r of Object.values(budget.recurring || {})) {
+    if (!r || r.stopped || !Number.isInteger(r.amount) || !r.day) continue;
+    for (let m = monthOf(today); ; m = addMonths(m, 1)) {
+      const date = `${m}-${String(r.day).padStart(2, '0')}`;
+      if (date > endDate) break;
+      if (date < today || m < r.start || have.has(`r-${r.id}-${m}`)) continue;
+      list.push({ ruleId: r.id, date, kind: r.kind, amount: r.amount, description: r.description || '', categoryId: r.categoryId || null });
+    }
+  }
+  list.sort((a, b) => a.date.localeCompare(b.date) || b.amount - a.amount);
+  const s = monthSummary(budget, transactionList, monthOf(today));
+  const left = Object.fromEntries(Object.entries(s.categories).map(([id, x]) => [id, x.available]));
+  for (const b of list) {
+    if (b.kind !== 'spend') continue;
+    // Only this month's money is known; next month's bills are covered once next month is planned.
+    if (monthOf(b.date) !== monthOf(today)) { b.covered = null; continue; }
+    b.covered = (left[b.categoryId] ?? 0) >= b.amount;
+    left[b.categoryId] = (left[b.categoryId] ?? 0) - b.amount;
+  }
+  const out = list.filter(x => x.kind === 'spend').reduce((a, x) => a + x.amount, 0);
+  const incoming = list.filter(x => x.kind === 'income').reduce((a, x) => a + x.amount, 0);
+  return { list, out, incoming, uncovered: list.filter(x => x.covered === false).length };
+}
+
+/** One category over a range of months: spending each month, the average of active months, and its biggest purchases. */
+export function categoryHistory(transactionList, catId, months, biggest = 5) {
+  const transactions = liveTransactions(transactionList).filter(t => t.categoryId === catId && months.includes(monthOf(t.date)));
+  const byMonth = Object.fromEntries(months.map(m => [m, 0]));
+  for (const t of transactions) byMonth[monthOf(t.date)] += net(t);
+  const rows = months.map(m => ({ month: m, spent: Math.max(0, byMonth[m]) }));
+  const active = rows.filter(r => r.spent > 0);
+  return {
+    rows, total: rows.reduce((a, r) => a + r.spent, 0),
+    average: active.length ? Math.round(active.reduce((a, r) => a + r.spent, 0) / active.length) : 0,
+    biggest: transactions.filter(t => t.kind === 'spend').sort((a, b) => b.amount - a.amount).slice(0, biggest),
+  };
+}
+
+/** The largest single purchases in a month. */
+export const biggestPurchases = (transactionList, month, n = 5) =>
+  liveTransactions(transactionList).filter(t => t.kind === 'spend' && monthOf(t.date) === month).sort((a, b) => b.amount - a.amount).slice(0, n);
+
+/** Spending in a month by who added it, biggest first. */
+export function byPerson(budget, transactionList, month) {
+  const out = {};
+  for (const t of liveTransactions(transactionList)) {
+    if (t.kind === 'income' || monthOf(t.date) !== month || t.automatic) continue;
+    out[t.createdBy] = (out[t.createdBy] || 0) + net(t);
+  }
+  return Object.entries(out).filter(([, v]) => v > 0).map(([uid, spent]) => ({ uid, name: budget.members?.[uid]?.name || 'Former member', spent })).sort((a, b) => b.spent - a.spent);
+}
+
+/** Spending by category over several months, biggest first. */
+export function categoryTotals(budget, transactionList, months) {
+  const out = {};
+  for (const t of liveTransactions(transactionList)) {
+    if (t.kind === 'income' || !months.includes(monthOf(t.date)) || !budget.categories?.[t.categoryId]) continue;
+    out[t.categoryId] = (out[t.categoryId] || 0) + net(t);
+  }
+  return Object.entries(out).filter(([, v]) => v > 0).map(([id, spent]) => ({ id, name: budget.categories[id].name, spent, perMonth: Math.round(spent / months.length) })).sort((a, b) => b.spent - a.spent);
+}
+
+/**
+ * Up to three short lines for the top of Trends, most useful first: a big change against usual,
+ * where spending is heading this month, and what was left over last month.
+ */
+export function headlines(budget, transactionList, month, today) {
+  const out = [];
+  const change = notableChanges(categoryCompare(budget, transactionList, month, today))[0];
+  if (change) out.push({ kind: change.change > 0 ? 'up' : 'down', text: `${change.name} is ${change.change > 0 ? 'up' : 'down'} ${Math.abs(change.pct)}% on usual`, id: change.id });
+  const p = pace(budget, transactionList, month, today);
+  if (p.elapsed > 0 && p.elapsed < 1 && p.spent > 0) out.push({ kind: p.budgeted && p.projected > p.budgeted ? 'up' : 'pace', text: 'pace', projected: p.projected, budgeted: p.budgeted });
+  const [prev] = monthTotals(transactionList, addMonths(month, -1), 1);
+  if (prev && (prev.income || prev.spent)) out.push({ kind: prev.income - prev.spent >= 0 ? 'left' : 'short', text: 'leftover', month: prev.month, amount: prev.income - prev.spent });
+  return out.slice(0, 3);
+}

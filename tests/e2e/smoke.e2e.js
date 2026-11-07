@@ -133,12 +133,30 @@ await page.locator('[data-action=open-rule]', { hasText: 'Music app' }).click();
 await tap('[data-action=rule-stop]');
 if (await page.locator('[data-action=open-rule]', { hasText: 'Music app' }).count()) fail('Stopped repeat still listed');
 
-// Trends.
+// Trends: summary first, then sections that fold, a range, tappable months, and one category's trend.
 await tap('a.tab[href$="-trends"]');
-await page.getByRole('heading', { name: 'Where it went' }).waitFor();
-for (const h of ['Worth a look', 'Month by month', 'Plan vs real', 'Saving']) await page.getByRole('heading', { name: h }).waitFor();
-if (!(await page.locator('.cols .col').count())) fail('No month columns');
+await page.locator('.summary li').first().waitFor();
+for (const h of ['Pace this month', 'Coming up', 'Where it went', 'Worth a look', 'Month by month', 'Categories over time', 'Biggest purchases', 'Plan vs real', 'Saving', 'By person']) {
+  await page.getByRole('heading', { name: h, exact: true }).waitFor();
+}
 await shot('trends');
+await page.locator('.cmp-btn').first().click();
+await page.getByText('Average month').waitFor();
+await shot('category-trend');
+await tap('[data-action=close-sheet]');
+await tap('[data-action=trend-range][data-id="12"]');
+await page.locator('[data-section=categories]').getByText('last 12 months').waitFor();
+const cols = page.locator('.cols:not(.one) .col');
+await cols.nth(1).click();
+const picked = await page.locator('.col-detail strong').innerText();
+await cols.last().click();
+if ((await page.locator('.col-detail strong').innerText()) === picked) fail('Tapping a month did not change the numbers shown');
+await page.locator('[data-action=trend-fold][data-id=biggest]').click();
+await page.locator('.trend.folded[data-section=biggest]').waitFor();
+await page.locator('[data-action=trend-fold][data-id=biggest]').click();
+await page.locator('[data-section=people] [data-change=trend-byperson]').check();
+await page.locator('[data-section=people] .cmp-list li').first().waitFor();
+await shot('trends-bottom');
 if (await page.locator('[data-action=plan-usual]').count()) {
   await tap('[data-action=plan-usual]');
   await page.locator('#toast').filter({ hasText: 'planned' }).waitFor();

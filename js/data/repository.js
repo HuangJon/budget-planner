@@ -58,6 +58,8 @@ export function createRepository(backend, now = () => Date.now()) {
       return { budget, written: Promise.all(writes) };
     },
     renameBudget: (id, name) => backend.update(budgetPath(id), { name, changedBy: uid() }),
+    /** Budget-wide settings everyone in it shares, like showing spending by person. */
+    setSetting: (id, key, value) => backend.update(budgetPath(id), { [`settings.${key}`]: value, changedBy: uid() }),
 
     /** Sets what's assigned to some categories in one month. Pass { catId: cents }. */
     setAssigned: (id, month, byCategory) => backend.update(budgetPath(id), {

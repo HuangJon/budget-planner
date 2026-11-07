@@ -214,3 +214,45 @@ button.group-tab { border:0; cursor:pointer; font:inherit; text-align:left }
 .group-tab[aria-expanded="false"] .fold-chev svg { transform:rotate(-90deg) }
 .group-tab .fold-chev { align-self:center }
 .fold-line { border:0 }
+
+/* ---------- Trends, round 5 ---------- */
+.trend { overflow:hidden }
+.trend-head { display:flex; align-items:center; gap:10px; width:100%; padding:16px; background:none; border:0; text-align:left; color:var(--ink); cursor:pointer }
+.trend-head h2 { font-size:1.125rem }
+.trend-head .fold-chev svg { width:18px; height:18px; color:var(--muted); transition:transform .15s ease; display:block }
+.trend.folded .trend-head .fold-chev svg { transform:rotate(-90deg) }
+.trend-body { padding:0 16px 16px }
+.summary ul { list-style:none; margin:0; padding:0; display:grid; gap:10px }
+.summary li { display:flex; gap:10px; align-items:baseline; font-size:1rem }
+.summary .dot { width:8px; height:8px; border-radius:50%; background:var(--accent); flex:none; transform:translateY(-2px) }
+.summary li.bad .dot { background:var(--owe) }
+.link-text { background:none; border:0; padding:0; color:inherit; font:inherit; text-align:left; cursor:pointer; text-decoration:underline; text-decoration-color:var(--line); text-underline-offset:3px }
+.cmp-btn { display:grid; gap:4px; width:100%; background:none; border:0; padding:0; text-align:left; color:inherit; font:inherit; cursor:pointer }
+.cmp-track.neutral i { background:var(--accent); opacity:.75 }
+.pace-bar { position:relative; height:14px; border-radius:7px; background:var(--sunken) }
+.pace-bar i { display:block; height:100%; border-radius:7px; background:var(--accent) }
+.pace-bar i.fast { background:var(--owe) }
+.pace-bar b { position:absolute; top:-4px; bottom:-4px; width:3px; margin-left:-1.5px; border-radius:2px; background:var(--ink) }
+.bill-list { list-style:none; margin:0; padding:0; display:grid }
+.bill-list li { gap:12px; padding:10px 0; border-top:1px solid var(--line) }
+.bill-list li:first-child { border-top:0; padding-top:0 }
+.bill-date { display:grid; justify-items:center; width:40px; flex:none; line-height:1.1; padding:4px 0; border-radius:8px; background:var(--sunken) }
+.bill-date strong { font-size:1.05rem }
+.range-row { display:grid }
+.range-seg button { font-size:.8125rem; padding:7px 6px }
+.cols { position:relative }
+.cols .col { background:none; border:0; padding:0; font:inherit; color:inherit; cursor:pointer; border-radius:8px }
+.cols .col.picked { background:var(--sunken) }
+.cols.many { gap:3px }
+.cols.many .col-bars i { width:40%; max-width:10px }
+.cols.one .col-bars i { width:60%; max-width:22px }
+.cols.many.one .col-bars i { width:70%; max-width:14px }
+.cols .col span.tiny { font-size:.6875rem }
+.avg-line { position:absolute; left:0; right:0; border-top:2px dashed var(--ink); opacity:.55; pointer-events:none }
+.col-detail { display:grid; gap:4px; padding:12px; border-radius:10px; background:var(--sunken) }
+.two-stats { display:grid; grid-template-columns:1fr 1fr; gap:12px }
+.two-stats > div { display:grid; gap:2px }
+.tx-mini { list-style:none; margin:0 -16px; padding:0 }
+.tx-mini .tx-row { border-top:1px solid var(--line) }
+.tx-mini li:first-child .tx-row { border-top:0 }
+.switch-row.bordered { border:1px solid var(--line); border-radius:12px }
