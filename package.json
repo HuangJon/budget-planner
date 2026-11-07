@@ -1,0 +1,10 @@
+{
+  "name": "budget-planner",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Where's my money: a shared, every-dollar-a-job budget.",
+  "scripts": {
+    "test": "node --test \"tests/unit/*.test.js\""
+  }
+}
