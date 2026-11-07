@@ -291,3 +291,12 @@ a.request-note { display:flex; align-items:center; gap:12px; padding:14px 16px; 
 .help-list { margin:0; padding-left:18px; display:grid; gap:12px; line-height:1.45 }
 .help-list strong { font-weight:650 }
 .group-tab h2, .group-tab h3 { color:inherit }
+/* New month checklist */
+.new-month { padding:14px 16px; display:grid; gap:10px; box-shadow:inset 3px 0 0 var(--accent), var(--card-shadow) }
+.nm-steps { list-style:none; margin:0; padding:0; display:grid; gap:8px }
+.nm-steps li { display:flex; align-items:center; gap:10px; min-height:44px }
+.nm-steps .tick { width:24px; height:24px; border-radius:50%; border:2px solid var(--line); display:grid; place-items:center; flex:none }
+.nm-steps li.done .tick { background:var(--accent); border-color:var(--accent); color:var(--accent-ink) }
+.nm-steps li.done .grow { color:var(--muted); text-decoration:line-through }
+.nm-steps .tick svg { width:14px; height:14px; stroke-width:3 }
+.nm-steps a.btn { text-decoration:none }

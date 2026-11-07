@@ -24,7 +24,7 @@ function hero(b, s) {
   const needed = totalNeeded(b, s);
   const negative = s.readyToAssign < 0;
   // A fresh month with money waiting and nothing planned yet gets a nudge to plan it.
-  const fresh = A.month === thisMonth() && s.assignedThisMonth === 0 && s.readyToAssign > 0;
+  const fresh = A.month === thisMonth() && s.assignedThisMonth === 0 && s.readyToAssign > 0 && !showNewMonth(b, s);
   const say = negative
     ? `You've assigned ${money(-s.readyToAssign)} more than you have. Take some back from a category.`
     : fresh ? `It's ${shortMonth(A.month)}. Time to give this month's money its jobs.`
@@ -37,6 +37,35 @@ function hero(b, s) {
     <div class="hero-actions"><button type="button" class="hero-btn ghost" data-action="add-income">Add income</button><a class="hero-btn" href="#b-${b.id}-plan">${negative ? 'Take it back' : fresh ? `Plan ${esc(shortMonth(A.month))}` : 'Plan money'}</a></div>
   </section>`;
 }
+
+/**
+ * The first visit in a new month gets a short checklist: add this month's income, then plan it.
+ * Each step ticks itself off; the list goes away when both are done or when dismissed.
+ */
+const NM_KEY = (id, m) => `wmm:newmonth:${id}:${m}`;
+export function showNewMonth(b, s) {
+  if (A.month !== thisMonth()) return false;
+  if (s.incomeThisMonth > 0 && s.assignedThisMonth > 0) return false;
+  try { if (localStorage.getItem(NM_KEY(b.id, A.month))) return false; } catch { if (A[`mem:${NM_KEY(b.id, A.month)}`]) return false; }
+  return true;
+}
+function newMonthCard(b, s) {
+  if (!showNewMonth(b, s)) return '';
+  const step = (done, label, action) => `<li class="${done ? 'done' : ''}"><span class="tick" aria-hidden="true">${done ? svg(ICON.check) : ''}</span><span class="grow">${label}</span>${done ? '<span class="sr">Done</span>' : action}</li>`;
+  return `<section class="panel new-month" aria-label="New month">
+    <div class="row between"><h3>New month: ${esc(fmtMonth(A.month))}</h3><button type="button" class="link small" data-action="new-month-dismiss">Dismiss</button></div>
+    <ol class="nm-steps">
+      ${step(s.incomeThisMonth > 0, 'Add this month\u2019s income', '<button type="button" class="btn small" data-action="add-income">Add income</button>')}
+      ${step(s.assignedThisMonth > 0, 'Plan money: give every dollar a job', `<a class="btn small primary" href="#b-${b.id}-plan">Plan money</a>`)}
+    </ol>
+    <p class="tiny muted">Leftovers and overspending from last month are already carried over.</p>
+  </section>`;
+}
+actions['new-month-dismiss'] = () => {
+  const key = NM_KEY(A.route.id, A.month);
+  try { localStorage.setItem(key, '1'); } catch { A[`mem:${key}`] = true; }
+  render();
+};
 
 /* Filters and compact rows, remembered on this device. */
 const pref = (key, fallback) => { try { return localStorage.getItem(key) ?? A[`mem:${key}`] ?? fallback; } catch { return A[`mem:${key}`] ?? fallback; } };
@@ -123,6 +152,7 @@ export function budgetScreen(b) {
   const groups = groupedCategories(b).map(g => ({ ...g, all: g.categories, categories: g.categories.filter(c => keepIt(s.categories[c.id])) })).filter(g => f === 'all' || g.categories.length);
   return `${monthBar()}
     ${hero(b, s)}
+    ${newMonthCard(b, s)}
     ${b.members?.[A.user?.uid]?.admin && Object.keys(b.requests || {}).length ? `<a class="panel request-note" href="#b-${b.id}-people"><span class="grow">${esc(Object.values(b.requests).map(r => r.name || 'Someone').join(', '))} asked to join</span><span class="small link">Review</span></a>` : ''}
     ${overspentNotice(b, s)}
     ${s.unknownActivity ? `<p class="notice">${money(-s.unknownActivity)} was spent in a category that has since been removed.</p>` : ''}

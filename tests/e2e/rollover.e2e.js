@@ -22,6 +22,14 @@ await page.locator('.monthbar h2', { hasText: 'December 2026' }).waitFor();
 if (await page.locator('.away-pill').count()) fail('December should be the current month, not a "future month"');
 const groceriesDec = await page.locator('.cat-row', { hasText: 'Groceries' }).locator('.cat-avail .amt').innerText();
 if (groceriesDec !== groceriesNov) fail(`Groceries should carry ${groceriesNov} into December, got ${groceriesDec}`);
-if (!(await page.locator('.hero p').innerText()).includes("It's Dec")) fail('New month nudge missing');
+// December's paychecks repeat on the 1st, so income is already ticked; planning is next.
+await page.locator('.new-month', { hasText: 'New month: December 2026' }).waitFor();
+if (!(await page.locator('.nm-steps li.done', { hasText: 'income' }).count())) fail('Repeating paychecks should tick off the income step');
+if (await page.locator('.nm-steps li.done', { hasText: 'Plan money' }).count()) fail('Planning is not done yet');
+if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/new-month.png` });
+await page.locator('.nm-steps a', { hasText: 'Plan money' }).click();
+await page.locator('[data-action=plan-copy]').click();
+await page.locator('.topbar a.btn').click();
+if (await page.locator('.new-month').count()) fail('Checklist should go once income is in and money is planned');
 await browser.close();
 console.log('Rollover test passed');
