@@ -41,12 +41,22 @@ function addDueCopies(id) {
   adding.add(id);
   A.repo.addRecurringCopies(id, due).catch(() => {}).finally(() => adding.delete(id));
 }
+/**
+ * Watches one budget and its transactions. A refused read is tried again a few times before the
+ * budget shows as "can't be opened": a brand-new budget can be watched a moment before the server
+ * has it, and a phone coming back online can be briefly refused.
+ */
 function follow(id) {
   if (!started || stops.has(id)) return;
-  // A budget you were removed from, or can't read, shows as "can't be opened" instead of breaking.
-  const gone = () => { A.budgets[id] = null; render(); };
-  const s1 = A.repo.watchBudget(id, b => { A.budgets[id] = b; addDueCopies(id); render(); }, gone);
-  const s2 = A.repo.watchTransactions(id, list => { A.transactions[id] = list; addDueCopies(id); render(); }, () => {});
+  const watch = (start, onData, onGone, tries = 0) => {
+    let stop = start(onData, () => {
+      if (tries >= 3) { onGone(); return; }
+      setTimeout(() => { stop = watch(start, onData, onGone, tries + 1); }, 800 * (tries + 1));
+    });
+    return () => stop();
+  };
+  const s1 = watch((ok, err) => A.repo.watchBudget(id, ok, err), b => { A.budgets[id] = b; addDueCopies(id); render(); }, () => { A.budgets[id] = null; render(); });
+  const s2 = watch((ok, err) => A.repo.watchTransactions(id, ok, err), list => { A.transactions[id] = list; addDueCopies(id); render(); }, () => {});
   stops.set(id, () => { s1(); s2(); });
 }
 

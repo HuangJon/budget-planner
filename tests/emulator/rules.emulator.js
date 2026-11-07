@@ -76,6 +76,12 @@ await no(carol.backend.batch([{ op: 'merge', path: 'stats/usage', value: { budge
 await no(alice.backend.batch([{ op: 'update', path: `users/${alice.uid}`, value: { lastWeek: '2099-W01' } }, { op: 'merge', path: 'stats/usage', value: { people: 3 } }]), 'no counting yourself twice as a person');
 await no(carol.backend.get(`users/${alice.uid}`), "nobody reads someone else's visit record");
 
+/* Reading a budget that isn't saved yet gives nothing away, so it's allowed (and empty). */
+const notYet = 'n'.repeat(24);
+assert.equal(await carol.backend.get(`budgets/${notYet}`), null, 'a budget that does not exist reads as missing');
+assert.deepEqual(await carol.backend.list(`budgets/${notYet}/transactions`), [], 'and has no transactions');
+checks += 2;
+
 /* A budget: only its members can see it. */
 const { budget, written } = alice.repo.createBudget({ name: 'Home', kind: 'shared', myName: 'Alice', startingMoney: 250000, today: '2026-11-07' });
 await ok(written, 'creating a budget with starting money');

@@ -52,7 +52,9 @@ service cloud.firestore {
 
     // ---------- Budgets ----------
     match /budgets/{budgetId} {
-      allow get: if signedIn() && okId(budgetId) && memberOf(resource.data);
+      // A budget that doesn't exist yet reveals nothing, so reading it is allowed: a phone starts
+      // watching a new budget a moment before the server has saved it.
+      allow get: if signedIn() && okId(budgetId) && (resource == null || memberOf(resource.data));
       allow list: if false;
       allow create: if signedIn() && okId(budgetId)
         && validBudget(request.resource.data, budgetId)
@@ -123,7 +125,8 @@ service cloud.firestore {
       }
 
       match /transactions/{tid} {
-        allow read: if signedIn() && memberOf(budgetNow(budgetId));
+        // Same for the transactions of a budget not saved yet: there can't be any.
+        allow read: if signedIn() && okId(budgetId) && (!exists(budgetPath(budgetId)) || memberOf(budgetNow(budgetId)));
         // getAfter, so a new budget and its starting money can be saved together.
         allow create: if signedIn() && memberOf(budgetAfter(budgetId)) && budgetAfter(budgetId).deleted == false
           && validTx(request.resource.data, tid)
