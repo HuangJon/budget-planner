@@ -12,55 +12,99 @@ import { helpButton, describe } from './ui/help.js';
 import { openTxForm } from './ui/tx-form.js';
 import { openCatEditor } from './ui/cat-edit.js';
 import { createLocalBackend } from './data/backend-local.js';
+import { createFirebaseBackend, loadFirebaseSdk } from './data/backend-firebase.js';
 import { createRepository } from './data/repository.js';
+import { signInView, verifyView } from './ui/account.js';
+import { ownerScreen, loadOwner, isOwnerAccount } from './ui/owner.js';
+import { setUpErrorLog } from './ui/error-log.js';
+import { watchForUpdates } from './ui/updates.js';
+import { maybeStartTour, drawTour } from './ui/tour.js';
 import { exampleData } from './data/example.js';
 import { thisMonth } from './core/budget.js';
 import { dueTransactions } from './core/recurring.js';
 import { APP_NAME } from './config/app.js';
 
 applyLook();
-A.preview = Boolean(globalThis.__WMM_PREVIEW__) || !globalThis.__WMM_FIREBASE__;
+// The preview build runs on this device only; the real site uses Firebase and real sign-in.
+A.preview = Boolean(globalThis.__WMM_PREVIEW__);
 A.month = thisMonth();
-
-const backend = createLocalBackend();
-A.repo = createRepository(backend);
-A.user = backend.user();
-if (A.preview && backend.isEmpty()) backend.reset(exampleData(A.user.uid));
 
 /* ---------- Live data ---------- */
 const stops = new Map();
-/** Adds any monthly copies that are due, once both the budget and its transactions have arrived. */
+/** Adds any repeats that are due, once both the budget and its transactions have arrived. */
 const adding = new Set();
 function addDueCopies(id) {
   const b = A.budgets[id], list = A.transactions[id];
-  if (!b || !list || !b.members?.[A.user?.uid] || adding.has(id)) return;
+  if (!b || b.deleted || !list || !b.members?.[A.user?.uid] || adding.has(id)) return;
   const due = dueTransactions(b.recurring, list.map(t => t.id), today());
   if (!due.length) return;
   adding.add(id);
   A.repo.addRecurringCopies(id, due).catch(() => {}).finally(() => adding.delete(id));
 }
 function follow(id) {
-  if (stops.has(id)) return;
-  const s1 = A.repo.watchBudget(id, b => { A.budgets[id] = b; addDueCopies(id); render(); });
-  const s2 = A.repo.watchTransactions(id, list => { A.transactions[id] = list; addDueCopies(id); render(); });
+  if (!started || stops.has(id)) return;
+  // A budget you were removed from, or can't read, shows as "can't be opened" instead of breaking.
+  const gone = () => { A.budgets[id] = null; render(); };
+  const s1 = A.repo.watchBudget(id, b => { A.budgets[id] = b; addDueCopies(id); render(); }, gone);
+  const s2 = A.repo.watchTransactions(id, list => { A.transactions[id] = list; addDueCopies(id); render(); }, () => {});
   stops.set(id, () => { s1(); s2(); });
 }
-A.repo.watchMyPending(list => { A.pending = list; render(); });
-A.repo.watchMyBudgets(ids => {
-  A.budgetIds = ids;
-  ids.forEach(follow);
-  A.status = 'ready';
-  render();
-});
+
+let started = false;
+/** Once someone is signed in and verified: follow their budgets and requests, and count the visit. */
+function startData() {
+  if (started) return;
+  started = true;
+  A.repo.watchMyPending(list => { A.pending = list; render(); }, () => {});
+  A.repo.watchMyBudgets(ids => {
+    A.budgetIds = ids;
+    ids.forEach(follow);
+    A.status = 'ready';
+    render();
+  }, () => { A.status = 'ready'; render(); });
+  readRoute();
+  if (!A.preview) A.repo.noteVisit().catch(() => {});
+  setUpErrorLog();
+}
+
+/** Called whenever the signed-in account changes or gets verified. */
+A.onUser = user => {
+  A.user = user;
+  if (!user) { A.status = 'signed-out'; render(); return; }
+  if (!user.verified) { A.status = 'verify'; render(); return; }
+  startData();
+};
+
+async function boot() {
+  if (A.preview) {
+    const backend = createLocalBackend();
+    A.repo = createRepository(backend);
+    if (backend.isEmpty()) backend.reset(exampleData(backend.user().uid));
+    A.onUser({ ...backend.user(), verified: true });
+    return;
+  }
+  try {
+    const { firebaseConfig, appCheckSiteKey, FIREBASE_VERSION, ownerUid } = await import('./config/firebase.js');
+    A.ownerUid = ownerUid;
+    const sdk = await loadFirebaseSdk(FIREBASE_VERSION, { appCheck: Boolean(appCheckSiteKey) });
+    const backend = await createFirebaseBackend(firebaseConfig, sdk, { appCheckSiteKey });
+    A.repo = createRepository(backend);
+    A.onUser(backend.auth.current());
+    backend.auth.onChange(user => { if (user?.uid !== A.user?.uid || user?.verified !== A.user?.verified) A.onUser(user); });
+  } catch {
+    document.getElementById('app').innerHTML = '<section class="panel empty"><h2>Can\u2019t reach the app</h2><p class="muted">Check your connection, then reload this page.</p><button type="button" class="btn" onclick="location.reload()">Reload</button></section>';
+  }
+}
 
 /* ---------- Routes ---------- */
 function readRoute() {
+  if (location.hash === '#owner') { A.route = { name: 'owner' }; if (started) loadOwner(); return; }
   const join = /^#join-([a-z0-9]{12,40})$/.exec(location.hash);
-  if (join) { A.route = { name: 'join', code: join[1] }; openJoin(join[1]); return; }
+  if (join) { A.route = { name: 'join', code: join[1] }; if (started) openJoin(join[1]); return; }
   const m = /^#b-([a-z0-9]{20,40})(?:-(activity|plan|trends|people))?$/.exec(location.hash);
   const names = { activity: 'transactions', plan: 'plan', trends: 'trends', people: 'people' };
   A.route = m ? { name: names[m[2]] || 'budget', id: m[1] } : { name: 'home' };
-  A.confirmRemove = null; A.confirmLeave = false;
+  A.confirmRemove = null; A.confirmLeave = false; A.confirmDelete = false;
   // Plan money starts each visit with a fresh undo point and no open preview.
   if (A.route.name === 'plan') { A.planSnapshot = null; A.fundPreview = false; }
   if (m) follow(m[1]);
@@ -95,13 +139,22 @@ function drawTabs(b) {
 }
 
 function render() {
+  if (A.status === 'signed-out' || A.status === 'verify') {
+    document.title = APP_NAME;
+    app.innerHTML = A.status === 'verify' ? verifyView(A.user) : signInView();
+    tabs.hidden = true;
+    return;
+  }
   if (A.status !== 'ready') return;
   // Someone may be typing on the page (Plan money). Keep their box, cursor and unsaved text.
   const active = document.activeElement;
   const keep = active && app.contains(active) && active.id && /INPUT|TEXTAREA/.test(active.tagName)
     ? { id: active.id, value: active.value, start: active.selectionStart, end: active.selectionEnd } : null;
   const b = A.route.id ? A.budgets[A.route.id] : null;
-  if (A.route.name === 'join') {
+  if (A.route.name === 'owner') {
+    document.title = `Owner page · ${APP_NAME}`;
+    app.innerHTML = ownerScreen();
+  } else if (A.route.name === 'join') {
     document.title = APP_NAME;
     app.innerHTML = joinScreen();
   } else if (A.route.name === 'home') {
@@ -109,6 +162,9 @@ function render() {
     app.innerHTML = homeScreen();
   } else if (b === undefined) {
     app.innerHTML = '<section class="panel empty"><h2>Opening the budget</h2><p class="muted">One moment.</p></section>';
+  } else if (b && b.deleted) {
+    const admin = b.members?.[A.user?.uid]?.admin;
+    app.innerHTML = `<section class="panel empty"><h2>${esc(b.name)} was deleted</h2><p class="muted">${admin ? 'You can bring it back for 30 days after it was deleted.' : 'An admin can bring it back.'}</p>${admin ? `<button type="button" class="btn primary" data-action="budget-restore" data-id="${b.id}">Restore it</button>` : ''}<a class="btn" href="#home">See your budgets</a></section>`;
   } else if (!b) {
     app.innerHTML = `<section class="panel empty"><h2>This budget can't be opened</h2><p class="muted">It may have been removed, or you weren't added to it.</p><a class="btn" href="#home">See your budgets</a></section>`;
   } else {
@@ -116,6 +172,8 @@ function render() {
     app.innerHTML = A.route.name === 'plan' ? planScreen(b) : topbar(b) + describe(A.route.name) + ({ transactions: transactionsScreen, trends: trendsScreen, people: peopleScreen }[A.route.name] || budgetScreen)(b);
   }
   drawTabs(b);
+  if (A.tour) requestAnimationFrame(drawTour);
+  else if (A.route.name === 'budget' && b && !b.deleted && !A.noTour) requestAnimationFrame(maybeStartTour);
   if (keep) {
     const el = document.getElementById(keep.id);
     if (el) {
@@ -182,5 +240,23 @@ document.addEventListener('pointerdown', ev => {
   if (!matchMedia('(pointer:coarse)').matches || !typing?.closest?.('dialog') || !typing.matches('input,textarea')) return;
   if (!ev.target.closest?.('input,textarea,select,label')) typing.blur();
 });
+
+boot();
+
+/* A new version: keep the phone's copy fresh, and offer a reload when one is ready. */
+if (!A.preview && 'serviceWorker' in navigator) {
+  watchForUpdates({
+    sw: navigator.serviceWorker, doc: document, win: window,
+    onUpdate: () => {
+      if (document.getElementById('updateBar')) return;
+      const bar = document.createElement('div');
+      bar.id = 'updateBar';
+      bar.className = 'update-bar';
+      bar.setAttribute('role', 'status');
+      bar.innerHTML = '<span>A new version is ready.</span><button type="button" class="btn small primary" onclick="location.reload()">Update</button>';
+      document.body.appendChild(bar);
+    },
+  });
+}
 
 export { openTxForm };

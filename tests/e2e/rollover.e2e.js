@@ -12,6 +12,7 @@ const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 await page.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
 await page.clock.install({ time: new Date('2026-11-30T23:58:00') });
+await page.addInitScript(() => localStorage.setItem('wmm:tourDone', '1'));
 await page.goto(pathToFileURL(resolve('preview-test.html')).href);
 await page.locator('a.budget-row').click();
 await page.locator('.monthbar h2', { hasText: 'November 2026' }).waitFor();

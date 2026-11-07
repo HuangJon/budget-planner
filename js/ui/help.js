@@ -80,6 +80,7 @@ function helpSheet() {
   const h = HELP[A.sheet.id] || HELP.budget;
   openSheet(`<div class="sheet">${sheetHead(h.title)}<div class="sheet-body">
     <ul class="help-list">${h.points.map(([lead, rest]) => `<li><strong>${esc(lead)}</strong> ${esc(rest)}</li>`).join('')}</ul>
+    ${A.route?.id ? '<button type="button" class="btn" data-action="tour-start">Show me around</button>' : ''}
   </div></div>`);
 }
 actions.help = el => openChild({ kind: 'help', id: el.dataset.id }, helpSheet);

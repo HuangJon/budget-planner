@@ -90,7 +90,19 @@ export function toast(message, undo) {
 /** Runs a write without waiting. Offline writes stay open until reconnecting, so only failure is reported. */
 export function send(promise) {
   promise.catch(e => {
+    A.logProblem?.(e?.code === 'permission-denied' ? 'refused-save' : 'failed-save', e?.code || e?.message || 'Save failed');
     const why = e?.code === 'permission-denied' ? "That change was refused. Check that you're on the latest version." : "That change didn't save. Check your connection and try again.";
     toast(why);
   });
+}
+
+/** Saves a text file to the phone or computer. The preview can't save files, so it says so. */
+export function downloadFile(name, text, type = 'text/csv') {
+  if (A.preview) { toast('Saving files works in the real app.'); return; }
+  const url = URL.createObjectURL(new Blob([text], { type: `${type};charset=utf-8` }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: name });
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
 }

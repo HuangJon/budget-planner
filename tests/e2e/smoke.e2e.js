@@ -27,6 +27,15 @@ await shot('home');
 await tap('a.budget-row');
 await page.locator('[data-testid=ready]').waitFor();
 const ready = async () => page.locator('[data-testid=ready]').innerText();
+// The tour runs on the first budget opened: step through every part, then it stays away.
+await page.locator('.tour-card').waitFor();
+await shot('tour');
+for (let i = 0; i < 6 && await page.locator('.tour-card').count(); i += 1) await page.locator('[data-action=tour-next]').click();
+if (await page.locator('.tour').count()) fail('The tour did not finish');
+await page.reload();
+await page.locator('[data-testid=ready]').waitFor();
+await page.waitForTimeout(200);
+if (await page.locator('.tour').count()) fail('The tour should only run once');
 const before = await ready();
 await shot('budget-blue');
 
@@ -298,7 +307,9 @@ await page.locator('.screen-tip').waitFor();
 await tap('[data-action=help]');
 await page.locator('.help-list li').first().waitFor();
 await shot('help');
-await tap('[data-action=sheet-back]');
+await tap('[data-action=tour-start]');
+await page.locator('.tour-card').waitFor();
+await tap('[data-action=tour-end]');
 
 // Plan money: groups fold, categories can be added there.
 await tap('a.hero-btn');

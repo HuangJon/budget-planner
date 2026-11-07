@@ -47,6 +47,10 @@ export function peopleScreen(b) {
       <p class="small muted">Only the people above can see this budget in the app. The app's owner sees counts and error reports, never amounts or what you typed. They run the database, so they could technically look inside it, but the app never shows them your budget.</p>
     </section>
 
+    ${admin ? (A.confirmDelete
+      ? `<section class="panel pad stack delete-panel"><p>Delete ${esc(b.name)} for everyone in it? An admin can restore it from the budget list for 30 days.</p><div class="row gap8"><button type="button" class="btn danger" data-action="budget-delete-yes">Delete</button><button type="button" class="btn" data-action="budget-delete-no">Keep it</button></div></section>`
+      : '<button type="button" class="btn danger" data-action="budget-delete-ask">Delete this budget</button>') : ''}
+
     ${people.length > 1 ? (admin && admins === 1
       ? '<p class="small muted">You’re the only admin. Make someone else an admin before you leave.</p>'
       : `${A.confirmLeave ? `<section class="panel pad stack"><p>Leave ${esc(b.name)}? You'll need a new invite to come back.</p><div class="row gap8"><button type="button" class="btn danger" data-action="leave-yes">Leave</button><button type="button" class="btn" data-action="leave-no">Stay</button></div></section>` : '<button type="button" class="btn danger" data-action="leave-ask">Leave this budget</button>'}`) : ''}`;
@@ -149,3 +153,12 @@ actions['request-decline'] = el => {
 };
 actions['pending-cancel'] = el => { send(A.repo.cancelRequest(el.dataset.id)); toast('Request cancelled'); };
 actions['pending-dismiss'] = el => send(A.repo.dismissPending(el.dataset.id));
+actions['budget-delete-ask'] = () => { A.confirmDelete = true; render(); };
+actions['budget-delete-no'] = () => { A.confirmDelete = false; render(); };
+actions['budget-delete-yes'] = () => {
+  const b = A.budgets[A.route.id];
+  A.confirmDelete = false;
+  send(A.repo.deleteBudget(b.id));
+  location.hash = '#home';
+  toast(`${b.name} deleted`, () => send(A.repo.restoreBudget(b.id)));
+};

@@ -1,6 +1,8 @@
 /** Your budgets, starting a new one, and your account menu. */
 import { A, actions, render } from './state.js';
-import { esc, openSheet, closeSheet, sheetHead, toast, send, val, today, registerSheet } from './dom.js';
+import { esc, openSheet, closeSheet, sheetHead, toast, send, val, today, registerSheet, downloadFile } from './dom.js';
+import { transactionsCsv, planCsv, exportName } from '../core/export.js';
+import { RESTORE_DAYS } from '../data/repository.js';
 import { lookPicker, setLook } from './look.js';
 import { summaryFor } from './budget.js';
 import { money, toCents } from '../core/money.js';
@@ -9,7 +11,10 @@ import { starterCategories } from '../data/repository.js';
 import { helpButton } from './help.js';
 
 export function homeScreen() {
-  const ids = A.budgetIds.filter(id => A.budgets[id]);
+  const all = A.budgetIds.filter(id => A.budgets[id]);
+  const ids = all.filter(id => !A.budgets[id].deleted);
+  const daysLeft = b => Math.max(0, RESTORE_DAYS - Math.floor((Date.now() - (b.deletedAt || 0)) / 864e5));
+  const deleted = all.filter(id => A.budgets[id].deleted && A.budgets[id].members?.[A.user?.uid]?.admin && daysLeft(A.budgets[id]) > 0);
   return `<header class="home-head"><div class="row between"><h1>${esc(APP_NAME)}</h1>${helpButton('home')}</div><p class="muted">Every dollar gets a job. Start a budget for yourself, or one to share.</p></header>
     ${ids.length ? `<section class="panel">${ids.map(id => {
       const b = A.budgets[id];
@@ -20,6 +25,7 @@ export function homeScreen() {
     : `<section class="panel empty"><h2>No budgets yet</h2><p class="muted">Start one for yourself, or one to share with your household.</p></section>`}
     ${(A.pending || []).length ? `<section class="panel pending-list">${A.pending.map(p => `<div class="request-row"><span class="grow stack tight"><strong class="wrap-any">${esc(p.budgetName || 'A shared budget')}</strong><span class="tiny ${p.declined ? 'owe' : 'muted'}">${p.declined ? 'The admin didn\u2019t let you in' : 'Waiting for an admin to let you in'}</span></span>${p.declined ? `<button type="button" class="btn small" data-action="pending-dismiss" data-id="${p.budgetId}">Dismiss</button>` : `<button type="button" class="btn small" data-action="pending-cancel" data-id="${p.budgetId}">Cancel</button>`}</div>`).join('')}</section>` : ''}
     <button type="button" class="btn primary" data-action="new-budget">Start a budget</button>
+    ${deleted.length ? `<section class="panel pending-list" aria-label="Deleted budgets"><span class="label">Deleted</span>${deleted.map(id => `<div class="request-row"><span class="grow stack tight"><strong class="wrap-any">${esc(A.budgets[id].name)}</strong><span class="tiny muted">Can be restored for ${daysLeft(A.budgets[id])} more days</span></span><button type="button" class="btn small" data-action="budget-restore" data-id="${id}">Restore</button></div>`).join('')}</section>` : ''}
     ${A.user ? `<p class="small muted signed-in">Signed in as ${esc(A.user.email)}${A.preview ? ' (preview)' : ''}. <button type="button" class="link small" data-action="sign-out">Sign out</button></p>` : ''}`;
 }
 
@@ -94,15 +100,22 @@ actions.account = () => {
       <span class="small muted">${esc(A.user?.email || '')}</span>
     </section>
     <section class="panel pad stack">${lookPicker()}</section>
-    ${b ? `<section class="panel pad stack"><h3>${esc(b.name)}</h3><button type="button" class="btn" data-action="edit-cats">Edit categories</button></section>` : ''}
+    ${b ? `<section class="panel pad stack"><h3>${esc(b.name)}</h3><button type="button" class="btn" data-action="edit-cats">Edit categories</button>
+      <span class="label">Export to a spreadsheet</span>
+      <div class="two-btns"><button type="button" class="btn" data-action="export-tx">Transactions</button><button type="button" class="btn" data-action="export-plan">Plan by month</button></div>
+      <p class="tiny muted">CSV files that open in Numbers, Excel or Google Sheets. A good backup too.</p></section>` : ''}
     <section class="panel pad stack">
       <h3>Your privacy</h3>
       <p class="small muted">Only people in a budget can see it in the app. The app's owner sees only counts, like how many people use it, and error reports with amounts and anything you typed removed. The owner runs the database, so they could technically look inside it, but the app never shows them your budget.</p>
     </section>
+    ${A.ownerUid && A.user?.uid === A.ownerUid ? '<a class="btn" href="#owner">Owner page</a>' : ''}
+    <button type="button" class="btn" data-action="sign-out">Sign out</button>
     ${A.preview ? '<button type="button" class="btn" data-action="preview-reset">Start the preview over</button>' : ''}
   </div></div>`);
 };
 registerSheet('account', () => actions.account());
+actions['export-tx'] = () => { const b = A.budgets[A.route.id]; downloadFile(exportName(b.name, 'transactions', today()), transactionsCsv(b, A.transactions[b.id] || [])); };
+actions['export-plan'] = () => { const b = A.budgets[A.route.id]; downloadFile(exportName(b.name, 'plan', today()), planCsv(b)); };
 actions['set-look'] = el => { setLook(el.dataset.id); actions.account(); };
-actions['sign-out'] = () => { if (A.preview) toast('Sign out works in the real app.'); };
 export const refreshAccount = () => render();
+actions['budget-restore'] = el => { send(A.repo.restoreBudget(el.dataset.id)); toast('Budget restored'); };

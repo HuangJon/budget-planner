@@ -300,3 +300,23 @@ a.request-note { display:flex; align-items:center; gap:12px; padding:14px 16px; 
 .nm-steps li.done .grow { color:var(--muted); text-decoration:line-through }
 .nm-steps .tick svg { width:14px; height:14px; stroke-width:3 }
 .nm-steps a.btn { text-decoration:none }
+/* Owner page */
+.owner-counts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px }
+.owner-counts > div { display:grid; gap:2px }
+.week-bars { display:grid; grid-auto-flow:column; grid-auto-columns:1fr; gap:6px; height:140px; align-items:end }
+.week-bar { display:grid; grid-template-rows:auto 1fr auto; justify-items:center; height:100%; gap:4px }
+.week-bar i { align-self:end; width:60%; max-width:22px; min-height:2px; border-radius:4px 4px 0 0; background:var(--accent) }
+.error-list { list-style:none; margin:0; padding:0; display:grid; gap:12px }
+.error-list li { display:grid; gap:2px; border-top:1px solid var(--line); padding-top:10px }
+.error-list li:first-child { border-top:0; padding-top:0 }
+/* New version banner, above the tabs */
+.update-bar { position:fixed; left:max(12px, env(safe-area-inset-left, 0px)); right:max(12px, env(safe-area-inset-right, 0px)); bottom:calc(76px + env(safe-area-inset-bottom, 0px)); z-index:30; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px 10px 16px; border-radius:14px; background:var(--hero); color:var(--hero-ink); box-shadow:0 6px 20px var(--shadow); max-width:656px; margin:0 auto }
+/* Tour */
+.tour { position:fixed; inset:0; z-index:40 }
+.tour-ring { position:fixed; border-radius:14px; box-shadow:0 0 0 3px var(--accent), 0 0 0 9999px rgba(10,20,35,.55); pointer-events:none; transition:all .2s ease }
+@media (prefers-reduced-motion: reduce) { .tour-ring { transition:none } }
+.tour-card { position:fixed; left:max(16px, env(safe-area-inset-left, 0px)); right:max(16px, env(safe-area-inset-right, 0px)); max-width:420px; margin:0 auto; padding:16px; border-radius:16px; background:var(--surface); color:var(--ink); box-shadow:0 12px 32px rgba(0,0,0,.25); display:grid; gap:8px }
+.tour-card.low { bottom:calc(90px + env(safe-area-inset-bottom, 0px)) }
+.tour-card.high { top:calc(16px + env(safe-area-inset-top, 0px)) }
+.tour-card h2 { font-size:1.125rem }
+@media (min-width:900px) { .tour-card { left:auto; right:24px; margin:0; width:380px } }
