@@ -61,7 +61,9 @@ try {
   await page.locator('[data-action=nb-next]').click();
   await page.locator('[data-action=nb-next]').click();
   await page.locator('#planReady').waitFor({ timeout: 30000 });
-  assert.equal(await page.locator('#planReady').innerText(), '$1,200.00');
+  // The budget can arrive a moment before its transactions, so wait for the starting money to count.
+  await page.waitForFunction(() => document.getElementById('planReady')?.textContent === '$1,200.00', null, { timeout: 20000 })
+    .catch(async () => assert.fail(`Ready to assign showed ${await page.locator('#planReady').innerText()}, not $1,200.00`));
   check('starting a budget with starting money, through the real rules');
 
   await page.locator('.topbar a.btn').click();
