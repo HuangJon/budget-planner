@@ -1,9 +1,9 @@
 /** Starts the app: picks the backend, follows the link, keeps data live and draws the screens. */
 import { A, actions, inputs, changes, setRender } from './ui/state.js';
-import { esc, svg, ICON, closeSheet, sheetBack, today } from './ui/dom.js';
+import { esc, svg, ICON, closeSheet, sheetBack, today, refreshOpenSheet } from './ui/dom.js';
 import { applyLook } from './ui/look.js';
 import { homeScreen } from './ui/home.js';
-import { budgetScreen, catSheet } from './ui/budget.js';
+import { budgetScreen } from './ui/budget.js';
 import { transactionsScreen } from './ui/transactions.js';
 import { planScreen } from './ui/plan.js';
 import { trendsScreen } from './ui/trends.js';
@@ -193,9 +193,8 @@ function render() {
       if (el.dataset.input) inputs[el.dataset.input]?.(el);
     }
   }
-  // Keep an open category up to date, unless someone is typing in it.
-  const typing = document.activeElement?.closest?.('dialog') && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
-  if (A.sheet?.kind === 'cat' && !typing) catSheet();
+  // Keep an open popup up to date with the latest data, unless someone is typing in it.
+  refreshOpenSheet();
 }
 setRender(render);
 

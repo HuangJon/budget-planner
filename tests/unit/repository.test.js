@@ -4,7 +4,7 @@ import { createRepository } from '../../js/data/repository.js';
 import { monthSummary } from '../../js/core/budget.js';
 
 const memory = () => { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, v) }; };
-const fresh = () => { const backend = createLocalBackend({ area: memory() }); return { backend, repo: createRepository(backend, () => 1000) }; };
+const fresh = () => { const backend = createLocalBackend({ delay: 0, area: memory() }); return { backend, repo: createRepository(backend, () => 1000) }; };
 
 test('creating a budget lists it as yours with starter categories', async () => {
   const { backend, repo } = fresh();

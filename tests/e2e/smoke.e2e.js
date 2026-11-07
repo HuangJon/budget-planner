@@ -13,6 +13,14 @@ const shots = process.env.SHOTS;
 const browser = await chromium.launch();
 const errors = [];
 const fail = m => { throw new Error(m); };
+/**
+ * Waits up to 3 seconds for something to become true, like a person glancing back. The database
+ * answers a moment after each change, on phones and in this preview alike.
+ */
+async function eventually(check, message) {
+  for (let i = 0; i < 60; i += 1) { if (await check()) return; await new Promise(r => setTimeout(r, 50)); }
+  fail(message);
+}
 const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, reducedMotion: 'reduce' });
 page.on('pageerror', e => errors.push(e.message));
 // Web fonts come from Google and may be unreachable where tests run; the app falls back to system fonts.
@@ -31,11 +39,11 @@ const ready = async () => page.locator('[data-testid=ready]').innerText();
 await page.locator('.tour-card').waitFor();
 await shot('tour');
 for (let i = 0; i < 6 && await page.locator('.tour-card').count(); i += 1) await page.locator('[data-action=tour-next]').click();
-if (await page.locator('.tour').count()) fail('The tour did not finish');
+await eventually(async () => !(await page.locator('.tour').count()), 'The tour did not finish');
 await page.reload();
 await page.locator('[data-testid=ready]').waitFor();
 await page.waitForTimeout(200);
-if (await page.locator('.tour').count()) fail('The tour should only run once');
+await eventually(async () => !(await page.locator('.tour').count()), 'The tour should only run once');
 const before = await ready();
 await shot('budget-blue');
 
@@ -46,7 +54,7 @@ await shot('cover-sheet');
 await tap('[data-action=cover-auto]');
 await page.locator('dialog .over-panel').waitFor({ state: 'detached' });
 await tap('[data-action=sheet-back]');
-if (await page.locator('.over').count()) fail('Still overspent after covering');
+await eventually(async () => !(await page.locator('.over').count()), 'Still overspent after covering');
 
 // Plan money: typing counts Ready to assign down live, leaving the box saves it.
 await tap('a.hero-btn');
@@ -56,18 +64,18 @@ const firstBox = page.locator('[data-plan]').nth(3);
 await firstBox.fill('');
 await firstBox.pressSequentially('25');
 const planTyped = await page.locator('#planReady').innerText();
-if (planTyped === planBefore) fail('Ready to assign did not update while typing');
+await eventually(async () => !(planTyped === planBefore), 'Ready to assign did not update while typing');
 await page.locator('[data-plan]').nth(4).focus();
 await page.waitForTimeout(50);
-if ((await page.locator('#planReady').innerText()) !== planTyped) fail('Leaving the box changed the total');
-if (!(await page.locator('[data-plan]').nth(4).evaluate(el => el === document.activeElement))) fail('Focus was lost after saving a box');
+await eventually(async () => !((await page.locator('#planReady').innerText()) !== planTyped), 'Leaving the box changed the total');
+await eventually(async () => !(!(await page.locator('[data-plan]').nth(4).evaluate(el => el === document.activeElement))), 'Focus was lost after saving a box');
 await shot('plan');
 // Copy last month's plan, then undo everything done on this screen.
 await tap('[data-action=plan-copy]');
 await page.locator('#toast').filter({ hasText: 'Copied' }).waitFor();
 await tap('[data-action=plan-undo]');
 await page.locator('#toast').filter({ hasText: 'Back to how the plan was' }).waitFor();
-if ((await page.locator('#planReady').innerText()) !== planBefore) fail('Undo did not put Ready to assign back');
+await eventually(async () => !((await page.locator('#planReady').innerText()) !== planBefore), 'Undo did not put Ready to assign back');
 // Fund bills and targets shows what it will do first.
 await tap('[data-action=fund-show]');
 await page.locator('.fund-preview li').first().waitFor();
@@ -75,12 +83,12 @@ await shot('fund-preview');
 await tap('.fund-preview [data-action=fund-targets]');
 await tap('.topbar a.btn');
 await page.locator('[data-testid=ready]').waitFor();
-if ((await ready()) === before) fail('Planning did not change Ready to assign');
+await eventually(async () => !((await ready()) === before), 'Planning did not change Ready to assign');
 
 // A category: add spending with it already picked, change the plan, set a yearly target.
 await page.locator('.cat-row', { hasText: 'Groceries' }).click();
 await tap('[data-action=cat-spend]');
-if ((await page.locator('#fCat option:checked').innerText()) !== 'Groceries') fail('Add spending did not pick the category');
+await eventually(async () => !((await page.locator('#fCat option:checked').innerText()) !== 'Groceries'), 'Add spending did not pick the category');
 await page.fill('#fAmount', '12');
 await page.locator('.sheet-head h2').tap();
 await tap('[data-action=tx-save]');
@@ -105,7 +113,7 @@ await page.locator('.cat-row', { hasText: 'Vacation' }).locator('.bar.save').wai
 await tap('.spend-tab');
 await page.fill('#fAmount', '18.50');
 await page.locator('#fDesc').pressSequentially('Trader Joe');
-if (!(await page.locator('#fCat').inputValue())) fail('No category suggested for groceries');
+await eventually(async () => !(!(await page.locator('#fCat').inputValue())), 'No category suggested for groceries');
 await shot('add-form');
 await page.locator('.sheet-head h2').tap(); // tap away to close the keyboard
 await tap('[data-action=tx-save]');
@@ -115,20 +123,20 @@ await page.locator('dialog[open]').waitFor({ state: 'detached' });
 const beforeIncome = await ready();
 await tap('[data-action=add-income]');
 await page.locator('.sheet-head h2', { hasText: 'Add income' }).waitFor();
-if (await page.locator('#fCat').count()) fail('Income should not ask for a category');
+await eventually(async () => !(await page.locator('#fCat').count()), 'Income should not ask for a category');
 await tap('[data-action=tx-quick]');
-if (!(await page.locator('#fAmount').inputValue())) fail('Tapping a recent paycheck did not fill the amount');
+await eventually(async () => !(!(await page.locator('#fAmount').inputValue())), 'Tapping a recent paycheck did not fill the amount');
 await shot('income-form');
 await page.locator('.sheet-head h2').tap();
 await tap('[data-action=tx-save]');
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
-if ((await ready()) === beforeIncome) fail('Income did not add to Ready to assign');
+await eventually(async () => !((await ready()) === beforeIncome), 'Income did not add to Ready to assign');
 
 // The Spend form only spends: usual ones are one tap, refunds are a switch, and it can repeat monthly.
 await tap('.spend-tab');
-if (await page.locator('[data-action=tx-kind]').count()) fail('Spend form should not offer income');
+await eventually(async () => !(await page.locator('[data-action=tx-kind]').count()), 'Spend form should not offer income');
 await tap('[data-action=tx-quick]');
-if (!(await page.locator('#fDesc').inputValue()) || !(await page.locator('#fCat').inputValue())) fail('Quick add did not fill description and category');
+await eventually(async () => !(!(await page.locator('#fDesc').inputValue()) || !(await page.locator('#fCat').inputValue())), 'Quick add did not fill description and category');
 await page.fill('#fAmount', '9.99');
 await page.fill('#fDesc', 'Music app');
 await page.locator('#fCat').selectOption({ label: 'Subscriptions' });
@@ -141,19 +149,19 @@ await page.locator('dialog[open]').waitFor({ state: 'detached' });
 // Activity, edit and delete with undo.
 await tap('a.tab[href$="-activity"]');
 await page.locator('.tx-row').first().waitFor();
-if (!(await page.locator('[data-action=open-rule]', { hasText: 'Music app' }).count())) fail('New repeat missing from Every month');
+await eventually(async () => !(!(await page.locator('[data-action=open-rule]', { hasText: 'Music app' }).count())), 'New repeat missing from Every month');
 await shot('activity');
 const count = await page.locator('.tx-list:not(:first-of-type) .tx-row, [data-action=edit-tx].tx-row').count();
 await tap('[data-action=edit-tx].tx-row');
 await tap('[data-action=tx-delete]');
-if (await page.locator('[data-action=edit-tx].tx-row').count() !== count - 1) fail('Delete did not remove the row');
+await eventually(async () => !(await page.locator('[data-action=edit-tx].tx-row').count() !== count - 1), 'Delete did not remove the row');
 await tap('#toast [data-action=undo]');
-if (await page.locator('[data-action=edit-tx].tx-row').count() !== count) fail('Undo did not restore the row');
+await eventually(async () => !(await page.locator('[data-action=edit-tx].tx-row').count() !== count), 'Undo did not restore the row');
 
 // Stop a repeat from the Every month list.
 await page.locator('[data-action=open-rule]', { hasText: 'Music app' }).click();
 await tap('[data-action=rule-stop]');
-if (await page.locator('[data-action=open-rule]', { hasText: 'Music app' }).count()) fail('Stopped repeat still listed');
+await eventually(async () => !(await page.locator('[data-action=open-rule]', { hasText: 'Music app' }).count()), 'Stopped repeat still listed');
 
 // Trends: summary first, then sections that fold, a range, tappable months, and one category's trend.
 await tap('a.tab[href$="-trends"]');
@@ -161,7 +169,7 @@ await page.locator('.summary li').first().waitFor();
 for (const h of ['Pace this month', 'Coming up', 'Where it went', 'Worth a look', 'Month by month', 'Categories over time', 'Biggest purchases', 'Plan vs real', 'Saving', 'By person']) {
   await page.getByRole('heading', { name: h, exact: true }).waitFor();
 }
-if (!(await page.locator('.trend.folded[data-section=where]').count())) fail('Lower Trends sections should start folded');
+await eventually(async () => !(!(await page.locator('.trend.folded[data-section=where]').count())), 'Lower Trends sections should start folded');
 await shot('trends');
 for (const k of ['where', 'months', 'people']) await page.locator(`[data-action=trend-fold][data-id=${k}]`).click();
 await page.locator('.cmp-btn').first().click();
@@ -175,7 +183,7 @@ const cols = page.locator('.cols:not(.one) .col');
 await cols.nth(1).click();
 const picked = await page.locator('.col-detail strong').innerText();
 await cols.last().click();
-if ((await page.locator('.col-detail strong').innerText()) === picked) fail('Tapping a month did not change the numbers shown');
+await eventually(async () => !((await page.locator('.col-detail strong').innerText()) === picked), 'Tapping a month did not change the numbers shown');
 await page.locator('[data-action=trend-fold][data-id=biggest]').click();
 await page.locator('.trend:not(.folded)[data-section=biggest]').waitFor();
 await page.locator('[data-section=people] [data-change=trend-byperson]').check();
@@ -234,7 +242,7 @@ await page.selectOption('#deleteMoveTo', { label: 'Groceries' });
 await tap('.delete-panel [data-action=cat-delete]');
 await page.locator('.ed-row', { hasText: 'Household' }).waitFor({ state: 'detached' });
 await tap('[data-action=sheet-back]');
-if (await page.locator('.cat-row', { hasText: 'Household' }).count()) fail('Deleted category still on the budget');
+await eventually(async () => !(await page.locator('.cat-row', { hasText: 'Household' }).count()), 'Deleted category still on the budget');
 
 // Fold a group to one line, and back.
 await page.locator('button.group-tab', { hasText: 'Bills' }).click();
@@ -256,8 +264,8 @@ await tap('[data-action=nb-pick][data-id=Pets]');
 await shot('setup-categories');
 await tap('[data-action=nb-next]');
 await page.locator('#planReady').waitFor();
-if ((await page.locator('#planReady').innerText()) !== '$1,500.00') fail('Starting money should be ready to assign');
-if (!(await page.locator('label.cat-name', { hasText: 'Pets' }).count())) fail('Picked category missing');
+await eventually(async () => !((await page.locator('#planReady').innerText()) !== '$1,500.00'), 'Starting money should be ready to assign');
+await eventually(async () => !(!(await page.locator('label.cat-name', { hasText: 'Pets' }).count())), 'Picked category missing');
 await shot('setup-plan');
 
 // Round 6: requests to join, filters, compact view, viewed-month dates, yearly start, See trend.
@@ -269,7 +277,7 @@ await shot('requests');
 await tap('[data-action=request-approve]');
 await page.locator('.person', { hasText: 'Alex' }).waitFor();
 await tap('a.tab[href^="#b-"]:not([href$="-activity"])');
-if (await page.locator('a.request-note').count()) fail('Request notice should go once handled');
+await eventually(async () => !(await page.locator('a.request-note').count()), 'Request notice should go once handled');
 await tap('[data-action=budget-filter][data-id=needs]');
 const needRows = await page.locator('.cat-row').count();
 if (!needRows || await page.locator('.cat-row .owe').count()) {
@@ -286,7 +294,7 @@ await page.locator('.away-pill').waitFor();
 await tap('.spend-tab');
 const viewed = await page.locator('.monthbar h2').innerText();
 const date = await page.locator('#fDate').inputValue();
-if (new Date(date + 'T12:00').toLocaleDateString('en', { month: 'long', year: 'numeric' }) !== viewed) fail(`Spend date ${date} is not in ${viewed}`);
+await eventually(async () => !(new Date(date + 'T12:00').toLocaleDateString('en', { month: 'long', year: 'numeric' }) !== viewed), `Spend date ${date} is not in ${viewed}`);
 await tap('[data-action=sheet-back]');
 await tap('.away-pill');
 await page.locator('.cat-row', { hasText: 'Gifts' }).click();
@@ -356,8 +364,8 @@ await shot('budget-blue-darkmode');
 // No sideways scrolling on a small phone.
 await page.setViewportSize({ width: 320, height: 640 });
 const wide = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1);
-if (wide) fail('The page scrolls sideways at 320px');
+await eventually(async () => !(wide), 'The page scrolls sideways at 320px');
 
 await browser.close();
-if (errors.length) fail(`Page errors:\n${errors.join('\n')}`);
+await eventually(async () => !(errors.length), `Page errors:\n${errors.join('\n')}`);
 console.log('Smoke test passed');

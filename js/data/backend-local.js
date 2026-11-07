@@ -31,7 +31,7 @@ function mergeInto(doc, value) {
   }
 }
 
-export function createLocalBackend({ area = safeStorage(), user = { uid: 'preview-you', displayName: 'You', email: 'you@example.com', emailVerified: true } } = {}) {
+export function createLocalBackend({ delay = 25, area = safeStorage(), user = { uid: 'preview-you', displayName: 'You', email: 'you@example.com', emailVerified: true } } = {}) {
   let docs = load();
   const docWatchers = new Map(), colWatchers = new Map();
 
@@ -39,9 +39,15 @@ export function createLocalBackend({ area = safeStorage(), user = { uid: 'previe
   function persist() { try { area?.setItem(KEY, JSON.stringify(docs)); } catch { /* memory only */ } }
   const docsIn = col => Object.keys(docs).filter(p => parentOf(p) === col).map(p => clone(docs[p]));
   const add = (map, key, fn) => { if (!map.has(key)) map.set(key, new Set()); map.get(key).add(fn); return () => map.get(key).delete(fn); };
+  /**
+   * Tells watchers a little later, like the real database does, so screens that assume a change
+   * shows up instantly fail in tests here instead of only on a phone.
+   */
   function emit(path) {
-    for (const fn of docWatchers.get(path) || []) fn(clone(docs[path]) ?? null);
-    for (const fn of colWatchers.get(parentOf(path)) || []) fn();
+    setTimeout(() => {
+      for (const fn of docWatchers.get(path) || []) fn(clone(docs[path]) ?? null);
+      for (const fn of colWatchers.get(parentOf(path)) || []) fn();
+    }, delay);
   }
 
   return {

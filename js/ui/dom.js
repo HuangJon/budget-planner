@@ -34,8 +34,33 @@ const parkToast = () => { const t = toastEl(); if (t.parentElement !== document.
 export function openSheet(html) {
   const d = sheet();
   parkToast();
+  // Redrawing the same popup (new data arrived) keeps its scroll position.
+  const before = d.open ? { title: d.querySelector('.sheet-head h2')?.textContent, top: d.querySelector('.sheet-body')?.scrollTop || 0 } : null;
   d.innerHTML = html;
   if (!d.open) d.showModal();
+  else if (before && d.querySelector('.sheet-head h2')?.textContent === before.title) {
+    const body = d.querySelector('.sheet-body');
+    if (body) body.scrollTop = before.top;
+  }
+}
+/**
+ * Redraws the open popup with the latest data. Anything the person has typed but not saved, and
+ * where their cursor is, survives the redraw.
+ */
+const LIVE = ['cat', 'cat-edit', 'rule', 'cat-trend', 'account'];
+export function refreshOpenSheet() {
+  const d = sheet(), active = document.activeElement;
+  if (!d.open || !A.sheet || !LIVE.includes(A.sheet.kind) || !drawers[A.sheet.kind]) return;
+  const typed = [...d.querySelectorAll('input[id], textarea[id]')]
+    .filter(el => el === active || el.value !== el.defaultValue).map(el => [el.id, el.value]);
+  const focus = active && d.contains(active) && active.id ? { id: active.id, start: active.selectionStart, end: active.selectionEnd } : null;
+  drawers[A.sheet.kind]();
+  for (const [id, value] of typed) { const el = document.getElementById(id); if (el && d.contains(el)) el.value = value; }
+  const el = focus && document.getElementById(focus.id);
+  if (el && d.contains(el)) {
+    el.focus({ preventScroll: true });
+    try { if (focus.start != null) el.setSelectionRange(focus.start, focus.end); } catch { /* not a text field */ }
+  }
 }
 export function closeSheet() {
   const d = sheet();
