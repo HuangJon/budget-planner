@@ -5,6 +5,7 @@ import { applyLook } from './ui/look.js';
 import { homeScreen } from './ui/home.js';
 import { budgetScreen, catSheet } from './ui/budget.js';
 import { transactionsScreen } from './ui/transactions.js';
+import { planScreen } from './ui/plan.js';
 import { openTxForm } from './ui/tx-form.js';
 import { openCatEditor } from './ui/cat-edit.js';
 import { createLocalBackend } from './data/backend-local.js';
@@ -39,8 +40,8 @@ A.repo.watchMyBudgets(ids => {
 
 /* ---------- Routes ---------- */
 function readRoute() {
-  const m = /^#b-([a-z0-9]{20,40})(-activity)?$/.exec(location.hash);
-  A.route = m ? { name: m[2] ? 'transactions' : 'budget', id: m[1] } : { name: 'home' };
+  const m = /^#b-([a-z0-9]{20,40})(?:-(activity|plan))?$/.exec(location.hash);
+  A.route = m ? { name: m[2] === 'activity' ? 'transactions' : m[2] === 'plan' ? 'plan' : 'budget', id: m[1] } : { name: 'home' };
   if (m) follow(m[1]);
 }
 addEventListener('hashchange', () => { closeSheet(); readRoute(); render(); scrollTo(0, 0); });
@@ -58,18 +59,22 @@ function topbar(b) {
 }
 
 function drawTabs(b) {
-  if (!b) { tabs.hidden = true; return; }
+  if (!b || A.route.name === 'plan') { tabs.hidden = true; return; }
   const here = A.route.name;
   tabs.hidden = false;
   tabs.innerHTML = `<div class="tabs-in tabs-3">
     <a class="tab" href="#b-${b.id}" ${here === 'budget' ? 'aria-current="page"' : ''}>${svg(ICON.wallet)}<span>Budget</span></a>
-    <button type="button" class="tab add-tab" data-action="add-tx">${svg(ICON.plus)}<span>Add</span></button>
+    <button type="button" class="tab add-tab spend-tab" data-action="add-tx">${svg(ICON.plus)}<span>Spend</span></button>
     <a class="tab" href="#b-${b.id}-activity" ${here === 'transactions' ? 'aria-current="page"' : ''}>${svg(ICON.list)}<span>Activity</span></a>
   </div>`;
 }
 
 function render() {
   if (A.status !== 'ready') return;
+  // Someone may be typing on the page (Plan money). Keep their box, cursor and unsaved text.
+  const active = document.activeElement;
+  const keep = active && app.contains(active) && active.id && /INPUT|TEXTAREA/.test(active.tagName)
+    ? { id: active.id, value: active.value, start: active.selectionStart, end: active.selectionEnd } : null;
   const b = A.route.id ? A.budgets[A.route.id] : null;
   if (A.route.name === 'home') {
     document.title = APP_NAME;
@@ -80,9 +85,18 @@ function render() {
     app.innerHTML = `<section class="panel empty"><h2>This budget can't be opened</h2><p class="muted">It may have been removed, or you weren't added to it.</p><a class="btn" href="#home">See your budgets</a></section>`;
   } else {
     document.title = `${b.name} · ${APP_NAME}`;
-    app.innerHTML = topbar(b) + (A.route.name === 'transactions' ? transactionsScreen(b) : budgetScreen(b));
+    app.innerHTML = A.route.name === 'plan' ? planScreen(b) : topbar(b) + (A.route.name === 'transactions' ? transactionsScreen(b) : budgetScreen(b));
   }
   drawTabs(b);
+  if (keep) {
+    const el = document.getElementById(keep.id);
+    if (el) {
+      el.value = keep.value;
+      el.focus({ preventScroll: true });
+      try { el.setSelectionRange(keep.start, keep.end); } catch { /* some boxes have no cursor */ }
+      if (el.dataset.input) inputs[el.dataset.input]?.(el);
+    }
+  }
   // Keep an open category up to date, unless someone is typing in it.
   const typing = document.activeElement?.closest?.('dialog') && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
   if (A.sheet?.kind === 'cat' && !typing) catSheet();

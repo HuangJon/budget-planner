@@ -16,16 +16,20 @@ export function exampleData(uid, now = new Date()) {
     transport: cat('Transport', 'Everyday', 6, { amount: 13200 }),
     household: cat('Household', 'Everyday', 7),
     fun: cat('Entertainment', 'Fun', 8),
-    gifts: cat('Gifts', 'Fun', 9),
-    emergency: cat('Emergency fund', 'Saving for', 10, { amount: 25000 }),
-    travel: cat('Travel', 'Saving for', 11),
+    clothes: cat('Clothes', 'Fun', 9, { type: 'yearly', amount: 200000 }),
+    gifts: cat('Gifts', 'Fun', 10, { type: 'yearly', amount: 60000 }),
+    unplanned: cat('Stuff I didn\u2019t plan for', 'Saving for', 11, { type: 'monthly', amount: 10000 }),
+    emergency: cat('Emergency fund', 'Saving for', 12, { type: 'monthly', amount: 25000 }),
+    travel: cat('Vacation', 'Saving for', 13, { type: 'byDate', amount: 300000, date: addMonths(m, 7) }),
+    investing: cat('Investing', 'Saving for', 14),
   };
   const id = 'examplebudgethome0000000';
   const budget = {
     id, schemaVersion: 1, name: 'Home', kind: 'shared', categories, createdAt: 0, changedBy: uid,
     members: { [uid]: { name: 'You', admin: true, joinedAt: 0 }, sam: { name: 'Sam', joinedAt: 1 } },
     assigned: {
-      [last]: { rent: 180000, power: 12000, phone: 6500, subs: 3500, groceries: 55000, eating: 20000, transport: 13200, household: 8000, fun: 10000, gifts: 5000, emergency: 25000, travel: 15000 },
+      [addMonths(m, -3)]: { clothes: 120000 },
+      [last]: { rent: 180000, power: 12000, phone: 6500, subs: 3500, groceries: 55000, eating: 20000, transport: 13200, household: 8000, fun: 10000, gifts: 5000, unplanned: 10000, emergency: 25000, travel: 60000, investing: 30000 },
       [m]: { rent: 180000, power: 12000, groceries: 60000, eating: 15000, transport: 13200, household: 5000, fun: 8000 },
     },
   };
@@ -43,6 +47,8 @@ export function exampleData(uid, now = new Date()) {
     t('spend', 13200, d(last, 2), 'transport', 'MetroCard'),
     t('spend', 4120, d(last, 9), 'household', 'Target'),
     t('spend', 6800, d(last, 25), 'fun', 'Concert tickets', 'sam'),
+    t('spend', 98000, d(addMonths(m, -3), 12), 'clothes', 'Winter coat and boots'),
+    t('spend', 30000, d(last, 3), 'investing', 'Transfer to brokerage'),
     t('income', 260000, d(m, 1), null, 'Paycheck'),
     t('income', 180000, d(m, 1), null, 'Sam paycheck', 'sam'),
     t('spend', 180000, d(m, 1), 'rent', 'Rent'),

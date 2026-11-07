@@ -45,3 +45,22 @@ test('edits keep the old version and deletes only mark', async () => {
   const b = await backend.get(`budgets/${budget.id}`);
   assert.equal(monthSummary(b, list, '2026-11').categories.a.activity, 0, 'deleted spending stops counting');
 });
+
+test('starting money goes in as income, ready to assign', async () => {
+  const { backend, repo } = fresh();
+  const { budget, written } = repo.createBudget({ name: 'New', startingMoney: 123456, today: '2026-11-06' });
+  await written;
+  let list;
+  repo.watchTransactions(budget.id, l => { list = l; });
+  await new Promise(r => setTimeout(r));
+  const b = await backend.get(`budgets/${budget.id}`);
+  assert.equal(monthSummary(b, list, '2026-11').readyToAssign, 123456);
+});
+
+test('the starter checklist picks the ticked categories by default, or exactly the ones given', async () => {
+  const { starterCategories } = await import('../../js/data/repository.js');
+  const names = c => Object.values(c).map(x => x.name);
+  assert.ok(names(starterCategories()).includes('Rent'));
+  assert.ok(!names(starterCategories()).includes('Pets'));
+  assert.deepEqual(names(starterCategories(['Pets', 'Rent'])), ['Rent', 'Pets']);
+});

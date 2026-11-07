@@ -16,10 +16,15 @@ const budgetPath = id => `budgets/${id}`;
 const txCol = id => `budgets/${id}/transactions`;
 const txPath = (id, tid) => `${txCol(id)}/${tid}`;
 
-export function starterCategories() {
+/** Categories for a new budget: the ticked starter ones, or the given names, in checklist order. */
+export function starterCategories(picked = null) {
   const out = {};
   let order = 0;
-  for (const g of STARTER_CATEGORIES) for (const name of g.names) out[randomId(8)] = { name, group: g.group, order: order++ };
+  for (const g of STARTER_CATEGORIES) {
+    for (const item of g.items) {
+      if (picked ? picked.includes(item.name) : item.on) out[randomId(8)] = { name: item.name, group: g.group, order: order++ };
+    }
+  }
   return out;
 }
 
@@ -37,14 +42,19 @@ export function createRepository(backend, now = () => Date.now()) {
       cb(good, list.length - good.length);
     }, err),
 
-    createBudget({ name, kind = 'personal', myName = 'You', categories = starterCategories() }) {
+    createBudget({ name, kind = 'personal', myName = 'You', categories = starterCategories(), startingMoney = 0, today = '' }) {
       const id = randomId(24);
       const budget = {
         id, schemaVersion: SCHEMA_VERSION, name, kind, categories, assigned: {},
         members: { [uid()]: { name: myName, admin: true, joinedAt: now() } }, createdAt: now(), changedBy: uid(),
       };
-      const written = Promise.all([backend.set(budgetPath(id), budget), backend.set(mine(id), { budgetId: id, at: now() })]);
-      return { budget, written };
+      const writes = [backend.set(budgetPath(id), budget), backend.set(mine(id), { budgetId: id, at: now() })];
+      // Money already in the bank goes in as income, so it's ready to assign straight away.
+      if (Number.isInteger(startingMoney) && startingMoney > 0 && today) {
+        const tid = randomId();
+        writes.push(backend.set(txPath(id, tid), { id: tid, budgetId: id, kind: 'income', amount: startingMoney, date: today, description: 'Starting money', categoryId: null, createdBy: uid(), createdAt: now() }));
+      }
+      return { budget, written: Promise.all(writes) };
     },
     renameBudget: (id, name) => backend.update(budgetPath(id), { name, changedBy: uid() }),
 

@@ -83,3 +83,44 @@ a.tap,a.icon-btn,a.btn { color:inherit; text-decoration:none }
 .hero-btn:disabled { opacity:.5 }
 /* Trip Tab's dark hero button is red for settling up; here red only ever means spending. */
 :root[data-look="dark"] .hero-btn { background:#F3EDE1; color:#1C1B19 }
+
+/* ---------- Round 2 ---------- */
+/* Group names sit on a tab above their card */
+.group { display:grid }
+.group-tab { justify-self:start; display:flex; align-items:baseline; gap:10px; padding:7px 14px 6px; border-radius:12px 12px 0 0; background:var(--accent); color:var(--accent-ink); max-width:100% }
+.group-tab h3 { font-size:1rem; letter-spacing:.01em; overflow-wrap:anywhere }
+.group-tab .small { color:inherit; opacity:.88; font-weight:600; white-space:nowrap }
+.group-card { overflow:hidden; border-top-left-radius:0 }
+.group-card .cat-row:first-child, .group-card .plan-row:first-child { border-top-color:transparent }
+:root[data-look="dark"] .group-tab { background:#45433E; color:#F3EDE1 }
+:root[data-look="light"] .group-tab { background:#3A4759; color:#F2EEE5 }
+:root[data-look="pride"] .group-tab { background:#241C33; color:#FFFFFF }
+
+/* The hero's Plan money link looks like the button it is */
+a.hero-btn { display:inline-grid; place-items:center; text-decoration:none; white-space:nowrap }
+
+/* Category sheet */
+.two-btns { display:grid; grid-template-columns:1fr 1fr; gap:10px }
+.more-list { overflow:hidden; display:grid }
+.more-list > * + * { border-top:1px solid var(--line) }
+.more-body { padding:4px 14px 16px }
+.more-list .form-row-value { margin-left:auto }
+.bar.save i { background:var(--accent) }
+
+/* Plan money */
+.plan-bar { position:sticky; top:calc(env(safe-area-inset-top,0px) + 60px); z-index:4; display:grid; gap:10px; padding:12px 16px; border-radius:14px; background:var(--surface); box-shadow:var(--card-shadow), 0 0 0 1px var(--card-line) }
+.plan-ready { font-size:1.5rem; font-weight:700 }
+.plan-row { display:flex; align-items:center; gap:12px; padding:12px 16px; border-top:1px solid var(--line) }
+.plan-in { flex:0 0 132px }
+.plan-in input { text-align:right }
+.plan-row .cat-name { cursor:pointer }
+@media (max-width:360px) { .plan-in { flex-basis:112px } }
+
+/* A bigger Spend button in the middle of the bar */
+.tabs .spend-tab svg { width:52px; height:40px; padding:9px; border-radius:14px; background:var(--accent); color:var(--accent-ink); margin-top:-14px; box-shadow:0 2px 8px var(--shadow) }
+.tabs .spend-tab { color:var(--accent); font-weight:700 }
+:root:is([data-look="dark"],[data-look="light"]) .tabs .spend-tab { color:var(--ink) }
+:root[data-look="pride"] .tabs .spend-tab svg { background:linear-gradient(120deg,#FF8A8A,#FFC766,#FFF07A,#8FE3A0,#8FB8FF,#C99BF0); color:#241C33 }
+
+/* Setup steps and chips */
+.chips .chip[aria-pressed="true"]::before { content:"\2713"; font-weight:700 }

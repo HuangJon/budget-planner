@@ -64,7 +64,7 @@ function activityByMonth(transactions) {
 /**
  * Everything one month's budget screen needs.
  * Returns { month, readyToAssign, incomeThisMonth, assignedThisMonth, activityThisMonth,
- *           categories: { [id]: { carried, assigned, activity, available, needed } },
+ *           categories: { [id]: { carried, assigned, activity, available, needed, target } },
  *           overspent: [ids], unknownActivity }
  */
 export function monthSummary(budget, transactionList, month) {
@@ -77,9 +77,19 @@ export function monthSummary(budget, transactionList, month) {
   // Carry each category forward month by month up to the one shown.
   const available = Object.fromEntries(ids.map(id => [id, 0]));
   let carried = { ...available };
+  // For yearly targets: what was assigned earlier this year, and what was spent this year so far.
+  const year = month.slice(0, 4);
+  const assignedEarlierThisYear = { ...available }, spentThisYear = { ...available };
   for (let m = firstMonth(budget, transactions, month); m <= month; m = addMonths(m, 1)) {
     carried = { ...available };
-    for (const id of ids) available[id] += (assignedAll[m]?.[id] || 0) + (activity[m]?.[id] || 0);
+    for (const id of ids) {
+      const a = assignedAll[m]?.[id] || 0, act = activity[m]?.[id] || 0;
+      available[id] += a + act;
+      if (m.startsWith(year)) {
+        spentThisYear[id] -= act;
+        if (m < month) assignedEarlierThisYear[id] += a;
+      }
+    }
   }
 
   const assignedHere = assignedAll[month] || {};
@@ -89,7 +99,7 @@ export function monthSummary(budget, transactionList, month) {
     const assigned = assignedHere[id] || 0;
     categories[id] = {
       carried: carried[id], assigned, activity: activityHere[id] || 0, available: available[id],
-      needed: neededForTarget(cats[id], assigned),
+      ...targetStatus(cats[id], { month, assigned, carried: carried[id], available: available[id], assignedEarlierThisYear: assignedEarlierThisYear[id], spentThisYear: spentThisYear[id] }),
     };
   }
 
@@ -121,12 +131,47 @@ export function monthSummary(budget, transactionList, month) {
   };
 }
 
-/** How much more needs assigning this month to meet a category's monthly target. */
-export function neededForTarget(category, assignedThisMonth) {
-  const goal = category?.target?.amount;
-  if (!Number.isInteger(goal) || goal <= 0) return 0;
-  return Math.max(0, goal - (assignedThisMonth || 0));
+/**
+ * Target kinds (category.target):
+ *   { type: 'monthly', amount, dueDay? }   needs `amount` assigned every month (bills, groceries)
+ *   { type: 'yearly', amount }              a yearly allowance, spread over the months left in the year;
+ *                                           money builds up and gets spent whenever (clothes, gifts)
+ *   { type: 'byDate', amount, date: 'YYYY-MM' }  save up `amount` by the end of that month (vacation)
+ * A target with no type is monthly, which is how round 1 stored them.
+ */
+export const targetType = t => (t && Number.isInteger(t.amount) && t.amount > 0 ? (['monthly', 'yearly', 'byDate'].includes(t.type) ? t.type : 'monthly') : null);
+
+const monthsBetween = (from, to) => {
+  const [a, b] = [from, to].map(m => m.split('-').map(Number));
+  return (b[0] - a[0]) * 12 + (b[1] - a[1]);
+};
+
+/**
+ * What a category still needs this month, and how far along it is.
+ * Returns { needed, target: null | { type, amount, ...progress } }.
+ */
+export function targetStatus(category, { month, assigned = 0, carried = 0, available = 0, assignedEarlierThisYear = 0, spentThisYear = 0 }) {
+  const t = category?.target, type = targetType(t);
+  if (!type) return { needed: 0, target: null };
+  if (type === 'monthly') {
+    return { needed: Math.max(0, t.amount - assigned), target: { type, amount: t.amount, dueDay: t.dueDay || null } };
+  }
+  if (type === 'yearly') {
+    const monthsLeft = 13 - Number(month.slice(5, 7));
+    const perMonth = Math.ceil(Math.max(0, t.amount - assignedEarlierThisYear) / monthsLeft);
+    return { needed: Math.max(0, perMonth - assigned), target: { type, amount: t.amount, perMonth, spentThisYear: Math.max(0, spentThisYear) } };
+  }
+  // byDate: save toward the amount, spreading what's missing over the months up to and including the date.
+  const date = isMonth(t.date) ? t.date : month;
+  const monthsLeft = monthsBetween(month, date) + 1;
+  const saved = Math.max(0, available);
+  if (monthsLeft <= 0) return { needed: 0, target: { type, amount: t.amount, date, saved, perMonth: 0, past: true } };
+  const perMonth = Math.ceil(Math.max(0, t.amount - carried) / monthsLeft);
+  return { needed: Math.max(0, perMonth - assigned), target: { type, amount: t.amount, date, saved, perMonth, past: false } };
 }
+
+/** Kept for older callers: what a monthly target still needs. */
+export const neededForTarget = (category, assignedThisMonth) => targetStatus(category, { month: '2000-01', assigned: assignedThisMonth }).needed;
 
 /**
  * Moves money in one month. `from` or `to` may be 'ready' (Ready to assign).

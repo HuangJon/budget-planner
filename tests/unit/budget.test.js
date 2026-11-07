@@ -153,3 +153,61 @@ test('totals never drift (random months)', () => {
     assert.equal(s.readyToAssign, income - given);
   }
 });
+
+test('a target with no type counts as monthly', () => {
+  const b = { categories: { r: { name: 'Rent', target: { amount: 1000 } } }, assigned: { '2026-11': { r: 400 } } };
+  const s = monthSummary(b, [], '2026-11');
+  assert.equal(s.categories.r.needed, 600);
+  assert.equal(s.categories.r.target.type, 'monthly');
+});
+
+test('a yearly target spreads what is left over the rest of the year', () => {
+  // $2,000 a year for clothes. Nothing assigned before November: 2 months left, so $1,000 each.
+  const clothes = { name: 'Clothes', target: { type: 'yearly', amount: 200000 } };
+  let s = monthSummary({ categories: { c: clothes }, assigned: {} }, [], '2026-11');
+  assert.equal(s.categories.c.needed, 100000);
+  assert.equal(s.categories.c.target.perMonth, 100000);
+  // In January the full year is ahead: $166.67 a month, rounded up so the year is never short.
+  s = monthSummary({ categories: { c: clothes }, assigned: {} }, [], '2027-01');
+  assert.equal(s.categories.c.needed, 16667);
+  // Assigned $1,500 so far this year by November: $250 a month for the last two.
+  const assigned = { '2026-03': { c: 100000 }, '2026-06': { c: 50000 }, '2025-12': { c: 99999 } };
+  s = monthSummary({ categories: { c: clothes }, assigned }, [], '2026-11');
+  assert.equal(s.categories.c.needed, 25000, 'last year does not count');
+});
+
+test('yearly targets report spending this year, lumpy or not', () => {
+  const clothes = { name: 'Clothes', target: { type: 'yearly', amount: 200000 } };
+  const t = [
+    { id: 'a', kind: 'spend', amount: 100000, date: '2026-02-10', categoryId: 'c' },
+    { id: 'b', kind: 'spend', amount: 2500, date: '2026-09-01', categoryId: 'c' },
+    { id: 'c', kind: 'refund', amount: 500, date: '2026-09-03', categoryId: 'c' },
+    { id: 'd', kind: 'spend', amount: 9999, date: '2025-12-24', categoryId: 'c' },
+  ];
+  const s = monthSummary({ categories: { c: clothes }, assigned: { '2026-01': { c: 200000 } } }, t, '2026-11');
+  assert.equal(s.categories.c.target.spentThisYear, 102000);
+  assert.equal(s.categories.c.needed, 0, 'fully funded in January');
+});
+
+test('save by a date spreads what is missing up to the date', () => {
+  // $3,000 by June 2027, starting November 2026 with $600 saved: 8 months (Nov..Jun) for $2,400.
+  const trip = { name: 'Vacation', target: { type: 'byDate', amount: 300000, date: '2027-06' } };
+  const b = { categories: { v: trip }, assigned: { '2026-10': { v: 60000 } } };
+  const s = monthSummary(b, [], '2026-11');
+  assert.equal(s.categories.v.target.perMonth, 30000);
+  assert.equal(s.categories.v.needed, 30000);
+  assert.equal(s.categories.v.target.saved, 60000);
+});
+
+test('save by a date asks for nothing once the date has passed', () => {
+  const trip = { name: 'Vacation', target: { type: 'byDate', amount: 300000, date: '2026-06' } };
+  const s = monthSummary({ categories: { v: trip }, assigned: {} }, [], '2026-11');
+  assert.equal(s.categories.v.needed, 0);
+  assert.equal(s.categories.v.target.past, true);
+});
+
+test('save by a date in the current month asks for all of what is missing', () => {
+  const trip = { name: 'Vacation', target: { type: 'byDate', amount: 50000, date: '2026-11' } };
+  const s = monthSummary({ categories: { v: trip }, assigned: { '2026-11': { v: 10000 } } }, [], '2026-11');
+  assert.equal(s.categories.v.needed, 40000);
+});

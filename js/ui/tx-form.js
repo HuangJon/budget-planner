@@ -11,10 +11,11 @@ import { LIMITS } from '../config/app.js';
 
 const KINDS = [['spend', 'Spending'], ['income', 'Income'], ['refund', 'Refund']];
 
-export function openTxForm(budgetId, editing = null) {
+export function openTxForm(budgetId, editing = null, preset = {}) {
   A.form = editing
     ? { budgetId, editing, kind: editing.kind, amount: fromCents(editing.amount), description: editing.description || '', categoryId: editing.categoryId || '', date: editing.date, note: editing.note || '', showNote: Boolean(editing.note), touchedCat: true }
-    : { budgetId, editing: null, kind: 'spend', amount: '', description: '', categoryId: '', date: today(), note: '', showNote: false, touchedCat: false };
+    : { budgetId, editing: null, kind: 'spend', amount: '', description: '', categoryId: preset.categoryId || '', date: today(), note: '', showNote: false, touchedCat: Boolean(preset.categoryId) };
+  A.sheet = { kind: 'tx' };
   drawForm();
   if (!editing) setTimeout(() => document.getElementById('fAmount')?.focus(), 50);
 }
@@ -24,7 +25,7 @@ const catOptions = (b, selected) => `<option value="" ${selected ? '' : 'selecte
 function drawForm() {
   const F = A.form, b = A.budgets[F.budgetId];
   const income = F.kind === 'income';
-  openSheet(`<form class="sheet tx-form" id="txForm" novalidate>${sheetHead(F.editing ? 'Edit' : 'Add')}
+  openSheet(`<form class="sheet tx-form" id="txForm" novalidate>${sheetHead(F.editing ? 'Edit' : F.kind === 'income' ? 'Add income' : F.kind === 'refund' ? 'Add a refund' : 'Add spending')}
     <div class="sheet-body">
       <div class="seg" role="group" aria-label="Kind">${KINDS.map(([k, label]) => `<button type="button" data-action="tx-kind" data-id="${k}" aria-pressed="${F.kind === k}">${label}</button>`).join('')}</div>
       <label class="money-in big"><span class="sr">Amount</span><span aria-hidden="true">$</span><input id="fAmount" class="amount-input" inputmode="decimal" autocomplete="off" placeholder="0.00" value="${esc(F.amount)}" data-input="tx-amount"></label>

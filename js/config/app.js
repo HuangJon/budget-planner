@@ -3,12 +3,29 @@ export const SCHEMA_VERSION = 1;
 export const APP_NAME = "Where's my money";
 export const CURRENCY = 'USD';
 
-/** Starter categories for a new budget, grouped the way most people think about bills. */
+/**
+ * The checklist shown when starting a budget. `on` ones start ticked; the rest are a tap away.
+ */
 export const STARTER_CATEGORIES = [
-  { group: 'Bills', names: ['Rent', 'Utilities', 'Phone', 'Internet', 'Insurance', 'Subscriptions'] },
-  { group: 'Everyday', names: ['Groceries', 'Eating out', 'Transport', 'Household', 'Health'] },
-  { group: 'Fun', names: ['Entertainment', 'Shopping', 'Gifts'] },
-  { group: 'Saving for', names: ['Emergency fund'] },
+  { group: 'Bills', items: [
+    { name: 'Rent', on: true }, { name: 'Utilities', on: true },
+    { name: 'Phone', on: true }, { name: 'Internet', on: true },
+    { name: 'Insurance', on: true }, { name: 'Subscriptions', on: true },
+    { name: 'Debt payments' }, { name: 'Car' },
+  ] },
+  { group: 'Everyday', items: [
+    { name: 'Groceries', on: true }, { name: 'Eating out', on: true }, { name: 'Transport', on: true },
+    { name: 'Household', on: true }, { name: 'Health', on: true }, { name: 'Personal care' },
+    { name: 'Pets' }, { name: 'Kids' },
+  ] },
+  { group: 'Fun', items: [
+    { name: 'Entertainment', on: true }, { name: 'Shopping', on: true }, { name: 'Clothes' },
+    { name: 'Gifts', on: true }, { name: 'Giving' }, { name: 'Education' },
+  ] },
+  { group: 'Saving for', items: [
+    { name: 'Stuff I didn’t plan for', on: true }, { name: 'Emergency fund', on: true },
+    { name: 'Travel' }, { name: 'Investing' },
+  ] },
 ];
 
 export const LIMITS = {

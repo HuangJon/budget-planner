@@ -1,10 +1,11 @@
 /** Your budgets, starting a new one, and your account menu. */
 import { A, actions, render } from './state.js';
-import { esc, openSheet, closeSheet, sheetHead, toast, send, val } from './dom.js';
+import { esc, openSheet, closeSheet, sheetHead, toast, send, val, today } from './dom.js';
 import { lookPicker, setLook } from './look.js';
 import { summaryFor } from './budget.js';
-import { money } from '../core/money.js';
-import { LIMITS, APP_NAME } from '../config/app.js';
+import { money, toCents } from '../core/money.js';
+import { LIMITS, APP_NAME, STARTER_CATEGORIES } from '../config/app.js';
+import { starterCategories } from '../data/repository.js';
 
 export function homeScreen() {
   const ids = A.budgetIds.filter(id => A.budgets[id]);
@@ -20,27 +21,66 @@ export function homeScreen() {
     ${A.user ? `<p class="small muted signed-in">Signed in as ${esc(A.user.email)}${A.preview ? ' (preview)' : ''}. <button type="button" class="link small" data-action="sign-out">Sign out</button></p>` : ''}`;
 }
 
+/* ---------- Starting a budget: who it's for, money you have now, categories, then Plan money ---------- */
 actions['new-budget'] = () => {
-  A.sheet = { kind: 'new-budget', type: 'personal' };
+  const picked = new Set(STARTER_CATEGORIES.flatMap(g => g.items.filter(i => i.on).map(i => i.name)));
+  A.sheet = { kind: 'new-budget', step: 1, type: 'personal', name: '', money: '', picked };
   drawNewBudget();
 };
+const STEPS = ['Name', 'Money', 'Categories'];
+const keepTyped = () => {
+  const S = A.sheet;
+  if (document.getElementById('nbName')) S.name = val('nbName');
+  if (document.getElementById('nbMoney')) S.money = val('nbMoney');
+};
 function drawNewBudget() {
-  const t = A.sheet.type;
-  openSheet(`<form class="sheet" id="newBudgetForm" novalidate>${sheetHead('New budget')}<div class="sheet-body">
-    <label class="f"><span>Name</span><input id="nbName" maxlength="${LIMITS.budgetName}" placeholder="${t === 'shared' ? 'Home, Family…' : 'My money'}" autocomplete="off"></label>
-    <div class="seg" role="group" aria-label="Who uses it"><button type="button" data-action="nb-type" data-id="personal" aria-pressed="${t === 'personal'}">Just me</button><button type="button" data-action="nb-type" data-id="shared" aria-pressed="${t === 'shared'}">Shared</button></div>
-    <p class="small muted">${t === 'shared' ? 'Everyone you invite sees and changes the same budget. You can invite people after it’s made.' : 'Only you can see it. You can share it later.'}</p>
-  </div><div class="sheet-foot"><button type="submit" class="btn primary" data-action="nb-save">Start it</button></div></form>`);
-  setTimeout(() => document.getElementById('nbName')?.focus(), 50);
+  const S = A.sheet, t = S.type;
+  const steps = `<ol class="steps">${STEPS.map((label, i) => `<li class="${i + 1 < S.step ? 'done' : ''}" ${i + 1 === S.step ? 'aria-current="step"' : ''}><span>${i + 1}</span>${label}</li>`).join('')}</ol>`;
+  let body, button;
+  if (S.step === 1) {
+    body = `<label class="f"><span>Name</span><input id="nbName" maxlength="${LIMITS.budgetName}" placeholder="${t === 'shared' ? 'Home, Family…' : 'My money'}" autocomplete="off" value="${esc(S.name)}"></label>
+      <div class="seg" role="group" aria-label="Who uses it"><button type="button" data-action="nb-type" data-id="personal" aria-pressed="${t === 'personal'}">Just me</button><button type="button" data-action="nb-type" data-id="shared" aria-pressed="${t === 'shared'}">Shared</button></div>
+      <p class="small muted">${t === 'shared' ? 'Everyone you invite sees and changes the same budget. You can invite people once it\u2019s made.' : 'Only you can see it. You can share it later.'}</p>`;
+    button = 'Next';
+  } else if (S.step === 2) {
+    body = `<h3>How much money do you have right now?</h3>
+      <p class="small muted">Add up what's in checking and savings that you want to budget. Leave out money you'd never touch, like retirement accounts.</p>
+      <label class="money-in big"><span class="sr">Money you have now</span><span aria-hidden="true">$</span><input id="nbMoney" class="amount-input" inputmode="decimal" autocomplete="off" placeholder="0.00" value="${esc(S.money)}"></label>
+      <p class="small muted">It goes into Ready to assign, so you can give it jobs straight away. You can skip this and add income later.</p>`;
+    button = 'Next';
+  } else {
+    body = `<h3>Pick your categories</h3><p class="small muted">Tap to add or remove. You can rename them and add your own any time.</p>
+      ${STARTER_CATEGORIES.map(g => `<section class="stack tight"><span class="label">${esc(g.group)}</span><div class="chips">${g.items.map(i => `<button type="button" class="chip" data-action="nb-pick" data-id="${esc(i.name)}" aria-pressed="${S.picked.has(i.name)}">${esc(i.name)}</button>`).join('')}</div></section>`).join('')}`;
+    button = `Start with ${S.picked.size} ${S.picked.size === 1 ? 'category' : 'categories'}`;
+  }
+  openSheet(`<form class="sheet" id="newBudgetForm" novalidate>${sheetHead('New budget', '', S.step > 1 ? 'Back' : 'Cancel').replace('data-action="close-sheet"', S.step > 1 ? 'data-action="nb-back"' : 'data-action="close-sheet"')}<div class="sheet-body">
+    ${steps}${body}
+  </div><div class="sheet-foot"><button type="submit" class="btn primary" data-action="nb-next">${button}</button></div></form>`);
+  if (S.step < 3) setTimeout(() => document.getElementById(S.step === 1 ? 'nbName' : 'nbMoney')?.focus(), 50);
 }
-actions['nb-type'] = el => { const name = val('nbName'); A.sheet.type = el.dataset.id; drawNewBudget(); document.getElementById('nbName').value = name; };
-actions['nb-save'] = () => {
-  const name = val('nbName').trim().slice(0, LIMITS.budgetName);
-  if (!name) { toast('Give it a name.'); return; }
-  const { budget, written } = A.repo.createBudget({ name, kind: A.sheet.type, myName: A.user?.displayName || 'You' });
+actions['nb-type'] = el => { keepTyped(); A.sheet.type = el.dataset.id; drawNewBudget(); };
+actions['nb-back'] = () => { keepTyped(); A.sheet.step -= 1; drawNewBudget(); };
+actions['nb-pick'] = el => {
+  const p = A.sheet.picked, n = el.dataset.id;
+  if (p.has(n)) p.delete(n); else p.add(n);
+  el.setAttribute('aria-pressed', String(p.has(n)));
+  document.querySelector('[data-action=nb-next]').textContent = `Start with ${p.size} ${p.size === 1 ? 'category' : 'categories'}`;
+};
+actions['nb-next'] = () => {
+  keepTyped();
+  const S = A.sheet;
+  if (S.step === 1) {
+    S.name = S.name.trim().slice(0, LIMITS.budgetName);
+    if (!S.name) { toast('Give it a name.'); return; }
+  }
+  if (S.step < 3) { S.step += 1; drawNewBudget(); return; }
+  const { budget, written } = A.repo.createBudget({
+    name: S.name, kind: S.type, myName: A.user?.displayName || 'You',
+    categories: starterCategories([...S.picked]), startingMoney: toCents(S.money), today: today(),
+  });
   send(written);
   closeSheet();
-  location.hash = `#b-${budget.id}`;
+  location.hash = `#b-${budget.id}-plan`;
 };
 
 actions.account = () => {
