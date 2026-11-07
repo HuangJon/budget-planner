@@ -68,6 +68,12 @@ export function createRepository(backend, now = () => Date.now()) {
       ...Object.fromEntries(Object.entries(fields).map(([k, v]) => [`categories.${catId}.${k}`, v])),
       changedBy: uid(),
     }),
+    /** Renames a group by moving every category in it, hidden ones included. */
+    async renameGroup(id, from, to) {
+      const b = await backend.get(budgetPath(id));
+      const fields = Object.fromEntries(Object.entries(b?.categories || {}).filter(([, c]) => (c.group || 'Other') === from).map(([cid]) => [`categories.${cid}.group`, to]));
+      if (Object.keys(fields).length) await backend.update(budgetPath(id), { ...fields, changedBy: uid() });
+    },
     addCategory(id, { name, group, order }) {
       const catId = randomId(8);
       return { catId, written: backend.update(budgetPath(id), { [`categories.${catId}`]: { name, group, order }, changedBy: uid() }) };

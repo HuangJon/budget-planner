@@ -166,16 +166,20 @@ await tap('[data-action=month][data-id="-1"]');
 await page.getByText('Back to this month').waitFor();
 await tap('[data-action=month][data-id=now]');
 
-// Categories editor: add one.
+// Categories: add one straight from the budget page, then rename it in the editor.
 await tap('a.tab[href^="#b-"]:not([href$="-activity"])');
-await tap('[data-action=account]');
-await tap('[data-action=edit-cats]');
+await page.locator('.group', { hasText: 'Everyday' }).locator('[data-action=add-cat-here]').click();
 await page.fill('#newCatName', 'Pets');
 await tap('[data-action=cat-add]');
-await page.locator('.edit-row input[value="Pets"]').waitFor();
+await page.locator('.ed-row', { hasText: 'Pets' }).waitFor();
+await page.locator('.ed-row', { hasText: 'Pets' }).locator('[data-action=cat-edit]').click();
+await page.fill('#editName', 'Pet stuff');
+await tap('[data-action=cat-edit-save]');
+await page.locator('.ed-row', { hasText: 'Pet stuff' }).waitFor();
+await tap('[data-action=group-toggle]');
 await shot('categories');
 await tap('[data-action=close-sheet]');
-if (!(await page.getByText('Pets', { exact: true }).count())) fail('New category not on the budget');
+if (!(await page.locator('.cat-row', { hasText: 'Pet stuff' }).count())) fail('New category not on the budget');
 
 // Starting a budget: name, money you have, categories, then straight to Plan money.
 await page.goto(pathToFileURL(resolve('preview-test.html')).href + '#home');

@@ -90,8 +90,9 @@ export function budgetScreen(b) {
     ${s.unknownActivity ? `<p class="notice">${money(-s.unknownActivity)} was spent in a category that has since been removed.</p>` : ''}
     ${groups.map(g => {
       const left = g.categories.reduce((a, c) => a + s.categories[c.id].available, 0);
-      return `<section class="group" aria-label="${esc(g.name)}">${groupTab(g.name, `${money(left)} left`)}<div class="panel group-card">${g.categories.map(c => catLine(c, s)).join('')}</div></section>`;
+      return `<section class="group" aria-label="${esc(g.name)}">${groupTab(g.name, `${money(left)} left`)}<div class="panel group-card">${g.categories.map(c => catLine(c, s)).join('')}<button type="button" class="add-cat" data-action="add-cat-here" data-id="${esc(g.name)}">+ Add category</button></div></section>`;
     }).join('')}
+    ${groups.length ? '<button type="button" class="link edit-cats-link" data-action="edit-cats">Edit categories</button>' : ''}
     ${groups.length ? '' : '<section class="panel empty"><h2>No categories yet</h2><p class="muted">Add one from the menu behind your icon.</p></section>'}`;
 }
 
@@ -165,6 +166,7 @@ export function catSheet() {
     <div class="panel more-list">
       <button type="button" class="form-row" data-action="cat-open" data-id="target" aria-expanded="${Boolean(open.target)}"><span class="form-row-label">Target</span><span class="form-row-value">${esc(targetLabel(c))}</span></button>
       ${open.target ? `<div class="more-body stack">${targetEditor(c)}</div>` : ''}
+      <button type="button" class="form-row" data-action="edit-this-cat"><span class="form-row-label">Name and group</span><span class="form-row-value muted">Rename, move or hide</span></button>
       <button type="button" class="form-row" data-action="cat-open" data-id="move" aria-expanded="${Boolean(open.move)}"><span class="form-row-label">Move money</span><span class="form-row-value muted">To another category</span></button>
       ${open.move ? `<div class="more-body stack">
         <div class="row gap8">${amountBox('moveAmt', 0, 'Amount to move')}</div>
