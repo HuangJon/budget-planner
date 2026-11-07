@@ -1,6 +1,6 @@
 /** Starts the app: picks the backend, follows the link, keeps data live and draws the screens. */
 import { A, actions, inputs, changes, setRender } from './ui/state.js';
-import { esc, svg, ICON, closeSheet, sheetBack, today, refreshOpenSheet } from './ui/dom.js';
+import { esc, svg, ICON, closeSheet, sheetBack, today, refreshOpenSheet, redrawKeeping } from './ui/dom.js';
 import { applyLook } from './ui/look.js';
 import { homeScreen } from './ui/home.js';
 import { budgetScreen } from './ui/budget.js';
@@ -156,10 +156,23 @@ function render() {
     return;
   }
   if (A.status !== 'ready') return;
-  // Someone may be typing on the page (Plan money). Keep their box, cursor and unsaved text.
-  const active = document.activeElement;
-  const keep = active && app.contains(active) && active.id && /INPUT|TEXTAREA/.test(active.tagName)
-    ? { id: active.id, value: active.value, start: active.selectionStart, end: active.selectionEnd } : null;
+  // New data can arrive while someone is typing on the page (Plan money, a name). Redrawing the
+  // same screen keeps what they typed and their cursor; a different screen starts fresh.
+  const where = `${A.route.name}:${A.route.id || ''}`;
+  if (where !== lastDrawn) { lastDrawn = where; drawScreen(); }
+  else {
+    redrawKeeping(app, drawScreen);
+    const el = document.activeElement;
+    if (el && app.contains(el) && el.dataset.input) inputs[el.dataset.input]?.(el);
+  }
+  drawTabs(A.route.id ? A.budgets[A.route.id] : null);
+  if (A.tour) requestAnimationFrame(drawTour);
+  else if (A.route.name === 'budget' && A.budgets[A.route.id] && !A.budgets[A.route.id].deleted && !A.noTour) requestAnimationFrame(maybeStartTour);
+  // Keep an open popup up to date with the latest data too.
+  refreshOpenSheet();
+}
+let lastDrawn = null;
+function drawScreen() {
   const b = A.route.id ? A.budgets[A.route.id] : null;
   if (A.route.name === 'owner') {
     document.title = `Owner page · ${APP_NAME}`;
@@ -181,20 +194,6 @@ function render() {
     document.title = `${b.name} · ${APP_NAME}`;
     app.innerHTML = A.route.name === 'plan' ? planScreen(b) : topbar(b) + describe(A.route.name) + ({ transactions: transactionsScreen, trends: trendsScreen, people: peopleScreen }[A.route.name] || budgetScreen)(b);
   }
-  drawTabs(b);
-  if (A.tour) requestAnimationFrame(drawTour);
-  else if (A.route.name === 'budget' && b && !b.deleted && !A.noTour) requestAnimationFrame(maybeStartTour);
-  if (keep) {
-    const el = document.getElementById(keep.id);
-    if (el) {
-      el.value = keep.value;
-      el.focus({ preventScroll: true });
-      try { el.setSelectionRange(keep.start, keep.end); } catch { /* some boxes have no cursor */ }
-      if (el.dataset.input) inputs[el.dataset.input]?.(el);
-    }
-  }
-  // Keep an open popup up to date with the latest data, unless someone is typing in it.
-  refreshOpenSheet();
 }
 setRender(render);
 

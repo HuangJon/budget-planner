@@ -44,23 +44,42 @@ export function openSheet(html) {
   }
 }
 /**
- * Redraws the open popup with the latest data. Anything the person has typed but not saved, and
- * where their cursor is, survives the redraw.
+ * Redraws part of the page without losing what the person was doing there: anything typed or
+ * picked but not saved yet, and where their cursor is. New data can arrive at any moment.
  */
-const LIVE = ['cat', 'cat-edit', 'rule', 'cat-trend', 'account'];
-export function refreshOpenSheet() {
-  const d = sheet(), active = document.activeElement;
-  if (!d.open || !A.sheet || !LIVE.includes(A.sheet.kind) || !drawers[A.sheet.kind]) return;
-  const typed = [...d.querySelectorAll('input[id], textarea[id]')]
-    .filter(el => el === active || el.value !== el.defaultValue).map(el => [el.id, el.value]);
-  const focus = active && d.contains(active) && active.id ? { id: active.id, start: active.selectionStart, end: active.selectionEnd } : null;
-  drawers[A.sheet.kind]();
-  for (const [id, value] of typed) { const el = document.getElementById(id); if (el && d.contains(el)) el.value = value; }
-  const el = focus && document.getElementById(focus.id);
-  if (el && d.contains(el)) {
-    el.focus({ preventScroll: true });
-    try { if (focus.start != null) el.setSelectionRange(focus.start, focus.end); } catch { /* not a text field */ }
+const isBox = el => el.type === 'checkbox' || el.type === 'radio';
+const shown = el => (isBox(el) ? el.defaultChecked : el.tagName === 'SELECT' ? [...el.options].filter(o => o.defaultSelected).map(o => o.value).join() : el.defaultValue);
+const current = el => (isBox(el) ? el.checked : el.value);
+const changedByPerson = el => (el.tagName === 'SELECT' ? [...el.options].some(o => o.selected !== o.defaultSelected) : current(el) !== shown(el));
+/**
+ * The box being typed in always keeps its text. Other changed boxes keep theirs only while the
+ * saved value underneath is unchanged, so a save (or someone else's edit) shows through.
+ */
+export function redrawKeeping(box, draw) {
+  const active = document.activeElement;
+  const kept = [...box.querySelectorAll('input[id], textarea[id], select[id]')]
+    .filter(el => el === active || changedByPerson(el))
+    .map(el => ({ id: el.id, focused: el === active, was: shown(el), value: current(el) }));
+  const focus = active && box.contains(active) && active.id ? { id: active.id, start: active.selectionStart, end: active.selectionEnd } : null;
+  draw();
+  for (const k of kept) {
+    const el = document.getElementById(k.id);
+    if (!el || !box.contains(el) || (!k.focused && shown(el) !== k.was)) continue;
+    if (isBox(el)) el.checked = k.value;
+    else if (el.tagName !== 'SELECT' || [...el.options].some(o => o.value === k.value)) el.value = k.value;
   }
+  const el = focus && document.getElementById(focus.id);
+  if (el && box.contains(el) && document.activeElement !== el) {
+    el.focus({ preventScroll: true });
+    try { if (focus.start != null) el.setSelectionRange(focus.start, focus.end); } catch { /* not a text box */ }
+  }
+}
+/** Redraws the open popup with the latest data. */
+const LIVE = ['cat', 'cat-edit', 'rule', 'cat-trend', 'account', 'tx'];
+export function refreshOpenSheet() {
+  const d = sheet();
+  if (!d.open || !A.sheet || !LIVE.includes(A.sheet.kind) || !drawers[A.sheet.kind]) return;
+  redrawKeeping(d, drawers[A.sheet.kind]);
 }
 export function closeSheet() {
   const d = sheet();
