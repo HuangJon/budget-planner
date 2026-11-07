@@ -58,7 +58,7 @@ function drawNewBudget() {
   openSheet(`<form class="sheet" id="newBudgetForm" novalidate>${S.step > 1 ? sheetHead('New budget').replace('data-action="sheet-back"', 'data-action="nb-back"') : sheetHead('New budget')}<div class="sheet-body">
     ${steps}${body}
   </div><div class="sheet-foot"><button type="submit" class="btn primary" data-action="nb-next">${button}</button></div></form>`);
-  if (S.step < 3) setTimeout(() => document.getElementById(S.step === 1 ? 'nbName' : 'nbMoney')?.focus(), 50);
+  if (S.step < 3) document.getElementById(S.step === 1 ? 'nbName' : 'nbMoney')?.focus();
 }
 actions['nb-type'] = el => { keepTyped(); A.sheet.type = el.dataset.id; drawNewBudget(); };
 actions['nb-back'] = () => { keepTyped(); A.sheet.step -= 1; drawNewBudget(); };

@@ -18,7 +18,7 @@ export function openCatEditor({ group = null, adding = null, editing = null } = 
   if (editing && b.categories[editing]) open[b.categories[editing].group || 'Other'] = true;
   if (adding) open[adding] = true;
   openChild({ kind: 'cat-edit', budgetId: A.route.id, open, editing, adding, renaming: null }, drawEditor);
-  if (adding) setTimeout(() => document.getElementById('newCatName')?.focus(), 50);
+  if (adding) document.getElementById('newCatName')?.focus();
 }
 
 function addRow(groupName) {
@@ -159,7 +159,8 @@ actions['cat-add'] = el => {
   A.sheet.adding = group === el.dataset.id ? group : null;
   A.sheet.open = { ...A.sheet.open, [group]: true };
   redraw();
-  setTimeout(() => document.getElementById('newCatName')?.focus(), 60);
+  // After the redraw above has run, so the new box is the one focused.
+  setTimeout(() => document.getElementById('newCatName')?.focus());
 };
 actions['group-rename'] = el => { A.sheet.renaming = el.dataset.id; drawEditor(); document.getElementById('groupName')?.select(); };
 actions['group-rename-cancel'] = () => { A.sheet.renaming = null; drawEditor(); };

@@ -19,7 +19,7 @@ export function openTxForm(budgetId, editing = null, preset = {}) {
     ? { budgetId, editing, kind: editing.kind, amount: fromCents(editing.amount), description: editing.description || '', categoryId: editing.categoryId || '', date: editing.date, note: editing.note || '', showNote: Boolean(editing.note), touchedCat: true, repeat: false, every: 'month' }
     : { budgetId, editing: null, kind: preset.kind || 'spend', amount: '', description: '', categoryId: preset.categoryId || '', date: defaultDate(), note: '', showNote: false, touchedCat: Boolean(preset.categoryId), repeat: false, every: 'month' };
   openChild({ kind: 'tx' }, drawForm);
-  if (!editing) setTimeout(() => document.getElementById('fAmount')?.focus(), 50);
+  if (!editing) document.getElementById('fAmount')?.focus();
 }
 
 const catOptions = (b, selected) => `<option value="" ${selected ? '' : 'selected'} disabled>Pick one</option>${groupedCategories(b).map(g => `<optgroup label="${esc(g.name)}">${g.categories.map(c => `<option value="${c.id}" ${c.id === selected ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</optgroup>`).join('')}${selected && b.categories[selected]?.hidden ? `<option value="${selected}" selected>${esc(b.categories[selected].name)} (hidden)</option>` : ''}`;
