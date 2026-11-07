@@ -98,3 +98,36 @@ test('leaving removes the budget from your list', async () => {
   assert.equal(await backend.get(`users/preview-you/budgets/${budget.id}`), null);
   assert.equal((await backend.get(`budgets/${budget.id}`)).members['preview-you'], undefined);
 });
+
+test('deleting a category moves its transactions, plan and repeats somewhere else first', async () => {
+  const { backend, repo } = fresh();
+  const { budget, written } = repo.createBudget({ name: 'Mine', categories: { a: { name: 'Coffee' }, b: { name: 'Eating out' } } });
+  await written;
+  await repo.setAssigned(budget.id, '2026-11', { a: 2000, b: 5000 });
+  await repo.saveRule(budget.id, { id: 'r1', kind: 'spend', amount: 500, categoryId: 'a', day: 3, start: '2026-11' });
+  const { written: w } = repo.addTransaction(budget.id, { kind: 'spend', amount: 450, date: '2026-11-02', categoryId: 'a', description: 'Latte' });
+  await w;
+  let list;
+  repo.watchTransactions(budget.id, l => { list = l; });
+  await new Promise(r => setTimeout(r));
+  const before = monthSummary(await backend.get(`budgets/${budget.id}`), list, '2026-11');
+  await repo.deleteCategory(budget.id, 'a', 'b', list);
+  await new Promise(r => setTimeout(r));
+  const after = await backend.get(`budgets/${budget.id}`);
+  assert.equal(after.categories.a, undefined);
+  assert.deepEqual(after.assigned['2026-11'], { b: 7000 });
+  assert.equal(after.recurring.r1.categoryId, 'b');
+  assert.equal(list[0].categoryId, 'b');
+  const s = monthSummary(after, list, '2026-11');
+  assert.equal(s.readyToAssign, before.readyToAssign, 'deleting never changes Ready to assign');
+  assert.equal(s.categories.b.available, before.categories.a.available + before.categories.b.available);
+});
+
+test('an unused category can be deleted outright, a used one needs somewhere to go', async () => {
+  const { backend, repo } = fresh();
+  const { budget, written } = repo.createBudget({ name: 'Mine', categories: { a: { name: 'A' }, b: { name: 'B' } } });
+  await written;
+  await repo.deleteCategory(budget.id, 'a');
+  assert.equal((await backend.get(`budgets/${budget.id}`)).categories.a, undefined);
+  await assert.rejects(repo.deleteCategory(budget.id, 'b', null, [{ id: 't', categoryId: 'b' }]), { code: 'in-use' });
+});

@@ -205,3 +205,12 @@ a.hero-btn { display:inline-grid; place-items:center; text-decoration:none; whit
 :root:is([data-look="dark"],[data-look="light"]) .add-cat { color:var(--ink) }
 :root[data-look="pride"] .add-cat { color:#5B1E8C }
 .edit-cats-link { justify-self:center; padding:6px }
+
+/* Round 4 */
+.delete-panel { padding:12px; border-radius:10px; background:var(--owe-soft); border:1px solid var(--owe) }
+.delete-panel p { color:var(--ink) }
+button.group-tab { border:0; cursor:pointer; font:inherit; text-align:left }
+.group-tab .fold-chev svg { width:16px; height:16px; stroke-width:2.4; transition:transform .15s ease; display:block; margin-top:1px }
+.group-tab[aria-expanded="false"] .fold-chev svg { transform:rotate(-90deg) }
+.group-tab .fold-chev { align-self:center }
+.fold-line { border:0 }

@@ -176,10 +176,29 @@ await page.locator('.ed-row', { hasText: 'Pets' }).locator('[data-action=cat-edi
 await page.fill('#editName', 'Pet stuff');
 await tap('[data-action=cat-edit-save]');
 await page.locator('.ed-row', { hasText: 'Pet stuff' }).waitFor();
-await tap('[data-action=group-toggle]');
+// Delete it: unused, so it goes straight away.
+await page.locator('.ed-row', { hasText: 'Pet stuff' }).locator('[data-action=cat-edit]').click();
+await tap('[data-action=cat-delete-ask]');
+await page.getByText('It has never been used').waitFor();
 await shot('categories');
+await tap('.delete-panel [data-action=cat-delete]');
+await page.locator('.ed-row', { hasText: 'Pet stuff' }).waitFor({ state: 'detached' });
+// Delete one that's in use: it asks where things move.
+await page.locator('.ed-row', { hasText: 'Household' }).locator('[data-action=cat-edit]').click();
+await tap('[data-action=cat-delete-ask]');
+await page.getByText('Pick where they move').waitFor();
+await page.selectOption('#deleteMoveTo', { label: 'Groceries' });
+await tap('.delete-panel [data-action=cat-delete]');
+await page.locator('.ed-row', { hasText: 'Household' }).waitFor({ state: 'detached' });
 await tap('[data-action=close-sheet]');
-if (!(await page.locator('.cat-row', { hasText: 'Pet stuff' }).count())) fail('New category not on the budget');
+if (await page.locator('.cat-row', { hasText: 'Household' }).count()) fail('Deleted category still on the budget');
+
+// Fold a group to one line, and back.
+await page.locator('button.group-tab', { hasText: 'Bills' }).click();
+await page.locator('.group.folded', { hasText: 'Bills' }).locator('.fold-line').waitFor();
+await shot('folded');
+await page.locator('button.group-tab', { hasText: 'Bills' }).click();
+await page.locator('.cat-row', { hasText: 'Rent' }).waitFor();
 
 // Starting a budget: name, money you have, categories, then straight to Plan money.
 await page.goto(pathToFileURL(resolve('preview-test.html')).href + '#home');

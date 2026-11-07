@@ -74,12 +74,25 @@ function catLine(c, s) {
   const x = s.categories[c.id];
   return `<button type="button" class="tap cat-row" data-action="open-cat" data-id="${c.id}">
     <span class="grow stack tight"><strong class="cat-name">${esc(c.name)}</strong><span class="small">${catStatus(c, x)}</span>${catBar(x)}</span>
-    <span class="cat-avail"><span class="amt ${x.available < 0 ? 'owe' : ''}">${money(x.available)}</span><span class="tiny muted">left</span></span>
+    <span class="cat-avail"><span class="amt ${x.available < 0 ? 'owe' : ''}">${money(Math.abs(x.available))}</span><span class="tiny ${x.available < 0 ? 'owe' : 'muted'}">${x.available < 0 ? 'over' : 'to spend'}</span></span>
   </button>`;
 }
 
 /** A group's name on a tab above its card, so groups are easy to tell apart. */
-export const groupTab = (name, right = '') => `<div class="group-tab"><h3>${esc(name)}</h3>${right ? `<span class="small">${right}</span>` : ''}</div>`;
+export const groupTab = (name, right = '', { toggle = false, folded = false } = {}) => toggle
+  ? `<button type="button" class="group-tab" data-action="group-fold" data-id="${esc(name)}" aria-expanded="${!folded}"><span class="fold-chev" aria-hidden="true">${svg('<path d="M6 9l6 6 6-6"/>')}</span><h3>${esc(name)}</h3>${right ? `<span class="small">${right}</span>` : ''}</button>`
+  : `<div class="group-tab"><h3>${esc(name)}</h3>${right ? `<span class="small">${right}</span>` : ''}</div>`;
+
+/** Which groups are folded, remembered on this device for each budget. */
+const FOLD_KEY = id => `wmm:folded:${id}`;
+const readFolds = id => { if (A.foldFallback) return A.foldFallback; try { return JSON.parse(localStorage.getItem(FOLD_KEY(id)) || '[]'); } catch { return []; } };
+export const isFolded = (id, name) => readFolds(id).includes(name);
+actions['group-fold'] = el => {
+  const id = A.route.id, name = el.dataset.id, list = readFolds(id);
+  const next = list.includes(name) ? list.filter(n => n !== name) : [...list, name];
+  try { localStorage.setItem(FOLD_KEY(id), JSON.stringify(next)); } catch { A.foldFallback = next; }
+  render();
+};
 
 export function budgetScreen(b) {
   const s = summaryFor(b);
@@ -90,7 +103,13 @@ export function budgetScreen(b) {
     ${s.unknownActivity ? `<p class="notice">${money(-s.unknownActivity)} was spent in a category that has since been removed.</p>` : ''}
     ${groups.map(g => {
       const left = g.categories.reduce((a, c) => a + s.categories[c.id].available, 0);
-      return `<section class="group" aria-label="${esc(g.name)}">${groupTab(g.name, `${money(left)} left`)}<div class="panel group-card">${g.categories.map(c => catLine(c, s)).join('')}<button type="button" class="add-cat" data-action="add-cat-here" data-id="${esc(g.name)}">+ Add category</button></div></section>`;
+      const over = g.categories.filter(c => s.categories[c.id].available < 0).length;
+      const needs = g.categories.filter(c => s.categories[c.id].needed > 0).length;
+      const folded = isFolded(b.id, g.name);
+      const summary = `${g.categories.length} ${g.categories.length === 1 ? 'category' : 'categories'}${over ? ` · <span class="owe">${over} over</span>` : ''}${needs ? ` · <span class="nudge">${needs} need money</span>` : ''}`;
+      return `<section class="group ${folded ? 'folded' : ''}" aria-label="${esc(g.name)}">${groupTab(g.name, `${money(left)} to spend`, { toggle: true, folded })}<div class="panel group-card">${folded
+        ? `<button type="button" class="tap fold-line" data-action="group-fold" data-id="${esc(g.name)}"><span class="grow small muted">${summary}</span><span class="small link">Show</span></button>`
+        : `${g.categories.map(c => catLine(c, s)).join('')}<button type="button" class="add-cat" data-action="add-cat-here" data-id="${esc(g.name)}">+ Add category</button>`}</div></section>`;
     }).join('')}
     ${groups.length ? '<button type="button" class="link edit-cats-link" data-action="edit-cats">Edit categories</button>' : ''}
     ${groups.length ? '' : '<section class="panel empty"><h2>No categories yet</h2><p class="muted">Add one from the menu behind your icon.</p></section>'}`;
@@ -135,7 +154,7 @@ export function catSheet() {
   const open = A.sheet.open || {};
   openSheet(`<div class="sheet">${sheetHead(c.name, '', 'Done')}<div class="sheet-body">
     <section class="panel pad stack">
-      <div class="row between"><span class="label">Left in ${esc(shortMonth(A.month))}</span><span class="big-amt amt ${x.available < 0 ? 'owe' : ''}">${money(x.available)}</span></div>
+      <div class="row between"><span class="label">${x.available < 0 ? 'Over in' : 'To spend in'} ${esc(shortMonth(A.month))}</span><span class="big-amt amt ${x.available < 0 ? 'owe' : ''}">${money(Math.abs(x.available))}</span></div>
       <p class="small">${catStatus(c, x)}</p>
       <dl class="mini-stats">
         <div><dt>Carried from last month</dt><dd class="amt ${x.carried < 0 ? 'owe' : ''}">${money(x.carried)}</dd></div>
@@ -149,7 +168,7 @@ export function catSheet() {
       <p class="small muted">Move money in from somewhere with some left.</p>
       ${donors.length || s.readyToAssign > 0 ? '<button type="button" class="btn primary" data-action="cover-auto">Cover it for me</button>' : '<p class="small">No category has money left to move. Add income, or plan less somewhere next month.</p>'}
       ${s.readyToAssign > 0 ? `<button type="button" class="btn row between" data-action="cover-from" data-id="ready"><span>From Ready to assign</span><span class="amt muted">${money(s.readyToAssign)}</span></button>` : ''}
-      ${donors.slice(0, 6).map(([o, oc]) => `<button type="button" class="btn row between" data-action="cover-from" data-id="${o}"><span>From ${esc(oc.name)}</span><span class="amt muted">${money(s.categories[o].available)} left</span></button>`).join('')}
+      ${donors.slice(0, 6).map(([o, oc]) => `<button type="button" class="btn row between" data-action="cover-from" data-id="${o}"><span>From ${esc(oc.name)}</span><span class="amt muted">${money(s.categories[o].available)} to spend</span></button>`).join('')}
     </section>` : ''}
 
     <div class="two-btns">

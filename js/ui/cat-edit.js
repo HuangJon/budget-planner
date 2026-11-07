@@ -35,7 +35,8 @@ function catRow(c, i, count, groupNames) {
     return `<div class="ed-row editing stack">
       <label class="f"><span>Name</span><input id="editName" maxlength="${LIMITS.categoryName}" value="${esc(c.name)}" autocomplete="off"></label>
       <div class="form-rows"><label class="form-row"><span class="form-row-label">Group</span><select id="editGroup">${groupNames.map(g => `<option ${g === (c.group || 'Other') ? 'selected' : ''}>${esc(g)}</option>`).join('')}</select></label></div>
-      <div class="row gap8 wrap"><button type="button" class="btn small primary" data-action="cat-edit-save" data-id="${c.id}">Save</button><button type="button" class="btn small" data-action="cat-edit-cancel">Cancel</button><span class="grow"></span><button type="button" class="btn small" data-action="cat-hide" data-id="${c.id}">Hide</button></div>
+      <div class="row gap8 wrap"><button type="button" class="btn small primary" data-action="cat-edit-save" data-id="${c.id}">Save</button><button type="button" class="btn small" data-action="cat-edit-cancel">Cancel</button><span class="grow"></span><button type="button" class="btn small" data-action="cat-hide" data-id="${c.id}">Hide</button><button type="button" class="btn small danger" data-action="cat-delete-ask" data-id="${c.id}">Delete</button></div>
+      ${S.deleting === c.id ? deletePanel(c) : ''}
     </div>`;
   }
   return `<div class="ed-row row">
@@ -43,6 +44,24 @@ function catRow(c, i, count, groupNames) {
     <button type="button" class="icon-btn small-icon" data-action="cat-up" data-id="${c.id}" aria-label="Move ${esc(c.name)} up" ${i === 0 ? 'disabled' : ''}>${svg(UP)}</button>
     <button type="button" class="icon-btn small-icon" data-action="cat-down" data-id="${c.id}" aria-label="Move ${esc(c.name)} down" ${i === count - 1 ? 'disabled' : ''}>${svg(DOWN)}</button>
     <button type="button" class="btn small" data-action="cat-edit" data-id="${c.id}">Edit</button>
+  </div>`;
+}
+
+/** How much a category is in use, to decide whether deleting needs somewhere to move things. */
+function usage(b, id) {
+  const txs = (A.transactions[b.id] || []).filter(t => t.categoryId === id);
+  const planned = Object.values(b.assigned || {}).some(m => m?.[id]);
+  const repeats = Object.values(b.recurring || {}).filter(r => r.categoryId === id && !r.stopped).length;
+  return { count: txs.filter(t => !t.deleted).length, any: txs.length > 0 || planned || repeats > 0, repeats };
+}
+function deletePanel(c) {
+  const b = A.budgets[A.sheet.budgetId], u = usage(b, c.id);
+  const others = Object.entries(b.categories).filter(([id, x]) => id !== c.id && !x.hidden).sort(([, p], [, q]) => (p.order ?? 0) - (q.order ?? 0));
+  if (!u.any) return `<div class="delete-panel stack"><p class="small">Delete ${esc(c.name)}? It has never been used.</p><div class="row gap8"><button type="button" class="btn small danger" data-action="cat-delete" data-id="${c.id}">Delete</button><button type="button" class="btn small" data-action="cat-delete-cancel">Keep it</button></div></div>`;
+  return `<div class="delete-panel stack">
+    <p class="small">${esc(c.name)} has ${u.count ? `${u.count} ${u.count === 1 ? 'transaction' : 'transactions'}` : 'planned money'}${u.repeats ? ` and ${u.repeats} monthly ${u.repeats === 1 ? 'repeat' : 'repeats'}` : ''}. Pick where they move, so your totals stay right. Hiding keeps it as it is instead.</p>
+    <div class="form-rows"><label class="form-row"><span class="form-row-label">Move to</span><select id="deleteMoveTo">${others.map(([id, x]) => `<option value="${id}">${esc(x.name)}</option>`).join('')}</select></label></div>
+    <div class="row gap8"><button type="button" class="btn small danger" data-action="cat-delete" data-id="${c.id}">Move and delete</button><button type="button" class="btn small" data-action="cat-delete-cancel">Keep it</button></div>
   </div>`;
 }
 
@@ -80,7 +99,7 @@ const redraw = () => setTimeout(() => { if (A.sheet?.kind === 'cat-edit') drawEd
 
 actions['group-toggle'] = el => { const k = el.dataset.id; A.sheet.open = { ...A.sheet.open, [k]: !A.sheet.open[k] }; A.sheet.editing = null; A.sheet.adding = null; drawEditor(); };
 actions['cat-edit'] = el => { A.sheet.editing = el.dataset.id; A.sheet.adding = null; drawEditor(); document.getElementById('editName')?.focus(); };
-actions['cat-edit-cancel'] = () => { A.sheet.editing = null; drawEditor(); };
+actions['cat-edit-cancel'] = () => { A.sheet.editing = null; A.sheet.deleting = null; drawEditor(); };
 actions['cat-edit-save'] = el => {
   const b = budget(), id = el.dataset.id, c = b.categories[id];
   const name = val('editName').trim().slice(0, LIMITS.categoryName), group = val('editGroup');
@@ -153,6 +172,23 @@ actions['group-rename-save'] = el => {
   toast(`Renamed to ${to}`, () => { send(A.repo.renameGroup(b.id, to, from)); redraw(); });
   A.sheet.open = { ...A.sheet.open, [to]: true };
   redraw();
+};
+
+actions['cat-delete-ask'] = el => { A.sheet.deleting = el.dataset.id; drawEditor(); };
+actions['cat-delete-cancel'] = () => { A.sheet.deleting = null; drawEditor(); };
+actions['cat-delete'] = async el => {
+  const b = budget(), id = el.dataset.id, c = { ...b.categories[id] };
+  const u = usage(b, id);
+  const moveTo = u.any ? val('deleteMoveTo') : null;
+  if (u.any && !moveTo) return toast('Pick a category to move things to.');
+  el.disabled = true;
+  try {
+    await A.repo.deleteCategory(b.id, id, moveTo, A.transactions[b.id] || []);
+    A.sheet.deleting = null; A.sheet.editing = null;
+    if (moveTo) toast(`Deleted ${c.name}. Everything moved to ${b.categories[moveTo].name}.`);
+    else toast(`Deleted ${c.name}`, () => { send(A.repo.updateCategory(b.id, id, c)); redraw(); });
+    redraw();
+  } catch { el.disabled = false; toast("Couldn't delete it. Check your connection and try again."); }
 };
 
 /* From the budget page and a category's sheet */

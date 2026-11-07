@@ -26,7 +26,7 @@ export function planScreen(b) {
     ${groupedCategories(b).map(g => `<section class="group">${groupTab(g.name)}<div class="panel group-card">${g.categories.map(c => {
       const x = s.categories[c.id];
       return `<div class="plan-row">
-        <div class="grow stack tight"><label class="cat-name" for="plan-${c.id}">${esc(c.name)}</label><span class="small">${catStatus(c, x)}</span><span class="tiny muted" id="left-${c.id}" data-saved="${x.available}">${money(x.available)} left</span></div>
+        <div class="grow stack tight"><label class="cat-name" for="plan-${c.id}">${esc(c.name)}</label><span class="small">${catStatus(c, x)}</span><span class="tiny muted" id="left-${c.id}" data-saved="${x.available}">${x.available < 0 ? `${money(-x.available)} over` : `${money(x.available)} to spend`}</span></div>
         <label class="money-in plan-in"><span class="sr">Planned for ${esc(c.name)}</span><span aria-hidden="true">$</span><input id="plan-${c.id}" inputmode="decimal" autocomplete="off" placeholder="0.00" value="${x.assigned ? esc(fromCents(x.assigned)) : ''}" data-plan="${c.id}" data-saved="${x.assigned}" data-input="plan" data-change="plan"></label>
       </div>`;
     }).join('')}</div></section>`).join('')}
@@ -41,7 +41,7 @@ inputs.plan = el => {
   ready.classList.toggle('owe', r < 0);
   const left = document.getElementById(`left-${el.dataset.plan}`);
   const l = Number(left.dataset.saved) + toCents(el.value) - Number(el.dataset.saved);
-  left.textContent = `${money(l)} left`;
+  left.textContent = l < 0 ? `${money(-l)} over` : `${money(l)} to spend`;
   left.classList.toggle('owe', l < 0);
   left.classList.toggle('muted', l >= 0);
 };

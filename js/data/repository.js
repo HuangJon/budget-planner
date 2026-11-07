@@ -68,6 +68,24 @@ export function createRepository(backend, now = () => Date.now()) {
       ...Object.fromEntries(Object.entries(fields).map(([k, v]) => [`categories.${catId}.${k}`, v])),
       changedBy: uid(),
     }),
+    /**
+     * Deletes a category for good. Its transactions, planned money and repeats move to `moveTo`
+     * first, so totals stay right and nothing goes missing. With no `moveTo` it must be unused.
+     */
+    async deleteCategory(id, catId, moveTo = null, transactions = []) {
+      const b = await backend.get(budgetPath(id));
+      const fields = { [`categories.${catId}`]: undefined, changedBy: uid() };
+      for (const [m, byCat] of Object.entries(b?.assigned || {})) {
+        if (!byCat?.[catId]) continue;
+        if (moveTo) fields[`assigned.${m}.${moveTo}`] = (byCat[moveTo] || 0) + byCat[catId];
+        fields[`assigned.${m}.${catId}`] = undefined;
+      }
+      for (const [rid, r] of Object.entries(b?.recurring || {})) if (r.categoryId === catId) fields[moveTo ? `recurring.${rid}.categoryId` : `recurring.${rid}.stopped`] = moveTo || true;
+      const mine = transactions.filter(t => t.categoryId === catId);
+      if (mine.length && !moveTo) throw Object.assign(new Error('Category still has transactions'), { code: 'in-use' });
+      await Promise.all(mine.map(t => backend.update(txPath(id, t.id), { categoryId: moveTo, movedFrom: catId, updatedAt: now(), updatedBy: uid() })));
+      await backend.update(budgetPath(id), fields);
+    },
     /** Renames a group by moving every category in it, hidden ones included. */
     async renameGroup(id, from, to) {
       const b = await backend.get(budgetPath(id));

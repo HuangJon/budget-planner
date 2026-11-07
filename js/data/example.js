@@ -31,7 +31,7 @@ export function exampleData(uid, now = new Date()) {
     invite: { code: 'examplepreviewinvite01', at: 0 },
     recurring: {
       pay: { id: 'pay', kind: 'income', amount: 260000, description: 'Paycheck', day: 1, start: last },
-      sampay: { id: 'sampay', kind: 'income', amount: 180000, description: 'Sam paycheck', day: 1, start: last },
+      sampay: { id: 'sampay', kind: 'income', amount: 180000, description: 'Sam\u2019s paycheck', day: 1, start: last },
       rent: { id: 'rent', kind: 'spend', amount: 180000, description: 'Rent', categoryId: 'rent', day: 1, start: last },
       phone: { id: 'phone', kind: 'spend', amount: 6500, description: 'Phone bill', categoryId: 'phone', day: 18, start: last },
       stream: { id: 'stream', kind: 'spend', amount: 3499, description: 'Streaming', categoryId: 'subs', day: 22, start: last },
@@ -49,7 +49,7 @@ export function exampleData(uid, now = new Date()) {
   });
   const transactions = [
     t('income', 260000, `${last}-01`, null, 'Paycheck', uid, 'pay'),
-    t('income', 180000, `${last}-01`, null, 'Sam paycheck', 'sam', 'sampay'),
+    t('income', 180000, `${last}-01`, null, 'Sam\u2019s paycheck', 'sam', 'sampay'),
     t('spend', 180000, `${last}-01`, 'rent', 'Rent', uid, 'rent'),
     t('spend', 11240, d(last, 12), 'power', 'Con Edison'),
     t('spend', 6500, `${last}-18`, 'phone', 'Phone bill', uid, 'phone'),
@@ -62,7 +62,7 @@ export function exampleData(uid, now = new Date()) {
     t('spend', 98000, d(addMonths(m, -3), 12), 'clothes', 'Winter coat and boots'),
     t('spend', 30000, d(last, 3), 'investing', 'Transfer to brokerage'),
     t('income', 260000, `${m}-01`, null, 'Paycheck', uid, 'pay'),
-    t('income', 180000, `${m}-01`, null, 'Sam paycheck', 'sam', 'sampay'),
+    t('income', 180000, `${m}-01`, null, 'Sam\u2019s paycheck', 'sam', 'sampay'),
     t('spend', 180000, `${m}-01`, 'rent', 'Rent', uid, 'rent'),
     t('spend', 13200, d(m, 2), 'transport', 'MetroCard'),
     t('spend', 21456, d(m, 3), 'groceries', 'Whole Foods', 'sam'),
@@ -78,7 +78,7 @@ export function exampleData(uid, now = new Date()) {
     const cents = v => Math.round(v * k);
     budget.assigned[mm] = { ...(budget.assigned[mm] || {}), rent: 180000, power: 12000, phone: 6500, subs: 3500, groceries: 55000, eating: 15000, transport: 13200, household: 6000, fun: 8000 };
     transactions.push(
-      t('income', 260000, `${mm}-01`, null, 'Paycheck'), t('income', 180000, `${mm}-01`, null, 'Sam paycheck', 'sam'),
+      t('income', 260000, `${mm}-01`, null, 'Paycheck'), t('income', 180000, `${mm}-01`, null, 'Sam\u2019s paycheck', 'sam'),
       t('spend', 180000, `${mm}-01`, 'rent', 'Rent'), t('spend', cents(10800), `${mm}-12`, 'power', 'Con Edison'),
       t('spend', 6500, `${mm}-18`, 'phone', 'Phone bill'), t('spend', 3499, `${mm}-22`, 'subs', 'Streaming'),
       t('spend', cents(21000), `${mm}-04`, 'groceries', 'Trader Joe\'s'), t('spend', cents(26500), `${mm}-17`, 'groceries', 'Whole Foods', 'sam'),
