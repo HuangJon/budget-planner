@@ -1,0 +1,33 @@
+/* Every color and font. Phone-first single column, with ticket-style tear lines for settling up. */
+:root {
+  --ground:#edf3f8; --surface:#fbfdfe; --sunken:#dfeaf3; --ink:#1d2c3f; --muted:#55687c; --line:#c5d6e4;
+  --accent:#396395; --accent-ink:#ffffff; --accent-soft:#dce8f3;
+  --owed:#2b6658; --owed-soft:#d8ece5; --owe:#ae3f52; --owe-soft:#f7e0e4; --warn:#603935; --warn-soft:#f1e4de;
+  --m1:#396395; --m2:#a5732f; --m3:#2f7f8f; --m4:#a0607f; --m5:#6b6fa8; --m6:#603935; --m7:#4f8fb3; --m8:#7c5a8c; --m9:#3f8478; --m10:#8a6d4f; --m11:#1f3f66; --m12:#6e7f8f;
+  --shadow:rgba(16,39,46,.28); --scrim:rgba(5,18,24,.55);
+  --card-shadow:0 1px 2px rgba(16,39,46,.06),0 6px 18px rgba(16,39,46,.06); --card-line:transparent;
+  --tabs-bg:#ffffff; --tabs-line:#a7c5dd; --tabs-ink:#3f5367; --tabs-shadow:0 -4px 16px rgba(29,44,63,.12); --wash:#c9dcea; --bar:rgba(237,243,248,.88); --heading:#2c4f78;
+  --hero:#396395; --hero-ink:#ffffff; --hero-muted:#d6e4f0; --hero-up:#d4f3e6; --hero-down:#ffd5da; --hero-tear:rgba(255,255,255,.3);
+  --food-bg:#f8e6c8; --food:#7d4e00; --drinks-bg:#f1e4de; --drinks:#603935; --lodging-bg:#dce8f3; --lodging:#396395;
+  --transport-bg:#d9ebf1; --transport:#2b6f7d; --flights-bg:#e3eef7; --flights:#396395; --activities-bg:#e9e4f2; --activities:#5f4f8a;
+  --groceries-bg:#eef0cf; --groceries:#565b12; --shopping-bg:#f5e3e9; --shopping:#8f3a57; --fees-bg:#f1e8dc; --fees:#7a5427; --other-bg:#e3eaf0; --other:#55687c;
+  --display:"Bricolage Grotesque","Noto Sans TC","PingFang TC",system-ui,sans-serif;
+  --body:"Instrument Sans","Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --mono:"IBM Plex Mono","Noto Sans TC",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground:#141c28; --surface:#1d2838; --sunken:#101722; --ink:#e9f0f6; --muted:#a7b8c8; --line:#33445a;
+    --accent:#a7c5dd; --accent-ink:#142233; --accent-soft:#2a3f5a;
+    --owed:#8fd8bf; --owed-soft:#1c3a33; --owe:#f0a0ad; --owe-soft:#47242c; --warn:#e6c4b8; --warn-soft:#3d2a26;
+    --m1:#396395; --m2:#a5732f; --m3:#2f7f8f; --m4:#a0607f; --m5:#6b6fa8; --m6:#603935; --m7:#4f8fb3; --m8:#7c5a8c; --m9:#3f8478; --m10:#8a6d4f; --m11:#1f3f66; --m12:#6e7f8f;
+    --shadow:rgba(0,0,0,.5); --scrim:rgba(0,0,0,.6);
+    --card-shadow:none; --card-line:#2b4049;
+    --tabs-bg:#233146; --tabs-line:#47607d; --tabs-ink:#d4e0ea; --tabs-shadow:0 -4px 16px rgba(0,0,0,.45); --wash:#22344a; --bar:rgba(20,28,40,.88); --heading:#c9dcea;
+    --hero:#396395; --hero-ink:#ffffff; --hero-muted:#d6e4f0; --hero-up:#d4f3e6; --hero-down:#ffd5da; --hero-tear:rgba(255,255,255,.3);
+    --food-bg:#43301a; --food:#f2c98a; --drinks-bg:#3d2a26; --drinks:#e6c4b8; --lodging-bg:#2a3f5a; --lodging:#a7c5dd;
+    --transport-bg:#1e3a42; --transport:#9ad5e2; --flights-bg:#253a54; --flights:#a7c5dd; --activities-bg:#322b4a; --activities:#c8bcef;
+    --groceries-bg:#34361a; --groceries:#d6da8f; --shopping-bg:#42243a; --shopping:#efabc4; --fees-bg:#3a2f1f; --fees:#e3c691; --other-bg:#273444; --other:#a7b8c8;
+    color-scheme:dark;
+  }
+}

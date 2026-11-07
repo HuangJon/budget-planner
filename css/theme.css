@@ -1,0 +1,253 @@
+/* Three looks. Blue is the default and uses the base styles, plus the concentric circles.
+ * Light is Indigo Circle and Dark is Ink; only they get the rules below. */
+.stats { display:grid; gap:8px; margin:12px 0 0 }
+.stats>div { display:flex; justify-content:space-between; gap:12px; border-top:1px solid var(--hero-tear); padding-top:8px }
+.stats dt { color:var(--hero-muted); font-size:.9375rem }
+.stats dd { margin:0; color:var(--hero-ink); font-weight:600; font-size:1rem; font-variant-numeric:tabular-nums; text-align:right }
+.hero .label { font-size:.875rem; letter-spacing:.02em; text-transform:none; color:var(--hero-ink) }
+.bar-row { font-size:.9375rem; color:var(--ink) }
+.bar-row .amt { font-family:var(--body); font-weight:700; font-size:.9375rem; color:var(--ink); font-variant-numeric:tabular-nums }
+.track { height:10px }
+.look-row { display:flex; justify-content:space-between; align-items:center; gap:12px }
+
+.me-actions { display:grid; gap:10px; padding-bottom:14px; border-bottom:1px solid var(--line) }
+.me-settings { display:flex; align-items:center; justify-content:center; gap:8px; width:100% }
+.me-settings svg { width:18px; height:18px }
+.fill.alt,.key.alt { background:#D2A64E }
+.topbar { gap:8px }
+.topbar h1 { font-size:1.25rem; line-height:1.2; min-width:0; overflow-wrap:break-word; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; overflow:hidden }
+@media (max-width:360px) { .topbar { gap:4px } .topbar h1 { font-size:1.05rem } }
+.signed-in { margin-top:24px; padding-top:14px; border-top:1px solid var(--line) }
+:root[data-look="blue"] .hero { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' fill='none' stroke='%23FFFFFF' stroke-opacity='.14' stroke-width='1'%3E%3Ccircle cx='200' cy='40' r='18'/%3E%3Ccircle cx='200' cy='40' r='32'/%3E%3Ccircle cx='200' cy='40' r='46'/%3E%3Ccircle cx='200' cy='40' r='60'/%3E%3Ccircle cx='200' cy='40' r='74'/%3E%3Ccircle cx='200' cy='40' r='88'/%3E%3Ccircle cx='200' cy='40' r='102'/%3E%3Ccircle cx='200' cy='40' r='116'/%3E%3Ccircle cx='200' cy='40' r='130'/%3E%3Ccircle cx='200' cy='40' r='144'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right top; background-size:170px auto }
+:root[data-look="dark"] { --ground:#1C1B19; --surface:#292825; --sunken:#33312E; --ink:#EAE1D1; --muted:#ABA79C; --line:#3A3A36;
+  --accent:#D9CFC0; --accent-ink:#1C1C1A; --accent-soft:#34342F;
+  --owed:#7DBBA9; --owed-soft:#22352F; --owe:#E8796A; --owe-soft:#3D2420; --warn:#C9B48C; --warn-soft:#2E2B24;
+  --m1:#4F5A63; --m2:#A23A2C; --m3:#3F7468; --m4:#8A6E45; --m5:#5C6B8A; --m6:#7E5569; --m7:#66743F; --m8:#6B6A63; --m9:#A17F2E; --m10:#2F6B7D; --m11:#8F5A3C; --m12:#6A5A85;
+  --shadow:rgba(0,0,0,.5); --scrim:rgba(0,0,0,.65); --card-shadow:none; --card-line:#3A3A36;
+  --tabs-bg:#222120; --tabs-line:#3A3A36; --tabs-ink:#ABA79C; --tabs-shadow:none; --wash:#1C1B19; --bar:rgba(28,27,25,.96); --heading:#EAE1D1;
+  --hero:#292825; --hero-ink:#EAE1D1; --hero-muted:#ABA79C; --hero-up:#EAE1D1; --hero-down:#EAE1D1; --hero-tear:#3A3A36;
+  --food-bg:#33312E; --food:#C9B48C; --drinks-bg:#33312E; --drinks:#C9B48C; --lodging-bg:#33312E; --lodging:#C9B48C; --transport-bg:#33312E; --transport:#C9B48C; --flights-bg:#33312E; --flights:#C9B48C;
+  --activities-bg:#33312E; --activities:#C9B48C; --groceries-bg:#33312E; --groceries:#C9B48C; --shopping-bg:#33312E; --shopping:#C9B48C; --fees-bg:#33312E; --fees:#C9B48C; --other-bg:#33312E; --other:#ABA79C;
+  --display:"Shippori Mincho","Noto Serif TC","Songti TC",Georgia,serif;
+  color-scheme:dark; }
+:root:is([data-look="dark"],[data-look="light"]) body { background:var(--ground); color:var(--ink) }
+:root:is([data-look="dark"],[data-look="light"]) h1,:root:is([data-look="dark"],[data-look="light"]) h2,:root:is([data-look="dark"],[data-look="light"]) .hero .big,:root:is([data-look="dark"],[data-look="light"]) .hero-settled { font-family:var(--display); font-weight:600; letter-spacing:0 }
+:root:is([data-look="dark"],[data-look="light"]) h2 { font-size:1.1rem }
+:root:is([data-look="dark"],[data-look="light"]) .date-head { color:var(--muted); letter-spacing:.04em; margin:8px 0 -4px }
+:root:is([data-look="dark"],[data-look="light"]) .stack { gap:16px }
+:root:is([data-look="dark"],[data-look="light"]) .stack.tight,:root:is([data-look="dark"],[data-look="light"]) .tight { gap:4px }
+:root:is([data-look="dark"],[data-look="light"]) .entries { gap:16px }
+:root:is([data-look="dark"],[data-look="light"]) .panel,:root:is([data-look="dark"],[data-look="light"]) .hero,:root:is([data-look="dark"],[data-look="light"]) .notice { border-radius:12px }
+:root:is([data-look="dark"],[data-look="light"]) .btn,:root:is([data-look="dark"],[data-look="light"]) .icon-btn,:root:is([data-look="dark"],[data-look="light"]) input,:root:is([data-look="dark"],[data-look="light"]) select,:root:is([data-look="dark"],[data-look="light"]) textarea,:root:is([data-look="dark"],[data-look="light"]) .chip,:root:is([data-look="dark"],[data-look="light"]) .seg,:root:is([data-look="dark"],[data-look="light"]) .hero-btn { border-radius:8px }
+:root:is([data-look="dark"],[data-look="light"]) .seg button { border-radius:6px }
+:root:is([data-look="dark"],[data-look="light"]) .pad { padding:18px }
+:root:is([data-look="dark"],[data-look="light"]) .btn,:root:is([data-look="dark"],[data-look="light"]) .hero-btn,:root:is([data-look="dark"],[data-look="light"]) .icon-btn { min-height:44px }
+:root:is([data-look="dark"],[data-look="light"]) .btn,:root:is([data-look="dark"],[data-look="light"]) .icon-btn,:root:is([data-look="dark"],[data-look="light"]) .chip { background:var(--sunken); border:1px solid #4A4A45; color:var(--ink) }
+:root:is([data-look="dark"],[data-look="light"]) .btn.primary { background:var(--accent); border-color:var(--accent); color:var(--accent-ink); font-weight:700 }
+:root:is([data-look="dark"],[data-look="light"]) input,:root:is([data-look="dark"],[data-look="light"]) select,:root:is([data-look="dark"],[data-look="light"]) textarea { background:#201F1D; border:1px solid #4A4A45; color:var(--ink) }
+:root:is([data-look="dark"],[data-look="light"]) input::placeholder,:root:is([data-look="dark"],[data-look="light"]) textarea::placeholder { color:#A5A196 }
+:root:is([data-look="dark"],[data-look="light"]) :focus-visible { outline-color:var(--accent) }
+:root:is([data-look="dark"],[data-look="light"]) .link,:root:is([data-look="dark"],[data-look="light"]) a { color:var(--ink) }
+:root:is([data-look="dark"],[data-look="light"]) .seg { background:var(--surface) }
+:root:is([data-look="dark"],[data-look="light"]) .seg button { color:var(--muted) }
+:root:is([data-look="dark"],[data-look="light"]) .seg button[aria-pressed="true"] { background:#3A3A36; color:var(--ink) }
+:root:is([data-look="dark"],[data-look="light"]) .notice { background:var(--surface); border:1px solid var(--line); color:var(--muted) }
+:root:is([data-look="dark"],[data-look="light"]) .tag { background:var(--sunken); color:var(--ink) }
+:root:is([data-look="dark"],[data-look="light"]) .linkbox { background:#201F1D }
+:root:is([data-look="dark"],[data-look="light"]) .cat-pick[aria-pressed="true"] { background:var(--sunken); border-color:var(--accent); color:var(--ink) }
+:root:is([data-look="dark"],[data-look="light"]) .pic-pick { background:var(--surface) }
+:root:is([data-look="dark"],[data-look="light"]) .hero,:root:is([data-look="dark"],[data-look="light"]) .hero.is-owing,:root:is([data-look="dark"],[data-look="light"]) .hero.is-owed { background:var(--surface); box-shadow:inset 0 0 0 1px var(--line); padding:20px }
+:root:is([data-look="dark"],[data-look="light"]) .hero::before,:root:is([data-look="dark"],[data-look="light"]) .hero::after,:root:is([data-look="dark"],[data-look="light"]) .tear::before,:root:is([data-look="dark"],[data-look="light"]) .tear::after { display:none }
+:root:is([data-look="dark"],[data-look="light"]) .tear { margin:4px 0; border-top:1px solid var(--line) }
+:root:is([data-look="dark"],[data-look="light"]) .hero .big { color:var(--ink) }
+:root:is([data-look="dark"],[data-look="light"]) .hero.is-owing .big { color:var(--owe) }
+:root:is([data-look="dark"],[data-look="light"]) .hero-say { font-size:1.0625rem; font-weight:600; color:var(--ink) }
+:root:is([data-look="dark"],[data-look="light"]) .hero.is-owing .hero-say { color:var(--owe) }
+:root:is([data-look="dark"],[data-look="light"]) .hero.is-owed .hero-say { color:var(--owed) }
+:root:is([data-look="dark"],[data-look="light"]) .hero-settled { display:flex; align-items:center; gap:10px; font-size:1.75rem; color:var(--ink) }
+:root:is([data-look="dark"],[data-look="light"]) .hero-settled svg { width:26px; height:26px; flex:none; color:var(--owed) }
+:root:is([data-look="dark"],[data-look="light"]) .hero-btn { background:#A62C20; color:#FBF3E8; font-weight:700; max-width:48%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+:root:is([data-look="dark"],[data-look="light"]) .entries .panel { overflow:hidden }
+:root:is([data-look="dark"],[data-look="light"]) .tap { padding:16px; border-radius:0; border-color:var(--line) }
+:root:is([data-look="dark"],[data-look="light"]) .tap:hover,:root:is([data-look="dark"],[data-look="light"]) .tap:active { background:var(--sunken) }
+:root:is([data-look="dark"],[data-look="light"]) .tap.payer-strip { position:relative; box-shadow:none }
+:root:is([data-look="dark"],[data-look="light"]) .tap.payer-strip::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--payer) }
+:root:is([data-look="dark"],[data-look="light"]) .tap .right .amt { font-family:var(--body); font-weight:700; font-size:1.0625rem; font-variant-numeric:tabular-nums }
+:root:is([data-look="dark"],[data-look="light"]) .tap .right .tiny { font-size:.8125rem }
+:root:is([data-look="dark"],[data-look="light"]) .payer-mark { width:48px; height:46px }
+:root:is([data-look="dark"],[data-look="light"]) .payer-mark .ava { width:44px; height:44px; font-size:1.1rem }
+:root:is([data-look="dark"],[data-look="light"]) .payer-mark .tile { background:#201F1D; box-shadow:0 0 0 2px var(--surface); color:var(--muted) }
+:root:is([data-look="dark"],[data-look="light"]) nav.tabs { background:var(--tabs-bg); border-top:1px solid var(--line) }
+:root:is([data-look="dark"],[data-look="light"]) .tabs button[aria-current="page"],:root:is([data-look="dark"],[data-look="light"]) .tabs button[aria-current="page"] svg { color:var(--ink); font-weight:700 }
+:root:is([data-look="dark"],[data-look="light"]) .tabs button[aria-current="page"] svg { background:#34342F }
+:root:is([data-look="dark"],[data-look="light"]) .tabs .add-tab { color:var(--ink); margin-top:-16px }
+:root:is([data-look="dark"],[data-look="light"]) .tabs .add-tab svg { width:56px; height:44px; padding:10px; border-radius:14px; background:var(--accent); color:var(--accent-ink); box-shadow:0 2px 8px var(--shadow) }
+:root:is([data-look="dark"],[data-look="light"]) dialog,:root:is([data-look="dark"],[data-look="light"]) dialog .sheet,:root:is([data-look="dark"],[data-look="light"]) dialog .sheet-body { background:var(--ground); color:var(--ink) }
+:root:is([data-look="dark"],[data-look="light"]) .sheet-head { background:var(--surface); border-bottom:1px solid var(--line) }
+:root:is([data-look="dark"],[data-look="light"]) .ava-btn .ava { box-shadow:0 0 0 1px #6B6A63 }
+:root:is([data-look="dark"],[data-look="light"]) .mark { background:var(--accent) }
+:root:is([data-look="dark"],[data-look="light"]) .mark::before { background:var(--ground) }
+:root:is([data-look="dark"],[data-look="light"]) .mark::after { border-left-color:var(--accent) }
+:root[data-look="dark"] body { background:linear-gradient(180deg,#34322E 0,#25241F 300px,#1C1B19 620px) fixed #1C1B19 }
+:root:is([data-look="dark"],[data-look="light"]) .panel { background:rgba(240,232,216,.055); border-color:rgba(240,232,216,.08) }
+:root:is([data-look="dark"],[data-look="light"]) .hero,:root:is([data-look="dark"],[data-look="light"]) .hero.is-owing,:root:is([data-look="dark"],[data-look="light"]) .hero.is-owed { background:linear-gradient(120deg,rgba(240,232,216,.13),rgba(240,232,216,.03) 75%); box-shadow:none; padding:24px 22px }
+:root:is([data-look="dark"],[data-look="light"]) .notice { background:rgba(240,232,216,.05); border-color:rgba(240,232,216,.08) }
+:root:is([data-look="dark"],[data-look="light"]) .tap { border-color:rgba(240,232,216,.08); padding:18px 16px }
+:root:is([data-look="dark"],[data-look="light"]) .tap strong.block { font-family:var(--display); font-weight:600; font-size:1.0625rem }
+:root:is([data-look="dark"],[data-look="light"]) .date-head { font-family:var(--display); text-transform:none; letter-spacing:.02em; font-size:.9375rem }
+:root:is([data-look="dark"],[data-look="light"]) .hero-say { font-family:var(--display) }
+:root:is([data-look="dark"],[data-look="light"]) .btn,:root:is([data-look="dark"],[data-look="light"]) .icon-btn,:root:is([data-look="dark"],[data-look="light"]) .chip { background:rgba(240,232,216,.08); border-color:rgba(240,232,216,.16) }
+:root:is([data-look="dark"],[data-look="light"]) .btn.primary { background:var(--accent); border-color:var(--accent) }
+:root:is([data-look="dark"],[data-look="light"]) input,:root:is([data-look="dark"],[data-look="light"]) select,:root:is([data-look="dark"],[data-look="light"]) textarea { background:rgba(0,0,0,.18); border-color:rgba(240,232,216,.16) }
+:root:is([data-look="dark"],[data-look="light"]) .hero-btn { border-radius:7px }
+:root:is([data-look="dark"],[data-look="light"]) nav.tabs { background:rgba(28,27,25,.92); border-top-color:rgba(240,232,216,.08) }
+:root:is([data-look="dark"],[data-look="light"]) dialog,:root:is([data-look="dark"],[data-look="light"]) dialog .sheet,:root:is([data-look="dark"],[data-look="light"]) dialog .sheet-body { background:#22211E }
+:root:is([data-look="dark"],[data-look="light"]) .sheet-head { background:#2B2A26; border-color:rgba(240,232,216,.08) }
+:root:is([data-look="dark"],[data-look="light"]) .hero,:root:is([data-look="dark"],[data-look="light"]) .hero.is-owing,:root:is([data-look="dark"],[data-look="light"]) .hero.is-owed { background:#45433E url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' fill='none' stroke='%23F3EDE1' stroke-opacity='.1' stroke-width='1'%3E%3Ccircle cx='200' cy='40' r='18'/%3E%3Ccircle cx='200' cy='40' r='32'/%3E%3Ccircle cx='200' cy='40' r='46'/%3E%3Ccircle cx='200' cy='40' r='60'/%3E%3Ccircle cx='200' cy='40' r='74'/%3E%3Ccircle cx='200' cy='40' r='88'/%3E%3Ccircle cx='200' cy='40' r='102'/%3E%3Ccircle cx='200' cy='40' r='116'/%3E%3Ccircle cx='200' cy='40' r='130'/%3E%3Ccircle cx='200' cy='40' r='144'/%3E%3C/svg%3E") no-repeat right top/170px auto; box-shadow:none; padding:22px; gap:6px; color:#F3EDE1 }
+:root:is([data-look="dark"],[data-look="light"]) .hero-say,:root:is([data-look="dark"],[data-look="light"]) .hero.is-owing .hero-say,:root:is([data-look="dark"],[data-look="light"]) .hero.is-owed .hero-say { font-family:var(--body); font-size:1rem; font-weight:600; color:#F3EDE1 }
+:root:is([data-look="dark"],[data-look="light"]) .hero .big,:root:is([data-look="dark"],[data-look="light"]) .hero .big.up,:root:is([data-look="dark"],[data-look="light"]) .hero .big.down { color:#F3EDE1 }
+:root:is([data-look="dark"],[data-look="light"]) .hero.is-owing .big { color:var(--owe) }
+:root:is([data-look="dark"],[data-look="light"]) .hero.is-owed .big { color:var(--owed) }
+:root:is([data-look="dark"],[data-look="light"]) .hero-settled,:root:is([data-look="dark"],[data-look="light"]) .hero-settled svg { color:#F3EDE1 }
+:root:is([data-look="dark"],[data-look="light"]) .hero p,:root:is([data-look="dark"],[data-look="light"]) .hero .label { color:#D8D2C6 }
+:root:is([data-look="dark"],[data-look="light"]) .hero-line { border-top:1px solid rgba(243,237,225,.28); margin-top:10px; padding-top:12px; gap:12px; font-size:1rem; font-weight:500; color:#F3EDE1 }
+:root:is([data-look="dark"],[data-look="light"]) .hero-line .wrap-any { flex:1; color:#F3EDE1 }
+:root:is([data-look="dark"],[data-look="light"]) .hero-line .amt { font-family:var(--body); font-weight:700; font-size:1.0625rem; font-variant-numeric:tabular-nums; color:#F3EDE1 }
+:root:is([data-look="dark"],[data-look="light"]) .hero.is-owing .hero-line .amt { color:var(--owe) }
+:root:is([data-look="dark"],[data-look="light"]) .hero.is-owed .hero-line .amt { color:var(--owed) }
+:root:is([data-look="dark"],[data-look="light"]) .hero-btn { background:#A62C20; color:#FBF3E8 }
+:root[data-look="light"] { --ground:#E3DED3;--surface:#EFEBE2;--sunken:#D8D2C5;--ink:#26262A;--muted:#57534A;--line:#CCC6B8;--accent:#3A4759;--accent-ink:#F2EEE5;--accent-soft:#D8D2C5;--owed:#2E6A52;--owed-soft:#D8D2C5;--owe:#A23A28;--owe-soft:#D8D2C5;--warn:#57534A;--warn-soft:#D8D2C5;--m1:#3A4759;--m2:#8A5A3C;--m3:#5A6F5A;--m4:#A0533A;--m5:#5F5A80;--m6:#4F7A8A;--m7:#7A6A4F;--m8:#7D5A6A;--m9:#8A7A2E;--m10:#3F6E6A;--m11:#57534A;--m12:#6A7F98;--shadow:rgba(30,40,40,.14);--scrim:rgba(30,40,40,.4);--card-line:#CCC6B8;--tabs-bg:#EFEBE2;--tabs-line:#CCC6B8;--tabs-ink:#57534A;--wash:#E3DED3;--bar:#E3DED3;--heading:#26262A;--hero:#3A4759;--hero-ink:#F2EEE5;--hero-muted:#D3DAE8;--food-bg:#D8D2C5;--food:#425066;--drinks-bg:#D8D2C5;--drinks:#425066;--lodging-bg:#D8D2C5;--lodging:#425066;--transport-bg:#D8D2C5;--transport:#425066;--flights-bg:#D8D2C5;--flights:#425066;--activities-bg:#D8D2C5;--activities:#425066;--groceries-bg:#D8D2C5;--groceries:#425066;--shopping-bg:#D8D2C5;--shopping:#425066;--fees-bg:#D8D2C5;--fees:#425066;--other-bg:#D8D2C5;--other:#425066;color-scheme:light }
+:root[data-look="light"] body { background:#E3DED3;color:#26262A }
+:root[data-look="light"] .btn,:root[data-look="light"] .icon-btn,:root[data-look="light"] .chip { background:#EFEBE2;border:1px solid #A8A294;color:#26262A }
+:root[data-look="light"] .btn.primary { background:#3A4759;border-color:#3A4759;color:#F2EEE5 }
+:root[data-look="light"] input,:root[data-look="light"] select,:root[data-look="light"] textarea,:root[data-look="light"] .linkbox { background:#F7F4EC;border:1px solid #A8A294;color:#26262A }
+:root[data-look="light"] input::placeholder,:root[data-look="light"] textarea::placeholder { color:#67635A }
+:root[data-look="light"] .hero,:root[data-look="light"] .hero.is-owing,:root[data-look="light"] .hero.is-owed { background:#3A4759;box-shadow:none;color:#F2EEE5 }
+:root[data-look="light"] .hero .big,:root[data-look="light"] .hero.is-owing .big,:root[data-look="light"] .hero.is-owed .big,:root[data-look="light"] .hero-say,:root[data-look="light"] .hero-settled { color:#F2EEE5 }
+:root[data-look="light"] .hero.is-owing .hero-say,:root[data-look="light"] .hero.is-owed .hero-say { color:#E7E1D4 }
+:root[data-look="light"] .hero-settled svg { color:#E7E1D4 }
+:root[data-look="light"] .hero-btn { background:#F2EEE5;color:#2C3646 }
+:root[data-look="light"] .seg { background:#D8D2C5 }
+:root[data-look="light"] .seg button { color:#57534A }
+:root[data-look="light"] .seg button[aria-pressed="true"] { background:#EFEBE2;color:#26262A }
+:root[data-look="light"] .notice { background:#EFEBE2;color:#57534A;border:1px solid #CCC6B8 }
+:root[data-look="light"] .tag { background:#D8D2C5;color:#26262A }
+:root[data-look="light"] .cat-pick[aria-pressed="true"] { background:#D8D2C5;border-color:#3A4759;color:#26262A }
+:root[data-look="light"] .tap:hover,:root[data-look="light"] .tap:active { background:#D8D2C5 }
+:root[data-look="light"] .payer-mark .tile { background:#EFEBE2;box-shadow:0 0 0 2px #EFEBE2;color:#57534A }
+:root[data-look="light"] .tabs button[aria-current="page"],:root[data-look="light"] .tabs button[aria-current="page"] svg { color:#3A4759 }
+:root[data-look="light"] .tabs button[aria-current="page"] svg { background:#D8D2C5 }
+:root[data-look="light"] .tabs .add-tab { color:#3A4759 }
+:root[data-look="light"] .tabs .add-tab svg { background:#3A4759;color:#F2EEE5 }
+:root[data-look="light"] dialog,:root[data-look="light"] dialog .sheet,:root[data-look="light"] dialog .sheet-body { background:#E3DED3;color:#26262A }
+:root[data-look="light"] .sheet-head { background:#EFEBE2;border-color:#CCC6B8 }
+:root[data-look="light"] .mark { background:#3A4759 }
+:root[data-look="light"] .mark::before { background:#F2EEE5 }
+:root[data-look="light"] .mark::after { border-left-color:#3A4759 }
+:root[data-look="light"] .ava-btn .ava { box-shadow:none }
+:root[data-look="light"] :focus-visible { outline-color:#3A4759 }
+:root[data-look="light"] .hero,:root[data-look="light"] .hero.is-owing,:root[data-look="light"] .hero.is-owed { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' fill='none' stroke='%23F2EEE5' stroke-opacity='.16' stroke-width='1'%3E%3Ccircle cx='200' cy='100' r='20'/%3E%3Ccircle cx='200' cy='100' r='36'/%3E%3Ccircle cx='200' cy='100' r='52'/%3E%3Ccircle cx='200' cy='100' r='68'/%3E%3Ccircle cx='200' cy='100' r='84'/%3E%3Ccircle cx='200' cy='100' r='100'/%3E%3Ccircle cx='200' cy='100' r='116'/%3E%3Ccircle cx='200' cy='100' r='132'/%3E%3Ccircle cx='200' cy='100' r='148'/%3E%3Ccircle cx='200' cy='100' r='164'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right center;background-size:auto 180%;--hero-tear:rgba(242,238,229,.22) }
+:root[data-look="light"] .hero-line { border-top-color:rgba(242,238,229,.22) }
+:root[data-look="light"] .panel { background:#EFEBE2;border:1px solid #CCC6B8 }
+:root[data-look="light"] .notice { background:#EFEBE2;border-color:#CCC6B8 }
+:root[data-look="light"] .hero,:root[data-look="light"] .hero.is-owing,:root[data-look="light"] .hero.is-owed { background-color:#3A4759;padding:22px }
+:root[data-look="light"] .btn,:root[data-look="light"] .icon-btn,:root[data-look="light"] .chip { background:#EFEBE2;border-color:#A8A294 }
+:root[data-look="light"] .btn.primary { background:#3A4759;border-color:#3A4759 }
+:root[data-look="light"] input,:root[data-look="light"] select,:root[data-look="light"] textarea { background:#F7F4EC;border-color:#A8A294 }
+:root[data-look="light"] .tap { border-color:#CCC6B8 }
+:root[data-look="light"] nav.tabs { background:#EFEBE2;border-top-color:#CCC6B8 }
+:root[data-look="light"] .tabs button { color:#57534A }
+:root[data-look="light"] .tabs button[aria-current="page"],:root[data-look="light"] .tabs button[aria-current="page"] svg,:root[data-look="light"] .tabs .add-tab { color:#3A4759 }
+:root[data-look="light"] dialog,:root[data-look="light"] dialog .sheet,:root[data-look="light"] dialog .sheet-body { background:#E3DED3 }
+:root[data-look="light"] .sheet-head { background:#EFEBE2;border-color:#CCC6B8 }
+:root[data-look="light"] .hero,:root[data-look="light"] .hero.is-owing,:root[data-look="light"] .hero.is-owed { background:#3A4759 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' fill='none' stroke='%23F2EEE5' stroke-opacity='.1' stroke-width='1'%3E%3Ccircle cx='200' cy='40' r='18'/%3E%3Ccircle cx='200' cy='40' r='32'/%3E%3Ccircle cx='200' cy='40' r='46'/%3E%3Ccircle cx='200' cy='40' r='60'/%3E%3Ccircle cx='200' cy='40' r='74'/%3E%3Ccircle cx='200' cy='40' r='88'/%3E%3Ccircle cx='200' cy='40' r='102'/%3E%3Ccircle cx='200' cy='40' r='116'/%3E%3Ccircle cx='200' cy='40' r='130'/%3E%3Ccircle cx='200' cy='40' r='144'/%3E%3C/svg%3E") no-repeat right top/170px auto; box-shadow:none; padding:22px; gap:6px; color:#F4F0E7 }
+:root[data-look="light"] .hero-say,:root[data-look="light"] .hero.is-owing .hero-say,:root[data-look="light"] .hero.is-owed .hero-say { font-family:var(--body); font-size:1rem; font-weight:600; color:#F4F0E7 }
+:root[data-look="light"] .hero .big,:root[data-look="light"] .hero .big.up,:root[data-look="light"] .hero .big.down { color:#F4F0E7 }
+:root[data-look="light"] .hero.is-owing .big { color:#F7B4A6 }
+:root[data-look="light"] .hero.is-owed .big { color:#A8E2C4 }
+:root[data-look="light"] .hero-settled,:root[data-look="light"] .hero-settled svg { color:#F4F0E7 }
+:root[data-look="light"] .hero p,:root[data-look="light"] .hero .label { color:#D9DEE3 }
+:root[data-look="light"] .hero-line { border-top:1px solid rgba(244,240,231,.3); margin-top:10px; padding-top:12px; gap:12px; font-size:1rem; font-weight:500; color:#F4F0E7 }
+:root[data-look="light"] .hero-line .wrap-any { flex:1; color:#F4F0E7 }
+:root[data-look="light"] .hero-line .amt { font-family:var(--body); font-weight:700; font-size:1.0625rem; font-variant-numeric:tabular-nums; color:#F4F0E7 }
+:root[data-look="light"] .hero.is-owing .hero-line .amt { color:#F7B4A6 }
+:root[data-look="light"] .hero.is-owed .hero-line .amt { color:#A8E2C4 }
+:root[data-look="light"] .hero-btn { background:#F2EEE5; color:#2C3646 }
+:root[data-look="light"] .hero.is-owing .big { color:#F59B8C }
+:root[data-look="light"] .hero.is-owed .big { color:#7ED49A }
+:root[data-look="light"] .hero-line .amt,:root[data-look="light"] .hero.is-owing .hero-line .amt,:root[data-look="light"] .hero.is-owed .hero-line .amt { color:#F4F0E7 }
+:root[data-look="light"] { --display:"Shippori Mincho","Noto Serif TC","Songti TC",Georgia,serif }
+:root[data-look="light"] h1,:root[data-look="light"] h2,:root[data-look="light"] .hero .big,:root[data-look="light"] .hero-settled { font-family:var(--display) }
+:root[data-look="light"] .fill.alt,:root[data-look="light"] .key.alt { background:#B5832F }
+:root[data-look="dark"] .fill,:root[data-look="dark"] .key { background:#D2A64E }
+:root[data-look="dark"] .fill.alt,:root[data-look="dark"] .key.alt { background:#7F8FA3 }
+
+/* Pride: the rainbow is the decoration, on calm surfaces, so money stays red and green and text stays readable */
+:root[data-look="pride"] {
+  --ground:#F8F5FB; --surface:#FFFFFF; --sunken:#EEE8F4; --ink:#241C33; --muted:#5A5068; --line:#DDD4E8;
+  --accent:#5B1E8C; --accent-ink:#FFFFFF; --accent-soft:#E9DDF5;
+  --owed:#0B6E33; --owed-soft:#DAF0E2; --owe:#BE1221; --owe-soft:#FBDEE0; --warn:#7A4A00; --warn-soft:#FFEFCF;
+  --m1:#5B1E8C; --m2:#C4122B; --m3:#0B6E33; --m4:#0B4FD6; --m5:#C25500; --m6:#A3127F; --m7:#00727A; --m8:#7A5C00; --m9:#3F2FB0; --m10:#8C2A5B; --m11:#3F7300; --m12:#2A5F8C;
+  --shadow:rgba(36,28,51,.16); --scrim:rgba(36,28,51,.5); --card-shadow:0 1px 2px rgba(36,28,51,.06),0 6px 16px rgba(36,28,51,.05); --card-line:#E7E0EF;
+  --tabs-bg:#FFFFFF; --tabs-line:#DDD4E8; --tabs-ink:#5A5068; --tabs-shadow:0 -2px 10px rgba(36,28,51,.06); --wash:#F8F5FB; --bar:rgba(248,245,251,.94); --heading:#241C33;
+  --hero:#241C33; --hero-ink:#FFFFFF; --hero-muted:#D9D2E4; --hero-up:#7BE39C; --hero-down:#FFA9A0; --hero-tear:rgba(255,255,255,.28);
+  --food-bg:#FFE3DF; --food:#B3121F; --drinks-bg:#FFEBD6; --drinks:#A84B00; --lodging-bg:#FFF6C7; --lodging:#6E5A00; --transport-bg:#DAF0E2; --transport:#0B6E33; --flights-bg:#DDE7FF; --flights:#0B4FD6; --activities-bg:#EEE0F8; --activities:#5B1E8C;
+  --groceries-bg:#E3F3D0; --groceries:#3F7300; --shopping-bg:#FBDDF0; --shopping:#A3127F; --fees-bg:#FFEBD6; --fees:#A84B00; --other-bg:#EEE8F4; --other:#5A5068;
+  color-scheme:light;
+}
+:root[data-look="pride"] body { background:#F8F5FB; color:#241C33 }
+:root[data-look="pride"] body::before { height:calc(env(safe-area-inset-top,0px) + 5px); background:linear-gradient(90deg,#E40303 0 16.66%,#FF8C00 16.66% 33.33%,#FFED00 33.33% 50%,#008026 50% 66.66%,#004DFF 66.66% 83.33%,#750787 83.33%) }
+:root[data-look="pride"] .hero { background:#241C33 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' fill='none' stroke-width='9' stroke-opacity='.95'%3E%3Ccircle cx='200' cy='40' r='32' stroke='%23E40303'/%3E%3Ccircle cx='200' cy='40' r='48' stroke='%23FF8C00'/%3E%3Ccircle cx='200' cy='40' r='64' stroke='%23FFED00'/%3E%3Ccircle cx='200' cy='40' r='80' stroke='%232FBF5B'/%3E%3Ccircle cx='200' cy='40' r='96' stroke='%235C8DFF'/%3E%3Ccircle cx='200' cy='40' r='112' stroke='%23B45CE0'/%3E%3C/svg%3E") no-repeat right top/125px auto; color:#FFFFFF }
+:root[data-look="pride"] .hero::before,:root[data-look="pride"] .hero::after { background:#F8F5FB }
+:root[data-look="pride"] .hero-btn { background:#FFFFFF; color:#241C33; position:relative }
+:root[data-look="pride"] nav.tabs { border-top:0; box-shadow:0 -3px 0 0 #fff; background:#FFFFFF; position:fixed }
+:root[data-look="pride"] nav.tabs::before { content:""; position:absolute; left:0; right:0; top:0; height:3px; background:linear-gradient(90deg,#E40303 0 16.66%,#FF8C00 16.66% 33.33%,#FFED00 33.33% 50%,#008026 50% 66.66%,#004DFF 66.66% 83.33%,#750787 83.33%) }
+:root[data-look="pride"] .tabs button[aria-current="page"],:root[data-look="pride"] .tabs button[aria-current="page"] svg,:root[data-look="pride"] .tabs .add-tab { color:#5B1E8C }
+:root[data-look="pride"] .tabs .add-tab svg { background:#5B1E8C; color:#FFFFFF }
+:root[data-look="pride"] .fill,:root[data-look="pride"] .key { background:#5B1E8C }
+:root[data-look="pride"] .fill.alt,:root[data-look="pride"] .key.alt { background:#E0762B }
+:root[data-look="pride"] .date-head { color:#5A5068 }
+:root[data-look="pride"] .mark { background:linear-gradient(180deg,#E40303 0 16.66%,#FF8C00 16.66% 33.33%,#FFED00 33.33% 50%,#008026 50% 66.66%,#004DFF 66.66% 83.33%,#750787 83.33%) }
+:root[data-look="pride"] .mark::after { border-left-color:#241C33 }
+:root[data-look="pride"] .mark::before { background:#FFFFFF }
+
+/* Pride, turned up: a soft rainbow behind everything, with white cards keeping the content readable */
+:root[data-look="pride"] { --muted:#3F3650; --bar:rgba(255,255,255,.55); --wash:transparent; background:#FFD9D6 }
+:root[data-look="pride"] body { background:none }
+:root[data-look="pride"] body::after { content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; background:linear-gradient(165deg,#FFC2C2 0%,#FFD9A8 20%,#FFF3A3 38%,#BDEFC4 56%,#B5D2FF 75%,#DDBDF5 100%) }
+:root[data-look="pride"] .panel,:root[data-look="pride"] .tap,:root[data-look="pride"] dialog .panel { --muted:#5A5068 }
+:root[data-look="pride"] .panel { background:#FFFFFF; border-color:transparent }
+:root[data-look="pride"] .date-head { color:#241C33 }
+:root[data-look="pride"] .notice { background:rgba(255,255,255,.82); color:#241C33 }
+:root[data-look="pride"] .seg { background:rgba(255,255,255,.55) }
+:root[data-look="pride"] .seg button { color:#241C33 }
+:root[data-look="pride"] .seg button[aria-pressed="true"] { background:#FFFFFF }
+:root[data-look="pride"] .hero { background-size:165px auto; box-shadow:0 0 0 3px #FFFFFF }
+:root[data-look="pride"] .hero::before,:root[data-look="pride"] .hero::after { display:none }
+:root[data-look="pride"] .hero-line { position:relative }
+:root[data-look="pride"] .btn:not(.primary),:root[data-look="pride"] .icon-btn { background:#FFFFFF }
+:root[data-look="pride"] input,:root[data-look="pride"] select,:root[data-look="pride"] textarea { background:#FFFFFF }
+:root[data-look="pride"] .link { color:#3D1266 }
+:root[data-look="pride"] nav.tabs::before { height:5px }
+:root[data-look="pride"] body::before { height:calc(env(safe-area-inset-top,0px) + 6px) }
+:root[data-look="pride"] .tabs .add-tab svg { background:linear-gradient(120deg,#FF8A8A,#FFC766,#FFF07A,#8FE3A0,#8FB8FF,#C99BF0); color:#241C33 }
+:root[data-look="pride"] .btn.primary { background:linear-gradient(100deg,#B3122A,#B85400 25%,#0B6E33 50%,#0B4FD6 75%,#5B1E8C); border-color:transparent; color:#FFFFFF }
+:root[data-look="pride"] dialog,:root[data-look="pride"] dialog .sheet,:root[data-look="pride"] dialog .sheet-body { background:linear-gradient(165deg,#FFE3E3,#FFF0D6 25%,#FFFAD6 45%,#E0F7E4 62%,#E0ECFF 80%,#F0E2FB); --muted:#3F3650 }
+:root[data-look="pride"] .sheet-head { background:rgba(255,255,255,.7) }
+:root[data-look="pride"] dialog .seg { background:rgba(255,255,255,.6) }
+:root[data-look="pride"] .hero-line .amt { background:#241C33; padding:2px 6px; border-radius:6px; margin-right:-6px }
+
+:root[data-look="pride"] .form-panel { background:rgba(255,255,255,.7) }
+
+.topbar .icon-btn { flex:none }
+:root[data-look="pride"] .topbar .ava-btn { background:#FFFFFF }
+
+/* Native menus and pickers follow the theme, so dropdown text stays readable */
+:root { color-scheme:light }
+@media (prefers-color-scheme:dark) { :root:not([data-look]),:root[data-look="blue"] { color-scheme:dark } }
+:root[data-look="dark"] { color-scheme:dark }
+:root:is([data-look="light"],[data-look="pride"]) { color-scheme:light }
+select option,select optgroup { background:var(--surface); color:var(--ink) }
+:root[data-look="dark"] select option { background:#26262A; color:#F2EFE8 }
+:root:is([data-look="dark"],[data-look="light"]) .form-row select { background:transparent; border:0; box-shadow:none }
+@media (pointer:fine) { :root:is([data-look="dark"],[data-look="light"]) .form-row-date input { background:transparent; border:0; box-shadow:none } }

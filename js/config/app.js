@@ -6,9 +6,9 @@ export const CURRENCY = 'USD';
 /** Starter categories for a new budget, grouped the way most people think about bills. */
 export const STARTER_CATEGORIES = [
   { group: 'Bills', names: ['Rent', 'Utilities', 'Phone', 'Internet', 'Insurance', 'Subscriptions'] },
-  { group: 'Everyday', names: ['Groceries', 'Eating out', 'Transport', 'Household'] },
+  { group: 'Everyday', names: ['Groceries', 'Eating out', 'Transport', 'Household', 'Health'] },
   { group: 'Fun', names: ['Entertainment', 'Shopping', 'Gifts'] },
-  { group: 'Saving for', names: ['Emergency fund', 'Travel'] },
+  { group: 'Saving for', names: ['Emergency fund'] },
 ];
 
 export const LIMITS = {

@@ -1,0 +1,85 @@
+/* Budget screens, on top of the shared Trip Tab look. Color means money: red is spending or
+ * overspent, green is money coming in. Everything else stays neutral. */
+.sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap }
+.two-lines { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; overflow:hidden }
+a.tap,a.icon-btn,a.btn { color:inherit; text-decoration:none }
+.home-head { display:grid; gap:4px; padding-top:8px }
+
+/* Month switcher */
+.monthbar { display:flex; align-items:center; gap:8px }
+.monthbar-mid { flex:1; min-width:0; display:grid; justify-items:center; gap:2px; text-align:center }
+.monthbar h2 { font-size:1.15rem }
+
+/* Overspent */
+.over { padding:14px 16px; display:grid; gap:10px; box-shadow:inset 3px 0 0 var(--owe), var(--card-shadow) }
+.over-head { display:flex; align-items:center; gap:8px }
+.owe-dot { width:10px; height:10px; border-radius:50%; background:var(--owe); flex:none }
+.over-row { display:flex; align-items:center; gap:12px; border-top:1px solid var(--line); padding-top:10px }
+
+/* Category groups */
+.group { overflow:hidden }
+.group-head { display:flex; justify-content:space-between; align-items:baseline; gap:12px; padding:14px 16px 6px }
+.pad-x { padding-inline:16px }
+.cat-row { border-top:1px solid var(--line); align-items:center }
+.group-head + .cat-row { border-top-color:transparent }
+.cat-name { font-weight:600; overflow-wrap:anywhere; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; overflow:hidden }
+.cat-avail { display:grid; justify-items:end; flex:none; max-width:45% }
+.cat-avail .amt { font-weight:700; font-size:1.0625rem }
+.bar { display:block; height:6px; border-radius:3px; background:var(--sunken); overflow:hidden; margin-top:4px; max-width:240px }
+.bar i { display:block; height:100%; background:var(--accent); border-radius:3px }
+.bar.is-over i { background:var(--owe) }
+@media (prefers-reduced-motion: no-preference) { .bar i { transition:width .25s ease } }
+
+/* Category sheet */
+.big-amt { font-size:1.75rem; font-weight:700 }
+.mini-stats { display:grid; gap:8px; margin:0 }
+.mini-stats>div { display:flex; justify-content:space-between; gap:12px; border-top:1px solid var(--line); padding-top:8px }
+.mini-stats dt { color:var(--muted); font-size:.9375rem }
+.mini-stats dd { margin:0; font-weight:600 }
+.over-panel { box-shadow:inset 3px 0 0 var(--owe), var(--card-shadow) }
+.btn.row { display:flex; text-align:left }
+
+/* Money boxes with a dollar sign */
+.money-in { position:relative; display:flex; align-items:center; flex:1; min-width:0 }
+.money-in > span[aria-hidden] { position:absolute; left:12px; color:var(--muted); font-weight:600; pointer-events:none }
+.money-in input { padding-left:26px; font-variant-numeric:tabular-nums; font-weight:600 }
+.money-in.big > span[aria-hidden] { font-size:1.5rem; left:14px }
+.money-in.big input { padding-left:34px }
+.form-row .money-in { max-width:160px; margin-left:auto }
+.form-row .money-in input { min-height:36px; text-align:right }
+
+/* Transactions */
+.totals { display:grid; grid-template-columns:1fr 1fr; gap:12px }
+.totals>div { display:grid; gap:2px }
+.totals .amt { font-size:1.25rem; font-weight:700 }
+.tx-list { overflow:hidden }
+.tx-row { border-top:1px solid var(--line) }
+.tx-list .tx-row:first-child { border-top-color:transparent }
+.tx-row .amt { flex:none; font-weight:700 }
+.budget-row { border-top:1px solid var(--line) }
+.budget-row:first-child { border-top-color:transparent }
+
+/* Category editor */
+.edit-list { overflow:hidden }
+.edit-row { display:grid; gap:8px; padding:12px 14px; border-top:1px solid var(--line) }
+.edit-row:first-child { border-top:0 }
+.edit-tools select { flex:1; min-width:0 }
+.edit-tools .icon-btn:disabled { opacity:.35 }
+
+/* Three tabs instead of Trip Tab's five */
+.tabs-in.tabs-3 { grid-template-columns:repeat(3,minmax(0,1fr)) }
+.tabs .tab { background:none; border:0; padding:9px 2px 8px; font-size:.8125rem; font-weight:600; color:var(--tabs-ink); display:grid; justify-items:center; gap:3px; min-height:58px; text-decoration:none }
+.tabs .tab svg { width:36px; height:26px; padding:2px 7px; border-radius:13px; box-sizing:border-box; stroke-width:2.1 }
+.tabs .tab[aria-current="page"] { color:var(--accent); font-weight:700 }
+.tabs .tab[aria-current="page"] svg { background:var(--accent); color:var(--accent-ink) }
+:root:is([data-look="dark"],[data-look="light"]) .tabs .tab[aria-current="page"],:root:is([data-look="dark"],[data-look="light"]) .tabs .tab[aria-current="page"] svg { color:var(--ink) }
+:root:is([data-look="dark"],[data-look="light"]) .tabs .tab[aria-current="page"] svg { background:var(--sunken) }
+:root[data-look="pride"] .tabs .tab[aria-current="page"],:root[data-look="pride"] .tabs .tab[aria-current="page"] svg { color:#5B1E8C }
+:root[data-look="pride"] .tabs .tab[aria-current="page"] svg { background:#E9DDF5 }
+
+/* Hero money on the dark hero cards stays readable */
+.hero .big.down { color:var(--hero-down) }
+.hero-line strong.amt { color:inherit }
+.hero-btn:disabled { opacity:.5 }
+/* Trip Tab's dark hero button is red for settling up; here red only ever means spending. */
+:root[data-look="dark"] .hero-btn { background:#F3EDE1; color:#1C1B19 }
