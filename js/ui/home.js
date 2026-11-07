@@ -1,15 +1,16 @@
 /** Your budgets, starting a new one, and your account menu. */
 import { A, actions, render } from './state.js';
-import { esc, openSheet, closeSheet, sheetHead, toast, send, val, today } from './dom.js';
+import { esc, openSheet, closeSheet, sheetHead, toast, send, val, today, registerSheet } from './dom.js';
 import { lookPicker, setLook } from './look.js';
 import { summaryFor } from './budget.js';
 import { money, toCents } from '../core/money.js';
 import { LIMITS, APP_NAME, STARTER_CATEGORIES } from '../config/app.js';
 import { starterCategories } from '../data/repository.js';
+import { helpButton } from './help.js';
 
 export function homeScreen() {
   const ids = A.budgetIds.filter(id => A.budgets[id]);
-  return `<header class="home-head"><h1>${esc(APP_NAME)}</h1><p class="muted">Every dollar gets a job.</p></header>
+  return `<header class="home-head"><div class="row between"><h1>${esc(APP_NAME)}</h1>${helpButton('home')}</div><p class="muted">Every dollar gets a job. Start a budget for yourself, or one to share.</p></header>
     ${ids.length ? `<section class="panel">${ids.map(id => {
       const b = A.budgets[id];
       const s = summaryFor(b);
@@ -17,6 +18,7 @@ export function homeScreen() {
       return `<a class="tap budget-row" href="#b-${id}"><span class="grow stack tight"><strong class="wrap-any two-lines">${esc(b.name)}</strong><span class="tiny muted">${people > 1 ? `Shared · ${people} people` : 'Just you'}${s.overspent.length ? ` · <span class="owe">${s.overspent.length} overspent</span>` : ''}</span></span><span class="stack tight right"><span class="amt ${s.readyToAssign < 0 ? 'owe' : ''}">${money(s.readyToAssign)}</span><span class="tiny muted">to assign</span></span></a>`;
     }).join('')}</section>`
     : `<section class="panel empty"><h2>No budgets yet</h2><p class="muted">Start one for yourself, or one to share with your household.</p></section>`}
+    ${(A.pending || []).length ? `<section class="panel pending-list">${A.pending.map(p => `<div class="request-row"><span class="grow stack tight"><strong class="wrap-any">${esc(p.budgetName || 'A shared budget')}</strong><span class="tiny ${p.declined ? 'owe' : 'muted'}">${p.declined ? 'The admin didn\u2019t let you in' : 'Waiting for an admin to let you in'}</span></span>${p.declined ? `<button type="button" class="btn small" data-action="pending-dismiss" data-id="${p.budgetId}">Dismiss</button>` : `<button type="button" class="btn small" data-action="pending-cancel" data-id="${p.budgetId}">Cancel</button>`}</div>`).join('')}</section>` : ''}
     <button type="button" class="btn primary" data-action="new-budget">Start a budget</button>
     ${A.user ? `<p class="small muted signed-in">Signed in as ${esc(A.user.email)}${A.preview ? ' (preview)' : ''}. <button type="button" class="link small" data-action="sign-out">Sign out</button></p>` : ''}`;
 }
@@ -53,7 +55,7 @@ function drawNewBudget() {
       ${STARTER_CATEGORIES.map(g => `<section class="stack tight"><span class="label">${esc(g.group)}</span><div class="chips">${g.items.map(i => `<button type="button" class="chip" data-action="nb-pick" data-id="${esc(i.name)}" aria-pressed="${S.picked.has(i.name)}">${esc(i.name)}</button>`).join('')}</div></section>`).join('')}`;
     button = `Start with ${S.picked.size} ${S.picked.size === 1 ? 'category' : 'categories'}`;
   }
-  openSheet(`<form class="sheet" id="newBudgetForm" novalidate>${sheetHead('New budget', '', S.step > 1 ? 'Back' : 'Cancel').replace('data-action="close-sheet"', S.step > 1 ? 'data-action="nb-back"' : 'data-action="close-sheet"')}<div class="sheet-body">
+  openSheet(`<form class="sheet" id="newBudgetForm" novalidate>${S.step > 1 ? sheetHead('New budget').replace('data-action="sheet-back"', 'data-action="nb-back"') : sheetHead('New budget')}<div class="sheet-body">
     ${steps}${body}
   </div><div class="sheet-foot"><button type="submit" class="btn primary" data-action="nb-next">${button}</button></div></form>`);
   if (S.step < 3) setTimeout(() => document.getElementById(S.step === 1 ? 'nbName' : 'nbMoney')?.focus(), 50);
@@ -86,7 +88,7 @@ actions['nb-next'] = () => {
 actions.account = () => {
   A.sheet = { kind: 'account' };
   const b = A.route.id ? A.budgets[A.route.id] : null;
-  openSheet(`<div class="sheet">${sheetHead('You', '', 'Done')}<div class="sheet-body">
+  openSheet(`<div class="sheet">${sheetHead('You and settings')}<div class="sheet-body">
     <section class="panel pad stack">
       <strong>${esc(A.user?.displayName || 'You')}</strong>
       <span class="small muted">${esc(A.user?.email || '')}</span>
@@ -100,6 +102,7 @@ actions.account = () => {
     ${A.preview ? '<button type="button" class="btn" data-action="preview-reset">Start the preview over</button>' : ''}
   </div></div>`);
 };
+registerSheet('account', () => actions.account());
 actions['set-look'] = el => { setLook(el.dataset.id); actions.account(); };
 actions['sign-out'] = () => { if (A.preview) toast('Sign out works in the real app.'); };
 export const refreshAccount = () => render();

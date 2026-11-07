@@ -43,3 +43,37 @@ test('next date skips copies already added', () => {
   assert.equal(nextDate(rent, '2026-11-06', ['r-rent-2026-11']), '2026-12-01');
   assert.equal(nextDate({ ...rent, stopped: true }, '2026-11-06'), null);
 });
+
+import { occurrences, howOften } from '../../js/core/recurring.js';
+
+const biweekly = { id: 'pay2', kind: 'income', amount: 150000, description: 'Paycheck', every: '2weeks', anchor: '2026-10-02' };
+const weekly = { id: 'kid', kind: 'spend', amount: 2000, categoryId: 'k', description: 'Allowance', every: 'week', anchor: '2026-11-02' };
+
+test('weekly and every-2-weeks rules need a first date instead of a day', () => {
+  assert.ok(isValidRule(biweekly));
+  assert.ok(!isValidRule({ ...biweekly, anchor: '2026-13-01' }));
+  assert.ok(!isValidRule({ ...weekly, categoryId: undefined }));
+});
+
+test('every 2 weeks lands on the right Fridays, across months', () => {
+  assert.deepEqual(occurrences(biweekly, '2026-10-01', '2026-11-30').map(o => o.date), ['2026-10-02', '2026-10-16', '2026-10-30', '2026-11-13', '2026-11-27']);
+  assert.equal(occurrences(biweekly, '2026-11-01', '2026-11-30')[0].id, 'r-pay2-2026-11-13');
+});
+
+test('weekly copies come due one at a time and are never added twice', () => {
+  const due = dueTransactions({ weekly }, ['r-kid-2026-11-02'], '2026-11-17');
+  assert.deepEqual(due.map(t => t.date), ['2026-11-09', '2026-11-16']);
+  assert.equal(due[0].categoryId, 'k');
+});
+
+test('every 2 weeks across daylight saving and a year end stays on the same weekday', () => {
+  const d = occurrences(biweekly, '2026-12-20', '2027-03-31').map(o => new Date(`${o.date}T12:00:00Z`).getUTCDay());
+  assert.ok(d.length >= 7 && d.every(x => x === 5), 'always a Friday');
+});
+
+test('next date and how often, in words', () => {
+  assert.equal(nextDate(biweekly, '2026-11-07'), '2026-11-13');
+  assert.equal(howOften(biweekly, n => `${n}th`), 'every other Friday');
+  assert.equal(howOften(weekly, n => `${n}th`), 'every Monday');
+  assert.equal(howOften(rent, n => (n === 1 ? '1st' : `${n}th`)), 'monthly on the 1st');
+});

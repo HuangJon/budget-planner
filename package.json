@@ -6,7 +6,7 @@
   "description": "Where's my money: a shared, every-dollar-a-job budget.",
   "scripts": {
     "test": "node --test \"tests/unit/*.test.js\"",
-    "test:smoke": "node tests/e2e/smoke.e2e.js",
+    "test:smoke": "node tests/e2e/smoke.e2e.js && node tests/e2e/rollover.e2e.js",
     "preview": "node tools/build-preview.mjs . preview.html"
   },
   "devDependencies": {

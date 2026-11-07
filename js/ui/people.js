@@ -22,9 +22,15 @@ export function peopleScreen(b) {
         : `<button type="button" class="link small" data-action="person-admin" data-id="${uid}">${m.admin ? 'Make not admin' : 'Make admin'}</button><button type="button" class="link small danger-link" data-action="person-ask" data-id="${uid}">Remove</button>`}</div>` : ''}
     </div>`).join('')}</section>
 
+    ${admin && Object.keys(b.requests || {}).length ? `<section class="panel pad stack requests" aria-label="Waiting to join">
+      <h3>Waiting to join</h3>
+      ${Object.entries(b.requests).map(([uid, r]) => `<div class="request-row"><span class="grow stack tight"><strong class="wrap-any">${esc(r.name || 'Someone')}</strong><span class="tiny muted">Asked with your invite link</span></span><div class="row gap8"><button type="button" class="btn small primary" data-action="request-approve" data-id="${uid}">Let in</button><button type="button" class="btn small" data-action="request-decline" data-id="${uid}">Turn away</button></div></div>`).join('')}
+      <p class="tiny muted">Once let in, they see and can change everything in this budget.</p>
+    </section>` : ''}
+
     ${admin ? `<section class="panel pad stack">
       <h3>Invite someone</h3>
-      <p class="small muted">Anyone with this link can join after signing in, and will see and change everything in this budget. Only send it to people you trust.</p>
+      <p class="small muted">Anyone with this link can ask to join after signing in. You let each person in before they see anything.</p>
       ${b.invite?.code ? `<div class="linkbox" id="inviteLink">${esc(inviteLink(b.invite.code))}</div>
         <div class="row gap8 wrap"><button type="button" class="btn primary" data-action="invite-copy">Copy link</button><button type="button" class="btn" data-action="invite-reset">Make a new link</button></div>
         <p class="tiny muted">Making a new link stops the old one from working. People already in stay in.</p>`
@@ -96,13 +102,14 @@ actions['leave-yes'] = () => {
 export function joinScreen() {
   const J = A.join;
   if (!J || J.status === 'loading') return '<section class="panel empty"><h2>Opening the invite</h2><p class="muted">One moment.</p></section>';
-  if (J.status === 'gone') return '<section class="panel empty"><h2>This invite doesn’t work any more</h2><p class="muted">It may have been replaced with a new link. Ask whoever sent it for a fresh one.</p><a class="btn" href="#home">See your budgets</a></section>';
+  if (J.status === 'gone') return '<section class="panel empty"><h2>This invite doesn\u2019t work any more</h2><p class="muted">It may have been replaced with a new link. Ask whoever sent it for a fresh one.</p><a class="btn" href="#home">See your budgets</a></section>';
+  if (J.status === 'sent') return `<section class="panel empty"><h2>Request sent</h2><p class="muted">An admin of ${esc(J.name || 'the budget')} needs to let you in. It will show in your budgets as soon as they do.</p><a class="btn" href="#home">See your budgets</a></section>`;
   return `<section class="panel pad stack join">
     <span class="label">You're invited</span>
     <h2>Join ${esc(J.name || 'a shared budget')}</h2>
-    <p class="small muted">You'll see and change everything in this budget, and the people in it will see what you add.</p>
+    <p class="small muted">An admin lets you in first. After that you'll see and change everything in this budget, and the people in it will see what you add.</p>
     <label class="f"><span>Your name in this budget</span><input id="joinName" maxlength="${LIMITS.personName}" value="${esc(A.user?.displayName || '')}" autocomplete="name"></label>
-    <button type="button" class="btn primary" data-action="join-yes">Join</button>
+    <button type="button" class="btn primary" data-action="join-yes">Ask to join</button>
     <a class="btn" href="#home">Not now</a>
   </section>`;
 }
@@ -113,6 +120,7 @@ export async function openJoin(code) {
   if (A.join?.code !== code) return;
   if (!invite) { A.join = { status: 'gone', code }; render(); return; }
   if (A.budgetIds.includes(invite.budgetId)) { location.hash = `#b-${invite.budgetId}`; return; }
+  if ((A.pending || []).some(p => p.budgetId === invite.budgetId && !p.declined)) { A.join = { status: 'sent', code, name: invite.budgetName || '' }; render(); return; }
   A.join = { status: 'ready', code, budgetId: invite.budgetId, name: invite.budgetName || '' };
   render();
 }
@@ -121,12 +129,23 @@ actions['join-yes'] = async el => {
   if (!name) return toast('Type the name people should see.');
   el.disabled = true;
   try {
-    const id = await A.repo.joinWithCode(A.join.code, name);
-    A.join = null;
-    location.hash = `#b-${id}`;
-    toast("You're in");
+    await A.repo.requestToJoin(A.join.code, name);
+    A.join = { ...A.join, status: 'sent' };
+    render();
   } catch (e) {
     el.disabled = false;
-    toast(e?.code === 'not-found' ? 'This invite no longer works. Ask for a new link.' : "Couldn't join. Check your connection and try again.");
+    toast(e?.code === 'not-found' ? 'This invite no longer works. Ask for a new link.' : "Couldn't send your request. Check your connection and try again.");
   }
 };
+actions['request-approve'] = el => {
+  const b = A.budgets[A.route.id], uid = el.dataset.id, name = b.requests?.[uid]?.name || 'They';
+  send(A.repo.approveRequest(b.id, uid));
+  toast(`${name} is in`);
+};
+actions['request-decline'] = el => {
+  const b = A.budgets[A.route.id], uid = el.dataset.id, name = b.requests?.[uid]?.name || 'They';
+  send(A.repo.declineRequest(b.id, uid));
+  toast(`${name} was turned away`);
+};
+actions['pending-cancel'] = el => { send(A.repo.cancelRequest(el.dataset.id)); toast('Request cancelled'); };
+actions['pending-dismiss'] = el => send(A.repo.dismissPending(el.dataset.id));

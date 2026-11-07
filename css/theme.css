@@ -183,71 +183,18 @@
 :root[data-look="dark"] .fill.alt,:root[data-look="dark"] .key.alt { background:#7F8FA3 }
 
 /* Pride: the rainbow is the decoration, on calm surfaces, so money stays red and green and text stays readable */
-:root[data-look="pride"] {
-  --ground:#F8F5FB; --surface:#FFFFFF; --sunken:#EEE8F4; --ink:#241C33; --muted:#5A5068; --line:#DDD4E8;
-  --accent:#5B1E8C; --accent-ink:#FFFFFF; --accent-soft:#E9DDF5;
-  --owed:#0B6E33; --owed-soft:#DAF0E2; --owe:#BE1221; --owe-soft:#FBDEE0; --warn:#7A4A00; --warn-soft:#FFEFCF;
-  --m1:#5B1E8C; --m2:#C4122B; --m3:#0B6E33; --m4:#0B4FD6; --m5:#C25500; --m6:#A3127F; --m7:#00727A; --m8:#7A5C00; --m9:#3F2FB0; --m10:#8C2A5B; --m11:#3F7300; --m12:#2A5F8C;
-  --shadow:rgba(36,28,51,.16); --scrim:rgba(36,28,51,.5); --card-shadow:0 1px 2px rgba(36,28,51,.06),0 6px 16px rgba(36,28,51,.05); --card-line:#E7E0EF;
-  --tabs-bg:#FFFFFF; --tabs-line:#DDD4E8; --tabs-ink:#5A5068; --tabs-shadow:0 -2px 10px rgba(36,28,51,.06); --wash:#F8F5FB; --bar:rgba(248,245,251,.94); --heading:#241C33;
-  --hero:#241C33; --hero-ink:#FFFFFF; --hero-muted:#D9D2E4; --hero-up:#7BE39C; --hero-down:#FFA9A0; --hero-tear:rgba(255,255,255,.28);
-  --food-bg:#FFE3DF; --food:#B3121F; --drinks-bg:#FFEBD6; --drinks:#A84B00; --lodging-bg:#FFF6C7; --lodging:#6E5A00; --transport-bg:#DAF0E2; --transport:#0B6E33; --flights-bg:#DDE7FF; --flights:#0B4FD6; --activities-bg:#EEE0F8; --activities:#5B1E8C;
-  --groceries-bg:#E3F3D0; --groceries:#3F7300; --shopping-bg:#FBDDF0; --shopping:#A3127F; --fees-bg:#FFEBD6; --fees:#A84B00; --other-bg:#EEE8F4; --other:#5A5068;
-  color-scheme:light;
-}
-:root[data-look="pride"] body { background:#F8F5FB; color:#241C33 }
-:root[data-look="pride"] body::before { height:calc(env(safe-area-inset-top,0px) + 5px); background:linear-gradient(90deg,#E40303 0 16.66%,#FF8C00 16.66% 33.33%,#FFED00 33.33% 50%,#008026 50% 66.66%,#004DFF 66.66% 83.33%,#750787 83.33%) }
-:root[data-look="pride"] .hero { background:#241C33 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' fill='none' stroke-width='9' stroke-opacity='.95'%3E%3Ccircle cx='200' cy='40' r='32' stroke='%23E40303'/%3E%3Ccircle cx='200' cy='40' r='48' stroke='%23FF8C00'/%3E%3Ccircle cx='200' cy='40' r='64' stroke='%23FFED00'/%3E%3Ccircle cx='200' cy='40' r='80' stroke='%232FBF5B'/%3E%3Ccircle cx='200' cy='40' r='96' stroke='%235C8DFF'/%3E%3Ccircle cx='200' cy='40' r='112' stroke='%23B45CE0'/%3E%3C/svg%3E") no-repeat right top/125px auto; color:#FFFFFF }
-:root[data-look="pride"] .hero::before,:root[data-look="pride"] .hero::after { background:#F8F5FB }
-:root[data-look="pride"] .hero-btn { background:#FFFFFF; color:#241C33; position:relative }
-:root[data-look="pride"] nav.tabs { border-top:0; box-shadow:0 -3px 0 0 #fff; background:#FFFFFF; position:fixed }
-:root[data-look="pride"] nav.tabs::before { content:""; position:absolute; left:0; right:0; top:0; height:3px; background:linear-gradient(90deg,#E40303 0 16.66%,#FF8C00 16.66% 33.33%,#FFED00 33.33% 50%,#008026 50% 66.66%,#004DFF 66.66% 83.33%,#750787 83.33%) }
-:root[data-look="pride"] .tabs button[aria-current="page"],:root[data-look="pride"] .tabs button[aria-current="page"] svg,:root[data-look="pride"] .tabs .add-tab { color:#5B1E8C }
-:root[data-look="pride"] .tabs .add-tab svg { background:#5B1E8C; color:#FFFFFF }
-:root[data-look="pride"] .fill,:root[data-look="pride"] .key { background:#5B1E8C }
-:root[data-look="pride"] .fill.alt,:root[data-look="pride"] .key.alt { background:#E0762B }
-:root[data-look="pride"] .date-head { color:#5A5068 }
-:root[data-look="pride"] .mark { background:linear-gradient(180deg,#E40303 0 16.66%,#FF8C00 16.66% 33.33%,#FFED00 33.33% 50%,#008026 50% 66.66%,#004DFF 66.66% 83.33%,#750787 83.33%) }
-:root[data-look="pride"] .mark::after { border-left-color:#241C33 }
-:root[data-look="pride"] .mark::before { background:#FFFFFF }
 
 /* Pride, turned up: a soft rainbow behind everything, with white cards keeping the content readable */
-:root[data-look="pride"] { --muted:#3F3650; --bar:rgba(255,255,255,.55); --wash:transparent; background:#FFD9D6 }
-:root[data-look="pride"] body { background:none }
-:root[data-look="pride"] body::after { content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; background:linear-gradient(165deg,#FFC2C2 0%,#FFD9A8 20%,#FFF3A3 38%,#BDEFC4 56%,#B5D2FF 75%,#DDBDF5 100%) }
-:root[data-look="pride"] .panel,:root[data-look="pride"] .tap,:root[data-look="pride"] dialog .panel { --muted:#5A5068 }
-:root[data-look="pride"] .panel { background:#FFFFFF; border-color:transparent }
-:root[data-look="pride"] .date-head { color:#241C33 }
-:root[data-look="pride"] .notice { background:rgba(255,255,255,.82); color:#241C33 }
-:root[data-look="pride"] .seg { background:rgba(255,255,255,.55) }
-:root[data-look="pride"] .seg button { color:#241C33 }
-:root[data-look="pride"] .seg button[aria-pressed="true"] { background:#FFFFFF }
-:root[data-look="pride"] .hero { background-size:165px auto; box-shadow:0 0 0 3px #FFFFFF }
-:root[data-look="pride"] .hero::before,:root[data-look="pride"] .hero::after { display:none }
-:root[data-look="pride"] .hero-line { position:relative }
-:root[data-look="pride"] .btn:not(.primary),:root[data-look="pride"] .icon-btn { background:#FFFFFF }
-:root[data-look="pride"] input,:root[data-look="pride"] select,:root[data-look="pride"] textarea { background:#FFFFFF }
-:root[data-look="pride"] .link { color:#3D1266 }
-:root[data-look="pride"] nav.tabs::before { height:5px }
-:root[data-look="pride"] body::before { height:calc(env(safe-area-inset-top,0px) + 6px) }
-:root[data-look="pride"] .tabs .add-tab svg { background:linear-gradient(120deg,#FF8A8A,#FFC766,#FFF07A,#8FE3A0,#8FB8FF,#C99BF0); color:#241C33 }
-:root[data-look="pride"] .btn.primary { background:linear-gradient(100deg,#B3122A,#B85400 25%,#0B6E33 50%,#0B4FD6 75%,#5B1E8C); border-color:transparent; color:#FFFFFF }
-:root[data-look="pride"] dialog,:root[data-look="pride"] dialog .sheet,:root[data-look="pride"] dialog .sheet-body { background:linear-gradient(165deg,#FFE3E3,#FFF0D6 25%,#FFFAD6 45%,#E0F7E4 62%,#E0ECFF 80%,#F0E2FB); --muted:#3F3650 }
-:root[data-look="pride"] .sheet-head { background:rgba(255,255,255,.7) }
-:root[data-look="pride"] dialog .seg { background:rgba(255,255,255,.6) }
-:root[data-look="pride"] .hero-line .amt { background:#241C33; padding:2px 6px; border-radius:6px; margin-right:-6px }
 
-:root[data-look="pride"] .form-panel { background:rgba(255,255,255,.7) }
 
 .topbar .icon-btn { flex:none }
-:root[data-look="pride"] .topbar .ava-btn { background:#FFFFFF }
 
 /* Native menus and pickers follow the theme, so dropdown text stays readable */
 :root { color-scheme:light }
 @media (prefers-color-scheme:dark) { :root:not([data-look]),:root[data-look="blue"] { color-scheme:dark } }
 :root[data-look="dark"] { color-scheme:dark }
-:root:is([data-look="light"],[data-look="pride"]) { color-scheme:light }
 select option,select optgroup { background:var(--surface); color:var(--ink) }
 :root[data-look="dark"] select option { background:#26262A; color:#F2EFE8 }
 :root:is([data-look="dark"],[data-look="light"]) .form-row select { background:transparent; border:0; box-shadow:none }
 @media (pointer:fine) { :root:is([data-look="dark"],[data-look="light"]) .form-row-date input { background:transparent; border:0; box-shadow:none } }
+:root[data-look="light"] { color-scheme:light }

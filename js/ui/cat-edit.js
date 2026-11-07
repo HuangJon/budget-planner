@@ -4,7 +4,7 @@
  * Also reachable from the budget page: "+ Add category" under each group, and from a category's sheet.
  */
 import { A, actions, changes, render } from './state.js';
-import { esc, svg, openSheet, sheetHead, toast, send, val } from './dom.js';
+import { esc, svg, openSheet, sheetHead, toast, send, val, openChild, registerSheet } from './dom.js';
 import { groupedCategories } from '../core/budget.js';
 import { LIMITS } from '../config/app.js';
 
@@ -17,8 +17,7 @@ export function openCatEditor({ group = null, adding = null, editing = null } = 
   if (group) open[group] = true;
   if (editing && b.categories[editing]) open[b.categories[editing].group || 'Other'] = true;
   if (adding) open[adding] = true;
-  A.sheet = { kind: 'cat-edit', budgetId: A.route.id, open, editing, adding, renaming: null };
-  drawEditor();
+  openChild({ kind: 'cat-edit', budgetId: A.route.id, open, editing, adding, renaming: null }, drawEditor);
   if (adding) setTimeout(() => document.getElementById('newCatName')?.focus(), 50);
 }
 
@@ -70,7 +69,7 @@ function drawEditor() {
   const groups = groupedCategories(b);
   const groupNames = groups.map(g => g.name);
   const hidden = Object.entries(b.categories).filter(([, c]) => c.hidden).map(([id, c]) => ({ id, ...c }));
-  openSheet(`<div class="sheet">${sheetHead('Categories', '', 'Done')}<div class="sheet-body">
+  openSheet(`<div class="sheet">${sheetHead('Categories')}<div class="sheet-body">
     <p class="small muted">Tap a group to open it. Hidden categories keep their history.</p>
     ${groups.map(g => {
       const isOpen = Boolean(S.open[g.name]);
@@ -195,3 +194,4 @@ actions['cat-delete'] = async el => {
 actions['add-cat-here'] = el => openCatEditor({ adding: el.dataset.id });
 actions['edit-this-cat'] = () => openCatEditor({ editing: A.sheet.id });
 export { changes };
+registerSheet('cat-edit', () => drawEditor());

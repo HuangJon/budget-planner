@@ -4,19 +4,21 @@
  * Spending offers your frequent ones as one-tap buttons; income offers your recent paychecks.
  */
 import { A, actions, inputs, changes } from './state.js';
-import { esc, openSheet, closeSheet, sheetHead, toast, send, today, fmtDate, ordinal } from './dom.js';
-import { groupedCategories, isValidTransaction, liveTransactions } from '../core/budget.js';
+import { esc, openSheet, closeSheet, sheetHead, toast, send, today, fmtDate, ordinal, openChild, finishSheet, registerSheet } from './dom.js';
+import { groupedCategories, isValidTransaction, liveTransactions, defaultDateFor } from '../core/budget.js';
 import { suggestCategory } from '../core/categorize.js';
-import { recurringId, DAY_MAX } from '../core/recurring.js';
+import { recurringId, DAY_MAX, EVERY, howOften } from '../core/recurring.js';
 import { toCents, fromCents, money } from '../core/money.js';
 import { LIMITS } from '../config/app.js';
 
+/** Today, or the same day in the month being looked at, so a purchase lands where you're looking. */
+export const defaultDate = (viewing = A.month) => defaultDateFor(today(), viewing);
+
 export function openTxForm(budgetId, editing = null, preset = {}) {
   A.form = editing
-    ? { budgetId, editing, kind: editing.kind, amount: fromCents(editing.amount), description: editing.description || '', categoryId: editing.categoryId || '', date: editing.date, note: editing.note || '', showNote: Boolean(editing.note), touchedCat: true, repeat: false }
-    : { budgetId, editing: null, kind: preset.kind || 'spend', amount: '', description: '', categoryId: preset.categoryId || '', date: today(), note: '', showNote: false, touchedCat: Boolean(preset.categoryId), repeat: false };
-  A.sheet = { kind: 'tx' };
-  drawForm();
+    ? { budgetId, editing, kind: editing.kind, amount: fromCents(editing.amount), description: editing.description || '', categoryId: editing.categoryId || '', date: editing.date, note: editing.note || '', showNote: Boolean(editing.note), touchedCat: true, repeat: false, every: 'month' }
+    : { budgetId, editing: null, kind: preset.kind || 'spend', amount: '', description: '', categoryId: preset.categoryId || '', date: defaultDate(), note: '', showNote: false, touchedCat: Boolean(preset.categoryId), repeat: false, every: 'month' };
+  openChild({ kind: 'tx' }, drawForm);
   if (!editing) setTimeout(() => document.getElementById('fAmount')?.focus(), 50);
 }
 
@@ -67,10 +69,12 @@ function drawForm() {
         <label class="form-row form-row-date"><span class="form-row-label">Date</span><span class="form-row-value" id="fDateShown">${esc(fmtDate(F.date))}</span><input id="fDate" type="date" required value="${esc(F.date)}" data-change="tx-date"></label>
         ${income ? '' : `<label class="form-row switch-row"><span class="form-row-label">This was a refund</span><input type="checkbox" id="fRefund" role="switch" ${refund ? 'checked' : ''} data-change="tx-refund"></label>`}
         ${F.editing
-          ? (isRepeatCopy ? `<div class="form-row"><span class="form-row-label">Repeats every month</span>${rule && !rule.stopped ? '<button type="button" class="link small" data-action="tx-stop-repeat">Stop repeating</button>' : '<span class="small muted">Stopped</span>'}</div>` : '')
-          : refund ? '' : `<label class="form-row switch-row"><span class="form-row-label">Repeat every month <span class="tiny muted" id="repeatHint">${F.repeat ? `on the ${ordinal(Math.min(day, DAY_MAX))}` : ''}</span></span><input type="checkbox" id="fRepeat" role="switch" ${F.repeat ? 'checked' : ''} data-change="tx-repeat"></label>`}
+          ? (isRepeatCopy ? `<div class="form-row"><span class="form-row-label">Repeats ${rule ? esc(howOften(rule, ordinal)) : ''}</span>${rule && !rule.stopped ? '<button type="button" class="link small" data-action="tx-stop-repeat">Stop repeating</button>' : '<span class="small muted">Stopped</span>'}</div>` : '')
+          : refund ? '' : `<label class="form-row switch-row"><span class="form-row-label">Repeat <span class="tiny muted" id="repeatHint">${F.repeat ? esc(howOften(draftRule(F), ordinal)) : ''}</span></span><input type="checkbox" id="fRepeat" role="switch" ${F.repeat ? 'checked' : ''} data-change="tx-repeat"></label>
+            ${F.repeat ? `<label class="form-row"><span class="form-row-label">How often</span><select id="fEvery" data-change="tx-every">${Object.entries(EVERY).map(([k, label]) => `<option value="${k}" ${F.every === k ? 'selected' : ''}>${label}</option>`).join('')}</select></label>` : ''}`}
       </div>
-      ${F.repeat && day > DAY_MAX ? `<p class="small muted">Repeats on the ${ordinal(DAY_MAX)}, so it lands in every month.</p>` : ''}
+      ${F.repeat && F.every === 'month' && day > DAY_MAX ? `<p class="small muted">Repeats on the ${ordinal(DAY_MAX)}, so it lands in every month.</p>` : ''}
+      ${F.repeat && F.every !== 'month' ? '<p class="small muted">Counted from this date. Paychecks every 2 weeks land in some months three times, and the extra goes to Ready to assign.</p>' : ''}
       ${F.showNote
         ? `<label class="f"><span>Note</span><textarea id="fNote" maxlength="${LIMITS.note}" data-input="tx-note">${esc(F.note)}</textarea></label>`
         : '<button type="button" class="link" data-action="tx-note">Add a note</button>'}
@@ -112,6 +116,14 @@ changes['tx-date'] = el => {
 };
 changes['tx-refund'] = el => { keepTyped(); A.form.kind = el.checked ? 'refund' : 'spend'; if (el.checked) A.form.repeat = false; drawForm(); };
 changes['tx-repeat'] = el => { keepTyped(); A.form.repeat = el.checked; drawForm(); };
+changes['tx-every'] = el => { keepTyped(); A.form.every = el.value; drawForm(); };
+
+/** The rule this form would save, for describing it before saving. */
+function draftRule(F) {
+  return F.every === 'month'
+    ? { id: 'draft', kind: F.kind, amount: 1, categoryId: F.categoryId || 'x', day: Math.min(Number(F.date.slice(8, 10)), DAY_MAX), start: F.date.slice(0, 7) }
+    : { id: 'draft', kind: F.kind, amount: 1, categoryId: F.categoryId || 'x', every: F.every, anchor: F.date };
+}
 actions['tx-note'] = () => { keepTyped(); A.form.showNote = true; drawForm(); document.getElementById('fNote')?.focus(); };
 actions['tx-quick'] = el => {
   keepTyped();
@@ -143,7 +155,7 @@ actions['tx-save'] = () => {
   if (F.editing) {
     const before = F.editing;
     send(A.repo.updateTransaction(budgetId, before, fields));
-    closeSheet();
+    finishSheet();
     const { id, budgetId: _b, createdBy, createdAt, updatedAt, updatedBy, ...old } = before;
     toast('Saved', () => send(A.repo.updateTransaction(budgetId, { ...before, ...fields }, { note: '', ...old, categoryId: old.categoryId ?? null })));
     return;
@@ -151,16 +163,19 @@ actions['tx-save'] = () => {
   let tid;
   if (F.repeat) {
     // This copy is the rule's first, so it isn't added a second time automatically.
-    const rule = { id: A.repo.newRuleId(), kind: F.kind, amount, description: fields.description, day: Math.min(Number(F.date.slice(8, 10)), DAY_MAX), start: F.date.slice(0, 7), ...(F.kind === 'income' ? {} : { categoryId: F.categoryId }) };
+    const base = { id: A.repo.newRuleId(), kind: F.kind, amount, description: fields.description, ...(F.kind === 'income' ? {} : { categoryId: F.categoryId }) };
+    const rule = F.every === 'month'
+      ? { ...base, every: 'month', day: Math.min(Number(F.date.slice(8, 10)), DAY_MAX), start: F.date.slice(0, 7) }
+      : { ...base, every: F.every, anchor: F.date };
     send(A.repo.saveRule(budgetId, rule));
-    tid = recurringId(rule.id, rule.start);
+    tid = recurringId(rule.id, F.every === 'month' ? rule.start : rule.anchor);
     fields.recurringId = rule.id;
   }
   const { transaction, written } = A.repo.addTransaction(budgetId, fields, tid);
   send(written);
-  closeSheet();
+  finishSheet();
   const message = F.kind === 'income' ? `Added ${money(amount)} to Ready to assign` : F.kind === 'refund' ? `Refund saved: ${money(amount)}` : `Saved ${money(amount)}`;
-  toast(`${message}${F.repeat ? ', repeats monthly' : ''}`, () => {
+  toast(`${message}${F.repeat ? `, repeats ${F.every === 'month' ? 'monthly' : F.every === 'week' ? 'weekly' : 'every 2 weeks'}` : ''}`, () => {
     send(A.repo.deleteTransaction(budgetId, transaction.id));
     if (fields.recurringId) send(A.repo.stopRule(budgetId, fields.recurringId));
   });
@@ -168,7 +183,7 @@ actions['tx-save'] = () => {
 actions['tx-delete'] = () => {
   const F = A.form, budgetId = F.budgetId, id = F.editing.id;
   send(A.repo.deleteTransaction(budgetId, id));
-  closeSheet();
+  finishSheet();
   toast('Deleted', () => send(A.repo.restoreTransaction(budgetId, id)));
 };
 actions['tx-stop-repeat'] = () => {
@@ -184,3 +199,5 @@ actions['edit-tx'] = el => {
   const t = (A.transactions[A.route.id] || []).find(x => x.id === el.dataset.id);
   if (t) openTxForm(A.route.id, t);
 };
+
+registerSheet('tx', () => drawForm());

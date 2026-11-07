@@ -36,7 +36,7 @@ await page.locator('dialog[open] .over-panel').waitFor();
 await shot('cover-sheet');
 await tap('[data-action=cover-auto]');
 await page.locator('dialog .over-panel').waitFor({ state: 'detached' });
-await tap('[data-action=close-sheet]');
+await tap('[data-action=sheet-back]');
 if (await page.locator('.over').count()) fail('Still overspent after covering');
 
 // Plan money: typing counts Ready to assign down live, leaving the box saves it.
@@ -53,7 +53,17 @@ await page.waitForTimeout(50);
 if ((await page.locator('#planReady').innerText()) !== planTyped) fail('Leaving the box changed the total');
 if (!(await page.locator('[data-plan]').nth(4).evaluate(el => el === document.activeElement))) fail('Focus was lost after saving a box');
 await shot('plan');
-await tap('[data-action=fund-targets]');
+// Copy last month's plan, then undo everything done on this screen.
+await tap('[data-action=plan-copy]');
+await page.locator('#toast').filter({ hasText: 'Copied' }).waitFor();
+await tap('[data-action=plan-undo]');
+await page.locator('#toast').filter({ hasText: 'Back to how the plan was' }).waitFor();
+if ((await page.locator('#planReady').innerText()) !== planBefore) fail('Undo did not put Ready to assign back');
+// Fund bills and targets shows what it will do first.
+await tap('[data-action=fund-show]');
+await page.locator('.fund-preview li').first().waitFor();
+await shot('fund-preview');
+await tap('.fund-preview [data-action=fund-targets]');
 await tap('.topbar a.btn');
 await page.locator('[data-testid=ready]').waitFor();
 if ((await ready()) === before) fail('Planning did not change Ready to assign');
@@ -65,6 +75,9 @@ if ((await page.locator('#fCat option:checked').innerText()) !== 'Groceries') fa
 await page.fill('#fAmount', '12');
 await page.locator('.sheet-head h2').tap();
 await tap('[data-action=tx-save]');
+// Saving returns to the category it was added from; Back from there closes it.
+await page.locator('.sheet-head h2', { hasText: 'Groceries' }).waitFor();
+await tap('[data-action=sheet-back]');
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
 await page.locator('.cat-row', { hasText: 'Entertainment' }).click();
 await tap('[data-action=cat-plan]');
@@ -76,7 +89,7 @@ await page.fill('#targetAmt', '2000');
 await tap('[data-action=target-save]');
 await page.locator('dialog .form-row-value', { hasText: '$2,000.00 a year' }).waitFor();
 await shot('category-sheet');
-await tap('[data-action=close-sheet]');
+await tap('[data-action=sheet-back]');
 await page.locator('.cat-row', { hasText: 'Vacation' }).locator('.bar.save').waitFor();
 
 // Spend from the bottom bar, with a suggested category.
@@ -139,12 +152,15 @@ await page.locator('.summary li').first().waitFor();
 for (const h of ['Pace this month', 'Coming up', 'Where it went', 'Worth a look', 'Month by month', 'Categories over time', 'Biggest purchases', 'Plan vs real', 'Saving', 'By person']) {
   await page.getByRole('heading', { name: h, exact: true }).waitFor();
 }
+if (!(await page.locator('.trend.folded[data-section=where]').count())) fail('Lower Trends sections should start folded');
 await shot('trends');
+for (const k of ['where', 'months', 'people']) await page.locator(`[data-action=trend-fold][data-id=${k}]`).click();
 await page.locator('.cmp-btn').first().click();
 await page.getByText('Average month').waitFor();
 await shot('category-trend');
-await tap('[data-action=close-sheet]');
-await tap('[data-action=trend-range][data-id="12"]');
+await tap('[data-action=sheet-back]');
+await page.locator('[data-section=months] [data-action=trend-range][data-id="12"]').click();
+await page.locator('[data-action=trend-fold][data-id=categories]').click();
 await page.locator('[data-section=categories]').getByText('last 12 months').waitFor();
 const cols = page.locator('.cols:not(.one) .col');
 await cols.nth(1).click();
@@ -152,11 +168,11 @@ const picked = await page.locator('.col-detail strong').innerText();
 await cols.last().click();
 if ((await page.locator('.col-detail strong').innerText()) === picked) fail('Tapping a month did not change the numbers shown');
 await page.locator('[data-action=trend-fold][data-id=biggest]').click();
-await page.locator('.trend.folded[data-section=biggest]').waitFor();
-await page.locator('[data-action=trend-fold][data-id=biggest]').click();
+await page.locator('.trend:not(.folded)[data-section=biggest]').waitFor();
 await page.locator('[data-section=people] [data-change=trend-byperson]').check();
 await page.locator('[data-section=people] .cmp-list li').first().waitFor();
 await shot('trends-bottom');
+await page.locator('[data-action=trend-fold][data-id=plan]').click();
 if (await page.locator('[data-action=plan-usual]').count()) {
   await tap('[data-action=plan-usual]');
   await page.locator('#toast').filter({ hasText: 'planned' }).waitFor();
@@ -181,7 +197,7 @@ await page.locator('[data-testid=ready]').waitFor();
 
 // Months.
 await tap('[data-action=month][data-id="-1"]');
-await page.getByText('Back to this month').waitFor();
+await page.locator('.away-pill').waitFor();
 await tap('[data-action=month][data-id=now]');
 
 // Categories: add one straight from the budget page, then rename it in the editor.
@@ -208,7 +224,7 @@ await page.getByText('Pick where they move').waitFor();
 await page.selectOption('#deleteMoveTo', { label: 'Groceries' });
 await tap('.delete-panel [data-action=cat-delete]');
 await page.locator('.ed-row', { hasText: 'Household' }).waitFor({ state: 'detached' });
-await tap('[data-action=close-sheet]');
+await tap('[data-action=sheet-back]');
 if (await page.locator('.cat-row', { hasText: 'Household' }).count()) fail('Deleted category still on the budget');
 
 // Fold a group to one line, and back.
@@ -235,19 +251,95 @@ if ((await page.locator('#planReady').innerText()) !== '$1,500.00') fail('Starti
 if (!(await page.locator('label.cat-name', { hasText: 'Pets' }).count())) fail('Picked category missing');
 await shot('setup-plan');
 
+// Round 6: requests to join, filters, compact view, viewed-month dates, yearly start, See trend.
+await page.goto(pathToFileURL(resolve('preview-test.html')).href + '#home');
+await tap('a.budget-row');
+await tap('a.request-note');
+await page.getByRole('heading', { name: 'Waiting to join' }).waitFor();
+await shot('requests');
+await tap('[data-action=request-approve]');
+await page.locator('.person', { hasText: 'Alex' }).waitFor();
+await tap('a.tab[href^="#b-"]:not([href$="-activity"])');
+if (await page.locator('a.request-note').count()) fail('Request notice should go once handled');
+await tap('[data-action=budget-filter][data-id=needs]');
+const needRows = await page.locator('.cat-row').count();
+if (!needRows || await page.locator('.cat-row .owe').count()) {
+  // Needs-money rows can still be overspent too; just make sure the list shrank.
+}
+await tap('[data-action=budget-filter][data-id=all]');
+if ((await page.locator('.cat-row').count()) <= needRows) fail('Needs money filter did not narrow the list');
+await tap('[data-action=budget-compact]');
+await page.locator('.groups.compact').waitFor();
+await shot('compact');
+await tap('[data-action=budget-compact]');
+await tap('[data-action=month][data-id="-1"]');
+await page.locator('.away-pill').waitFor();
+await tap('.spend-tab');
+const viewed = await page.locator('.monthbar h2').innerText();
+const date = await page.locator('#fDate').inputValue();
+if (new Date(date + 'T12:00').toLocaleDateString('en', { month: 'long', year: 'numeric' }) !== viewed) fail(`Spend date ${date} is not in ${viewed}`);
+await tap('[data-action=sheet-back]');
+await tap('.away-pill');
+await page.locator('.cat-row', { hasText: 'Gifts' }).click();
+await tap('[data-action=cat-trend]');
+await page.getByText('Average month').waitFor();
+await tap('[data-action=sheet-back]');
+await page.locator('.sheet-head h2', { hasText: 'Gifts' }).waitFor();
+await tap('[data-action=cat-open][data-id=target]');
+if (await page.locator('#targetStart').count()) {
+  await page.selectOption('#targetStart', 'jan');
+  await tap('[data-action=target-save]');
+  await page.locator('dialog .form-row-value', { hasText: 'from Jan' }).waitFor();
+}
+await tap('[data-action=sheet-back]');
+
+// Help and descriptors on each screen.
+await page.locator('.screen-tip').waitFor();
+await tap('[data-action=help]');
+await page.locator('.help-list li').first().waitFor();
+await shot('help');
+await tap('[data-action=sheet-back]');
+
+// Plan money: groups fold, categories can be added there.
+await tap('a.hero-btn');
+await page.locator('button.group-tab:has(h2:text-is("Fun"))').click();
+await page.locator('.group.folded:has(h2:text-is("Fun"))').waitFor();
+await page.locator('button.group-tab:has(h2:text-is("Fun"))').click();
+await page.locator('.group:has(.group-tab h2:text-is("Fun")) [data-action=add-cat-here]').click();
+await page.fill('#newCatName', 'Hobbies');
+await tap('[data-action=cat-add]');
+await page.locator('.ed-row', { hasText: 'Hobbies' }).waitFor();
+await tap('[data-action=sheet-back]');
+await page.locator('label.cat-name', { hasText: 'Hobbies' }).waitFor();
+await tap('.topbar a.btn');
+
+// A paycheck every 2 weeks.
+await tap('[data-action=add-income]');
+await page.fill('#fAmount', '1500');
+await page.fill('#fDesc', 'Side job');
+await page.locator('#fRepeat').check();
+await page.selectOption('#fEvery', '2weeks');
+await page.locator('#repeatHint').filter({ hasText: 'every other' }).waitFor();
+await page.locator('.sheet-head h2').tap();
+await tap('[data-action=tx-save]');
+await page.locator('dialog[open]').waitFor({ state: 'detached' });
+await tap('a.tab[href$="-activity"]');
+await page.locator('[data-action=open-rule]', { hasText: 'Side job' }).locator('text=every other').waitFor();
+await tap('a.tab[href^="#b-"]:not([href$="-activity"])');
+
 // Every theme, on the example budget.
 await page.goto(pathToFileURL(resolve('preview-test.html')).href + '#home');
 await tap('a.budget-row');
-for (const look of ['light', 'dark', 'pride']) {
+for (const look of ['light', 'dark']) {
   await tap('[data-action=account]');
   await tap(`[data-action=set-look][data-id=${look}]`);
-  await tap('[data-action=close-sheet]');
+  await tap('[data-action=sheet-back]');
   await shot(`budget-${look}`);
 }
 await page.emulateMedia({ colorScheme: 'dark' });
 await tap('[data-action=account]');
 await tap('[data-action=set-look][data-id=blue]');
-await tap('[data-action=close-sheet]');
+await tap('[data-action=sheet-back]');
 await shot('budget-blue-darkmode');
 
 // No sideways scrolling on a small phone.

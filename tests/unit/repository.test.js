@@ -87,7 +87,7 @@ test('an invite link adds you to the budget, and resetting it cuts the old link 
   const second = await repo.resetInvite(budget.id, first);
   assert.equal(await repo.lookUpInvite(first), null);
   assert.equal((await repo.lookUpInvite(second)).budgetId, budget.id);
-  await assert.rejects(repo.joinWithCode(first, 'Sam'), { code: 'not-found' });
+  await assert.rejects(repo.requestToJoin(first, 'Sam'), { code: 'not-found' });
 });
 
 test('leaving removes the budget from your list', async () => {
@@ -130,4 +130,29 @@ test('an unused category can be deleted outright, a used one needs somewhere to 
   await repo.deleteCategory(budget.id, 'a');
   assert.equal((await backend.get(`budgets/${budget.id}`)).categories.a, undefined);
   await assert.rejects(repo.deleteCategory(budget.id, 'b', null, [{ id: 't', categoryId: 'b' }]), { code: 'in-use' });
+});
+
+test('joining asks first; an admin lets people in or turns them away', async () => {
+  const { backend, repo } = fresh();
+  const { budget, written } = repo.createBudget({ name: 'Home', kind: 'shared' });
+  await written;
+  const code = await repo.resetInvite(budget.id, null, 'Home');
+  // Someone else asks, using the same local database with a different signed-in person.
+  const other = createRepository({ ...backend, uid: () => 'sam' }, () => 2000);
+  await other.requestToJoin(code, 'Sam');
+  let b = await backend.get(`budgets/${budget.id}`);
+  assert.equal(b.members.sam, undefined, 'not a member yet');
+  assert.equal(b.requests.sam.name, 'Sam');
+  assert.equal((await backend.get(`users/sam/pending/${budget.id}`)).budgetName, 'Home');
+  await repo.approveRequest(budget.id, 'sam');
+  b = await backend.get(`budgets/${budget.id}`);
+  assert.equal(b.members.sam.name, 'Sam');
+  assert.equal(b.requests.sam, undefined);
+  assert.ok(await backend.get(`users/sam/budgets/${budget.id}`), 'the budget shows in their list');
+  assert.equal(await backend.get(`users/sam/pending/${budget.id}`), null);
+  const alex = createRepository({ ...backend, uid: () => 'alex' }, () => 3000);
+  await alex.requestToJoin(code, 'Alex');
+  await repo.declineRequest(budget.id, 'alex');
+  assert.equal((await backend.get(`budgets/${budget.id}`)).requests.alex, undefined);
+  assert.equal((await backend.get(`users/alex/pending/${budget.id}`)).declined, true);
 });

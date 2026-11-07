@@ -1,6 +1,6 @@
 /** The budget screen: Ready to assign, anything overspent, and every category with what's left. */
 import { A, actions, changes, render } from './state.js';
-import { esc, svg, ICON, fmtMonth, ordinal, openSheet, closeSheet, sheetHead, toast, send, val, fmtDate } from './dom.js';
+import { esc, svg, ICON, fmtMonth, ordinal, openSheet, closeSheet, sheetHead, toast, send, val, fmtDate, registerSheet } from './dom.js';
 import { monthSummary, groupedCategories, fundTargets, coverOverspending, moveMoney, addMonths, thisMonth, monthOf, liveTransactions, targetType } from '../core/budget.js';
 import { money, toCents, fromCents } from '../core/money.js';
 import { openTxForm } from './tx-form.js';
@@ -12,7 +12,7 @@ export function monthBar() {
   const now = thisMonth();
   return `<div class="monthbar">
     <button type="button" class="icon-btn" data-action="month" data-id="-1" aria-label="Previous month">${svg(ICON.back)}</button>
-    <div class="monthbar-mid"><h2>${esc(fmtMonth(A.month))}</h2>${A.month !== now ? '<button type="button" class="link small" data-action="month" data-id="now">Back to this month</button>' : ''}</div>
+    <div class="monthbar-mid"><h2>${esc(fmtMonth(A.month))}</h2>${A.month !== now ? `<button type="button" class="away-pill" data-action="month" data-id="now">${A.month < now ? 'Past' : 'Future'} month · Back to ${esc(shortMonth(now))}</button>` : ''}</div>
     <button type="button" class="icon-btn" data-action="month" data-id="1" aria-label="Next month">${svg(ICON.next)}</button>
   </div>`;
 }
@@ -23,17 +23,38 @@ export const totalNeeded = (b, s) => Object.entries(s.categories).filter(([id]) 
 function hero(b, s) {
   const needed = totalNeeded(b, s);
   const negative = s.readyToAssign < 0;
+  // A fresh month with money waiting and nothing planned yet gets a nudge to plan it.
+  const fresh = A.month === thisMonth() && s.assignedThisMonth === 0 && s.readyToAssign > 0;
   const say = negative
     ? `You've assigned ${money(-s.readyToAssign)} more than you have. Take some back from a category.`
-    : s.readyToAssign === 0 ? 'Every dollar has a job.' : 'Give these dollars a job.';
-  return `<section class="hero ${negative ? 'is-owing' : ''}" aria-label="Ready to assign">
+    : fresh ? `It's ${shortMonth(A.month)}. Time to give this month's money its jobs.`
+      : s.readyToAssign === 0 ? 'Every dollar has a job.' : 'Give these dollars a job.';
+  return `<section class="hero ${negative ? 'is-owing' : ''} ${fresh ? 'is-fresh' : ''}" aria-label="Ready to assign">
     <span class="label">Ready to assign</span>
     <span class="big ${negative ? 'down' : ''}" data-testid="ready">${money(s.readyToAssign)}</span>
     <p>${esc(say)}</p>
     <div class="hero-line"><span>${needed > 0 ? `Bills and targets need <strong class="amt">${money(needed)}</strong>` : hasTargets(b) ? 'Bills and targets are covered' : 'Decide where it all goes'}</span></div>
-    <div class="hero-actions"><button type="button" class="hero-btn ghost" data-action="add-income">Add income</button><a class="hero-btn" href="#b-${b.id}-plan">Plan money</a></div>
+    <div class="hero-actions"><button type="button" class="hero-btn ghost" data-action="add-income">Add income</button><a class="hero-btn" href="#b-${b.id}-plan">${negative ? 'Take it back' : fresh ? `Plan ${esc(shortMonth(A.month))}` : 'Plan money'}</a></div>
   </section>`;
 }
+
+/* Filters and compact rows, remembered on this device. */
+const pref = (key, fallback) => { try { return localStorage.getItem(key) ?? A[`mem:${key}`] ?? fallback; } catch { return A[`mem:${key}`] ?? fallback; } };
+const setPref = (key, value) => { try { localStorage.setItem(key, value); } catch { A[`mem:${key}`] = value; } };
+const FILTERS = { all: () => true, needs: x => x.needed > 0, over: x => x.available < 0 };
+
+function filterBar(b, s) {
+  const f = pref('wmm:budgetFilter', 'all'), compact = pref('wmm:compact', 'no') === 'yes';
+  const ids = Object.keys(b.categories).filter(id => !b.categories[id].hidden);
+  const count = k => ids.filter(id => FILTERS[k](s.categories[id])).length;
+  const chip = (k, label) => `<button type="button" data-action="budget-filter" data-id="${k}" aria-pressed="${f === k}">${label}</button>`;
+  return `<div class="filter-row">
+    <div class="seg" role="group" aria-label="Show">${chip('all', 'All')}${chip('needs', `Needs money${count('needs') ? ` (${count('needs')})` : ''}`)}${chip('over', `Over${count('over') ? ` (${count('over')})` : ''}`)}</div>
+    <button type="button" class="btn small view-toggle" data-action="budget-compact" aria-pressed="${compact}">${compact ? 'Roomy' : 'Compact'}</button>
+  </div>`;
+}
+actions['budget-filter'] = el => { setPref('wmm:budgetFilter', el.dataset.id); render(); };
+actions['budget-compact'] = () => { setPref('wmm:compact', pref('wmm:compact', 'no') === 'yes' ? 'no' : 'yes'); render(); };
 
 function overspentNotice(b, s) {
   const over = s.overspent.filter(id => !b.categories[id]?.hidden);
@@ -53,6 +74,7 @@ export function catStatus(c, x) {
     const when = t?.type === 'monthly' && t.dueDay ? ` by the ${ordinal(t.dueDay)}` : t?.type === 'monthly' ? '' : ' this month';
     return `<span class="nudge">Needs ${money(x.needed)}${t?.type === 'monthly' ? ' more' : ''}${when}</span>`;
   }
+  if (t?.type === 'yearly' && t.notStarted) return `<span class="muted">Yearly target starts in ${shortMonth(t.start)}</span>`;
   if (t?.type === 'yearly') return `<span class="muted">${money(t.spentThisYear)} of ${money(t.amount)} spent this year</span>`;
   if (t?.type === 'byDate') return `<span class="muted">${t.saved >= t.amount ? 'Goal reached · ' : ''}${money(t.saved)} of ${money(t.amount)} saved</span>`;
   if (t?.type === 'monthly') return `<span class="muted">${spent ? `${money(spent)} spent · ` : ''}Target met</span>`;
@@ -79,9 +101,9 @@ function catLine(c, s) {
 }
 
 /** A group's name on a tab above its card, so groups are easy to tell apart. */
-export const groupTab = (name, right = '', { toggle = false, folded = false } = {}) => toggle
-  ? `<button type="button" class="group-tab" data-action="group-fold" data-id="${esc(name)}" aria-expanded="${!folded}"><span class="fold-chev" aria-hidden="true">${svg('<path d="M6 9l6 6 6-6"/>')}</span><h3>${esc(name)}</h3>${right ? `<span class="small">${right}</span>` : ''}</button>`
-  : `<div class="group-tab"><h3>${esc(name)}</h3>${right ? `<span class="small">${right}</span>` : ''}</div>`;
+export const groupTab = (name, right = '', { toggle = false, folded = false, level = 3 } = {}) => toggle
+  ? `<button type="button" class="group-tab" data-action="group-fold" data-id="${esc(name)}" aria-expanded="${!folded}"><span class="fold-chev" aria-hidden="true">${svg('<path d="M6 9l6 6 6-6"/>')}</span><h${level}>${esc(name)}</h${level}>${right ? `<span class="small">${right}</span>` : ''}</button>`
+  : `<div class="group-tab"><h${level}>${esc(name)}</h${level}>${right ? `<span class="small">${right}</span>` : ''}</div>`;
 
 /** Which groups are folded, remembered on this device for each budget. */
 const FOLD_KEY = id => `wmm:folded:${id}`;
@@ -96,23 +118,31 @@ actions['group-fold'] = el => {
 
 export function budgetScreen(b) {
   const s = summaryFor(b);
-  const groups = groupedCategories(b);
+  const f = pref('wmm:budgetFilter', 'all'), compact = pref('wmm:compact', 'no') === 'yes';
+  const keepIt = FILTERS[f] || FILTERS.all;
+  const groups = groupedCategories(b).map(g => ({ ...g, all: g.categories, categories: g.categories.filter(c => keepIt(s.categories[c.id])) })).filter(g => f === 'all' || g.categories.length);
   return `${monthBar()}
     ${hero(b, s)}
+    ${b.members?.[A.user?.uid]?.admin && Object.keys(b.requests || {}).length ? `<a class="panel request-note" href="#b-${b.id}-people"><span class="grow">${esc(Object.values(b.requests).map(r => r.name || 'Someone').join(', '))} asked to join</span><span class="small link">Review</span></a>` : ''}
     ${overspentNotice(b, s)}
     ${s.unknownActivity ? `<p class="notice">${money(-s.unknownActivity)} was spent in a category that has since been removed.</p>` : ''}
+    ${Object.keys(b.categories).length ? filterBar(b, s) : ''}
+    <div class="groups ${compact ? 'compact' : ''}">
     ${groups.map(g => {
-      const left = g.categories.reduce((a, c) => a + s.categories[c.id].available, 0);
-      const over = g.categories.filter(c => s.categories[c.id].available < 0).length;
-      const needs = g.categories.filter(c => s.categories[c.id].needed > 0).length;
-      const folded = isFolded(b.id, g.name);
-      const summary = `${g.categories.length} ${g.categories.length === 1 ? 'category' : 'categories'}${over ? ` · <span class="owe">${over} over</span>` : ''}${needs ? ` · <span class="nudge">${needs} need money</span>` : ''}`;
-      return `<section class="group ${folded ? 'folded' : ''}" aria-label="${esc(g.name)}">${groupTab(g.name, `${money(left)} to spend`, { toggle: true, folded })}<div class="panel group-card">${folded
+      const left = g.all.reduce((a, c) => a + s.categories[c.id].available, 0);
+      const over = g.all.filter(c => s.categories[c.id].available < 0).length;
+      const needs = g.all.filter(c => s.categories[c.id].needed > 0).length;
+      // A filter shows what matches even inside folded groups.
+      const folded = f === 'all' && isFolded(b.id, g.name);
+      const summary = `${g.all.length} ${g.all.length === 1 ? 'category' : 'categories'}${over ? ` · <span class="owe">${over} over</span>` : ''}${needs ? ` · <span class="nudge">${needs} need money</span>` : ''}`;
+      return `<section class="group ${folded ? 'folded' : ''}" aria-label="${esc(g.name)}">${groupTab(g.name, `${money(left)} to spend`, { toggle: f === 'all', folded })}<div class="panel group-card">${folded
         ? `<button type="button" class="tap fold-line" data-action="group-fold" data-id="${esc(g.name)}"><span class="grow small muted">${summary}</span><span class="small link">Show</span></button>`
-        : `${g.categories.map(c => catLine(c, s)).join('')}<button type="button" class="add-cat" data-action="add-cat-here" data-id="${esc(g.name)}">+ Add category</button>`}</div></section>`;
+        : `${g.categories.map(c => catLine(c, s)).join('')}${f === 'all' ? `<button type="button" class="add-cat" data-action="add-cat-here" data-id="${esc(g.name)}">+ Add category</button>` : ''}`}</div></section>`;
     }).join('')}
-    ${groups.length ? '<button type="button" class="link edit-cats-link" data-action="edit-cats">Edit categories</button>' : ''}
-    ${groups.length ? '' : '<section class="panel empty"><h2>No categories yet</h2><p class="muted">Add one from the menu behind your icon.</p></section>'}`;
+    </div>
+    ${f !== 'all' && !groups.length ? `<section class="panel empty"><h2>${f === 'over' ? 'Nothing is over' : 'Nothing needs money'}</h2><p class="muted">${f === 'over' ? 'Every category has money left.' : 'Every bill and target has what it needs this month.'}</p><button type="button" class="btn" data-action="budget-filter" data-id="all">Show all</button></section>` : ''}
+    ${Object.keys(b.categories).length && f === 'all' ? '<button type="button" class="link edit-cats-link" data-action="edit-cats">Edit categories</button>' : ''}
+    ${Object.keys(b.categories).length ? '' : '<section class="panel empty"><h2>No categories yet</h2><p class="muted">Add one from the menu behind your icon.</p></section>'}`;
 }
 
 /* ---------- One category ---------- */
@@ -123,7 +153,7 @@ const KINDS = [['none', 'None'], ['monthly', 'Monthly'], ['yearly', 'Yearly'], [
 const KIND_HELP = {
   none: 'No target. Add money whenever you have extra.',
   monthly: 'The same amount every month, like rent or groceries.',
-  yearly: 'A yearly limit, like $2,000 for clothes. It asks for a share each month, and the money builds up until you spend it.',
+  yearly: 'A yearly limit, like $2,000 for clothes. It asks for a share each month, and the money builds up until you spend it. Late in the year, starting in January keeps this year from asking for a lot at once.',
   byDate: 'Save up an amount by a month, like a trip. It works out how much to add each month.',
 };
 const futureMonths = (from, n = 48) => Array.from({ length: n }, (_, i) => addMonths(from, i));
@@ -134,6 +164,7 @@ function targetEditor(c) {
   const rows = kind === 'none' ? '' : `<div class="form-rows">
     <div class="form-row"><span class="form-row-label">${kind === 'yearly' ? 'Per year' : kind === 'byDate' ? 'Goal' : 'Per month'}</span>${amountBox('targetAmt', t.amount || 0, 'Target amount')}</div>
     ${kind === 'monthly' ? `<label class="form-row"><span class="form-row-label">Due day</span><select id="targetDue"><option value="">No due day</option>${Array.from({ length: 28 }, (_, i) => i + 1).map(n => `<option value="${n}" ${String(t.dueDay || '') === String(n) ? 'selected' : ''}>The ${ordinal(n)}</option>`).join('')}</select></label>` : ''}
+    ${kind === 'yearly' && thisMonth().slice(5) !== '01' ? `<label class="form-row"><span class="form-row-label">Starts</span><select id="targetStart"><option value="now" ${t.start && t.start > thisMonth() ? '' : 'selected'}>This month</option><option value="jan" ${t.start && t.start > thisMonth() ? 'selected' : ''}>January ${Number(thisMonth().slice(0, 4)) + 1}</option></select></label>` : ''}
     ${kind === 'byDate' ? `<label class="form-row"><span class="form-row-label">By</span><select id="targetDate">${futureMonths(thisMonth()).map(m => `<option value="${m}" ${(t.date || addMonths(thisMonth(), 6)) === m ? 'selected' : ''}>${esc(fmtMonth(m))}</option>`).join('')}</select></label>` : ''}
   </div>`;
   return `<div class="seg" role="group" aria-label="Target kind">${KINDS.map(([k, label]) => `<button type="button" data-action="target-kind" data-id="${k}" aria-pressed="${kind === k}">${label}</button>`).join('')}</div>
@@ -152,7 +183,7 @@ export function catSheet() {
   const donors = others.filter(([o]) => s.categories[o].available > 0);
   const recent = liveTransactions(A.transactions[budgetId]).filter(t => t.categoryId === id && monthOf(t.date) === A.month).sort((p, q) => q.date.localeCompare(p.date));
   const open = A.sheet.open || {};
-  openSheet(`<div class="sheet">${sheetHead(c.name, '', 'Done')}<div class="sheet-body">
+  openSheet(`<div class="sheet">${sheetHead(c.name)}<div class="sheet-body">
     <section class="panel pad stack">
       <div class="row between"><span class="label">${x.available < 0 ? 'Over in' : 'To spend in'} ${esc(shortMonth(A.month))}</span><span class="big-amt amt ${x.available < 0 ? 'owe' : ''}">${money(Math.abs(x.available))}</span></div>
       <p class="small">${catStatus(c, x)}</p>
@@ -185,6 +216,7 @@ export function catSheet() {
     <div class="panel more-list">
       <button type="button" class="form-row" data-action="cat-open" data-id="target" aria-expanded="${Boolean(open.target)}"><span class="form-row-label">Target</span><span class="form-row-value">${esc(targetLabel(c))}</span></button>
       ${open.target ? `<div class="more-body stack">${targetEditor(c)}</div>` : ''}
+      <button type="button" class="form-row" data-action="cat-trend" data-id="${id}"><span class="form-row-label">See trend</span><span class="form-row-value muted">Past months and biggest purchases</span></button>
       <button type="button" class="form-row" data-action="edit-this-cat"><span class="form-row-label">Name and group</span><span class="form-row-value muted">Rename, move or hide</span></button>
       <button type="button" class="form-row" data-action="cat-open" data-id="move" aria-expanded="${Boolean(open.move)}"><span class="form-row-label">Move money</span><span class="form-row-value muted">To another category</span></button>
       ${open.move ? `<div class="more-body stack">
@@ -206,7 +238,7 @@ function targetLabel(c) {
   const t = c.target;
   switch (targetType(t)) {
     case 'monthly': return `${money(t.amount)} a month`;
-    case 'yearly': return `${money(t.amount)} a year`;
+    case 'yearly': return `${money(t.amount)} a year${t.start && t.start > thisMonth() ? `, from ${shortMonth(t.start)} ${t.start.slice(0, 4)}` : ''}`;
     case 'byDate': return `${money(t.amount)} by ${shortMonth(t.date)} ${t.date.slice(0, 4)}`;
     default: return 'None';
   }
@@ -233,6 +265,7 @@ actions.month = el => {
 };
 actions['open-cat'] = el => { A.sheet = { kind: 'cat', budgetId: A.route.id, id: el.dataset.id, open: {} }; catSheet(); };
 actions['cat-spend'] = () => { const { budgetId, id } = A.sheet; openTxForm(budgetId, null, { categoryId: id }); };
+registerSheet('cat', () => catSheet());
 actions['cat-plan'] = () => { toggle('plan'); if (A.sheet.open.plan) document.getElementById('assignAmt')?.focus(); };
 actions['cat-open'] = el => toggle(el.dataset.id);
 actions['target-kind'] = el => { A.sheet.targetKind = el.dataset.id; catSheet(); };
@@ -245,6 +278,7 @@ actions['fund-targets'] = () => {
   if (!total) return toast(s.readyToAssign > 0 ? 'Bills and targets are already covered.' : 'Nothing left to assign.');
   const n = Object.keys(funded).length;
   writeAssigned(b, A.month, assigned, `Planned ${money(total)} for ${n} ${n === 1 ? 'category' : 'categories'}`);
+  A.fundPreview = false;
 };
 
 actions['assign-save'] = () => {
@@ -306,6 +340,7 @@ actions['target-save'] = () => {
     target = { type: kind, amount };
     if (kind === 'monthly' && Number(val('targetDue'))) target.dueDay = Number(val('targetDue'));
     if (kind === 'byDate') target.date = val('targetDate');
+    if (kind === 'yearly' && val('targetStart') === 'jan') target.start = `${Number(thisMonth().slice(0, 4)) + 1}-01`;
   }
   send(A.repo.updateCategory(b.id, id, { target }));
   toast(target ? 'Target saved' : 'Target removed', () => send(A.repo.updateCategory(b.id, id, { target: before })));

@@ -4,7 +4,7 @@
  * plan vs real, saving, and an opt-in look at who spent what. Tap a category for its own trend.
  */
 import { A, actions, changes, render } from './state.js';
-import { esc, svg, fmtMonth, fmtDate, today, toast, send, openSheet, closeSheet, sheetHead } from './dom.js';
+import { esc, svg, fmtMonth, fmtDate, today, toast, send, openSheet, closeSheet, sheetHead, openChild, registerSheet } from './dom.js';
 import { monthBar, writeAssigned, catSheet } from './budget.js';
 import {
   monthTotals, categoryCompare, notableChanges, planVsReal, savingThisMonth, targetProgress,
@@ -22,7 +22,8 @@ const CHEV = '<path d="M6 9l6 6 6-6"/>';
 const store = (key, fallback) => { try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); } catch { return A[`mem:${key}`] ?? fallback; } };
 const keep = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch { A[`mem:${key}`] = value; } };
 const range = () => store('wmm:trendsRange', '6');
-const folded = () => store('wmm:trendsFolded', []);
+// Summary, Pace and Coming up start open; the rest start folded so the page opens short.
+const folded = () => store('wmm:trendsFolded', ['where', 'changes', 'months', 'categories', 'biggest', 'plan', 'saving', 'people']);
 const RANGES = [['3', '3 months'], ['6', '6 months'], ['12', '12 months'], ['year', 'This year']];
 const rangeLabel = (r, month) => (r === 'year' ? `${month.slice(0, 4)} so far` : `last ${r} months`);
 
@@ -184,9 +185,8 @@ export function trendsScreen(b) {
     ${isNow ? section('bills', 'Coming up', billsBody(upcomingBills(b, list, now), b)) : ''}
     ${section('where', 'Where it went', whereItWent(compare), money(compare.total))}
     ${section('changes', 'Worth a look', changesBody(notableChanges(compare), compare))}
-    <div class="range-row">${rangePicker()}</div>
-    ${section('months', 'Month by month', monthByMonth(totals))}
-    ${section('categories', 'Categories over time', categoriesOverTime(categoryTotals(b, list, months), months, label), `<span class="small muted">${esc(label)}</span>`)}
+    ${section('months', 'Month by month', rangePicker() + monthByMonth(totals))}
+    ${section('categories', 'Categories over time', rangePicker() + categoriesOverTime(categoryTotals(b, list, months), months, label), `<span class="small muted">${esc(label)}</span>`)}
     ${section('biggest', 'Biggest purchases', biggest(biggestPurchases(list, A.month), b))}
     ${section('plan', 'Plan vs real', planReal(planVsReal(b, list, A.month)))}
     ${section('saving', 'Saving', saving(savingThisMonth(b, list, A.month), targetProgress(b, list, A.month)))}
@@ -202,7 +202,7 @@ function catTrendSheet() {
   const h = categoryHistory(A.transactions[b.id] || [], id, months);
   const max = Math.max(...h.rows.map(x => x.spent), h.average, 1);
   const here = h.rows.at(-1).spent;
-  openSheet(`<div class="sheet">${sheetHead(c.name, '', 'Done')}<div class="sheet-body">
+  openSheet(`<div class="sheet">${sheetHead(`${c.name} over time`)}<div class="sheet-body">
     <section class="panel pad stack">
       <div class="two-stats"><div><span class="label">${esc(fmtMonth(A.month).split(' ')[0])}</span><span class="big-amt amt">${money(here)}</span></div><div><span class="label">Average month</span><span class="big-amt amt">${money(h.average)}</span></div></div>
       <div class="cols one ${months.length > 6 ? 'many' : ''}" role="img" aria-label="${esc(c.name)} spending by month">${h.rows.map(x => `<div class="col"><span class="col-bars"><i class="out" style="height:${pct(x.spent, max)}%"></i></span><span class="tiny muted">${short(x.month)}</span></div>`).join('')}${h.average ? `<span class="avg-line" style="bottom:calc(22px + (100% - 22px) * ${(pct(h.average, max) / 100).toFixed(3)})" aria-hidden="true"></span>` : ''}</div>
@@ -222,8 +222,9 @@ actions['trend-fold'] = el => {
 };
 actions['trend-range'] = el => { keep('wmm:trendsRange', el.dataset.id); A.trendsCol = null; render(); };
 actions['trend-col'] = el => { A.trendsCol = el.dataset.id; render(); };
-actions['cat-trend'] = el => { A.sheet = { kind: 'cat-trend', id: el.dataset.id }; catTrendSheet(); };
-actions['trend-open-cat'] = el => { A.sheet = { kind: 'cat', budgetId: A.route.id, id: el.dataset.id, open: {} }; catSheet(); };
+actions['cat-trend'] = el => openChild({ kind: 'cat-trend', id: el.dataset.id }, catTrendSheet);
+actions['trend-open-cat'] = el => openChild({ kind: 'cat', budgetId: A.route.id, id: el.dataset.id, open: {} }, catSheet);
+registerSheet('cat-trend', () => catTrendSheet());
 actions['plan-usual'] = el => {
   const b = A.budgets[A.route.id], id = el.dataset.id, amount = Number(el.dataset.amount);
   const current = b.assigned?.[A.month]?.[id] || 0;

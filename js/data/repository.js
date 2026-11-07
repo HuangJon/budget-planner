@@ -133,12 +133,35 @@ export function createRepository(backend, now = () => Date.now()) {
       return code;
     },
     lookUpInvite: code => backend.get(`invites/${code}`),
-    async joinWithCode(code, myName) {
+    /**
+     * Asks to join with an invite code. Nothing in the budget is visible until an admin lets you in;
+     * your own list keeps the request so you can see it's waiting.
+     */
+    async requestToJoin(code, myName) {
       const invite = await backend.get(`invites/${code}`);
       if (!invite) throw Object.assign(new Error('No such invite'), { code: 'not-found' });
-      await backend.update(budgetPath(invite.budgetId), { [`members.${uid()}`]: { name: myName, joinedAt: now(), invite: code }, changedBy: uid() });
-      await backend.set(mine(invite.budgetId), { budgetId: invite.budgetId, at: now() });
+      await backend.update(budgetPath(invite.budgetId), { [`requests.${uid()}`]: { name: myName, at: now(), invite: code } });
+      await backend.set(`users/${uid()}/pending/${invite.budgetId}`, { budgetId: invite.budgetId, budgetName: invite.budgetName || '', at: now() });
       return invite.budgetId;
+    },
+    watchMyPending: (cb, err) => backend.watchCollection(`users/${uid()}/pending`, cb, err),
+    async cancelRequest(id) {
+      await backend.update(budgetPath(id), { [`requests.${uid()}`]: undefined }).catch(() => {});
+      await backend.remove(`users/${uid()}/pending/${id}`);
+    },
+    dismissPending: id => backend.remove(`users/${uid()}/pending/${id}`),
+    /** An admin lets someone in: they become a member and the budget appears in their list. */
+    async approveRequest(id, memberUid) {
+      const b = await backend.get(budgetPath(id));
+      const req = b?.requests?.[memberUid];
+      if (!req) throw Object.assign(new Error('No such request'), { code: 'not-found' });
+      await backend.update(budgetPath(id), { [`members.${memberUid}`]: { name: req.name, joinedAt: now(), invite: req.invite, approvedBy: uid() }, [`requests.${memberUid}`]: undefined, changedBy: uid() });
+      await backend.set(`users/${memberUid}/budgets/${id}`, { budgetId: id, at: now() });
+      await backend.remove(`users/${memberUid}/pending/${id}`);
+    },
+    async declineRequest(id, memberUid) {
+      await backend.update(budgetPath(id), { [`requests.${memberUid}`]: undefined, changedBy: uid() });
+      await backend.update(`users/${memberUid}/pending/${id}`, { declined: true }).catch(() => {});
     },
     removeMember: (id, memberUid) => backend.update(budgetPath(id), { [`members.${memberUid}`]: undefined, [`removed.${memberUid}`]: now(), changedBy: uid() }),
     setAdmin: (id, memberUid, admin) => backend.update(budgetPath(id), { [`members.${memberUid}.admin`]: admin, changedBy: uid() }),

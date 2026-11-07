@@ -74,8 +74,6 @@ a.tap,a.icon-btn,a.btn { color:inherit; text-decoration:none }
 .tabs .tab[aria-current="page"] svg { background:var(--accent); color:var(--accent-ink) }
 :root:is([data-look="dark"],[data-look="light"]) .tabs .tab[aria-current="page"],:root:is([data-look="dark"],[data-look="light"]) .tabs .tab[aria-current="page"] svg { color:var(--ink) }
 :root:is([data-look="dark"],[data-look="light"]) .tabs .tab[aria-current="page"] svg { background:var(--sunken) }
-:root[data-look="pride"] .tabs .tab[aria-current="page"],:root[data-look="pride"] .tabs .tab[aria-current="page"] svg { color:#5B1E8C }
-:root[data-look="pride"] .tabs .tab[aria-current="page"] svg { background:#E9DDF5 }
 
 /* Hero money on the dark hero cards stays readable */
 .hero .big.down { color:var(--hero-down) }
@@ -94,7 +92,6 @@ a.tap,a.icon-btn,a.btn { color:inherit; text-decoration:none }
 .group-card .cat-row:first-child, .group-card .plan-row:first-child { border-top-color:transparent }
 :root[data-look="dark"] .group-tab { background:#45433E; color:#F3EDE1 }
 :root[data-look="light"] .group-tab { background:#3A4759; color:#F2EEE5 }
-:root[data-look="pride"] .group-tab { background:#241C33; color:#FFFFFF }
 
 /* The hero's Plan money link looks like the button it is */
 a.hero-btn { display:inline-grid; place-items:center; text-decoration:none; white-space:nowrap }
@@ -120,7 +117,6 @@ a.hero-btn { display:inline-grid; place-items:center; text-decoration:none; whit
 .tabs .spend-tab svg { width:52px; height:40px; padding:9px; border-radius:14px; background:var(--accent); color:var(--accent-ink); margin-top:-14px; box-shadow:0 2px 8px var(--shadow) }
 .tabs .spend-tab { color:var(--accent); font-weight:700 }
 :root:is([data-look="dark"],[data-look="light"]) .tabs .spend-tab { color:var(--ink) }
-:root[data-look="pride"] .tabs .spend-tab svg { background:linear-gradient(120deg,#FF8A8A,#FFC766,#FFF07A,#8FE3A0,#8FB8FF,#C99BF0); color:#241C33 }
 
 /* Setup steps and chips */
 .chips .chip[aria-pressed="true"]::before { content:"\2713"; font-weight:700 }
@@ -131,7 +127,6 @@ a.hero-btn { display:inline-grid; place-items:center; text-decoration:none; whit
 .hero-btn.ghost { background:transparent; color:var(--hero-ink); box-shadow:inset 0 0 0 1.5px var(--hero-tear) }
 :root:is([data-look="dark"],[data-look="light"]) .hero-btn.ghost { background:transparent; color:#F3EDE1; box-shadow:inset 0 0 0 1.5px rgba(243,237,225,.4) }
 :root[data-look="light"] .hero-btn.ghost { color:#F2EEE5 }
-:root[data-look="pride"] .hero-btn.ghost { background:transparent; color:#FFFFFF }
 .quick { display:grid; gap:6px }
 .quick-row { display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; margin-inline:-4px; padding-inline:4px; scrollbar-width:none }
 .quick-row::-webkit-scrollbar { display:none }
@@ -203,7 +198,6 @@ a.hero-btn { display:inline-grid; place-items:center; text-decoration:none; whit
 /* "+ Add category" at the bottom of each group on the budget page */
 .add-cat { width:100%; text-align:left; padding:12px 16px; background:none; border:0; border-top:1px dashed var(--line); color:var(--accent); font-weight:600; font-size:.9375rem }
 :root:is([data-look="dark"],[data-look="light"]) .add-cat { color:var(--ink) }
-:root[data-look="pride"] .add-cat { color:#5B1E8C }
 .edit-cats-link { justify-self:center; padding:6px }
 
 /* Round 4 */
@@ -256,3 +250,44 @@ button.group-tab { border:0; cursor:pointer; font:inherit; text-align:left }
 .tx-mini .tx-row { border-top:1px solid var(--line) }
 .tx-mini li:first-child .tx-row { border-top:0 }
 .switch-row.bordered { border:1px solid var(--line); border-radius:12px }
+
+/* ---------- Round 6 ---------- */
+.fund-preview { padding:12px; border-radius:10px; background:var(--sunken) }
+.fund-preview ul { list-style:none; margin:0; padding:0; display:grid; gap:4px }
+.group-tab h2 { font-size:1rem; letter-spacing:.01em; overflow-wrap:anywhere }
+.away-pill { border:0; border-radius:999px; padding:6px 12px; background:var(--accent); color:var(--accent-ink); font-weight:600; font-size:.8125rem; min-height:32px }
+:root:is([data-look="dark"],[data-look="light"]) .away-pill { background:var(--sunken); color:var(--ink) }
+.filter-row { display:flex; gap:8px; align-items:center }
+.filter-row .seg { flex:1; min-width:0 }
+.filter-row .seg button { font-size:.8125rem; padding:7px 6px; white-space:nowrap }
+.view-toggle { flex:none }
+.groups { display:grid; gap:inherit; gap:16px }
+/* Compact: one line per category, status shown only through the amount's color */
+.groups.compact .cat-row { padding-block:9px; min-height:48px }
+.groups.compact .cat-row .stack > .small { display:none }
+.groups.compact .cat-row .bar { margin-top:5px; height:4px }
+.groups.compact .cat-avail .tiny.muted { display:none }
+.groups.compact .cat-avail .amt { font-size:1rem }
+.groups.compact .add-cat { padding-block:9px }
+@media (max-width:360px) { .filter-row { flex-wrap:wrap } .filter-row .seg { flex-basis:100% } .view-toggle { margin-left:auto } }
+/* Text-style buttons keep their look but get a full-size tap area. */
+button.link, button.link-text, .danger-link { min-height:44px; display:inline-flex; align-items:center }
+.summary li button.link-text { min-height:0; padding-block:10px; margin-block:-10px }
+.trend-body .range-seg { margin-bottom:4px }
+/* Rows never push a small phone sideways. */
+.form-row { min-width:0 }
+.form-row-label { min-width:0; overflow-wrap:anywhere }
+.switch-row input[type=checkbox] { margin-left:8px }
+.request-row { display:flex; flex-wrap:wrap; align-items:center; gap:10px 12px }
+.requests .request-row + .request-row { border-top:1px solid var(--line); padding-top:12px }
+.pending-list { padding:14px 16px; display:grid; gap:12px }
+a.request-note { display:flex; align-items:center; gap:12px; padding:14px 16px; color:var(--ink); text-decoration:none; box-shadow:inset 3px 0 0 var(--accent), var(--card-shadow) }
+/* The back arrow on every popup */
+.sheet-head .back-btn { display:inline-flex; align-items:center; gap:2px; padding-left:8px; min-height:40px }
+.sheet-head .back-btn svg { width:18px; height:18px }
+/* Descriptors and help */
+.screen-tip { margin:-6px 4px 0; color:var(--muted); font-size:.875rem; line-height:1.4 }
+.help-btn svg { width:22px; height:22px }
+.help-list { margin:0; padding-left:18px; display:grid; gap:12px; line-height:1.45 }
+.help-list strong { font-weight:650 }
+.group-tab h2, .group-tab h3 { color:inherit }

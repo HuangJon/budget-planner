@@ -29,6 +29,7 @@ export function exampleData(uid, now = new Date()) {
     id, schemaVersion: 1, name: 'Home', kind: 'shared', categories, createdAt: 0, changedBy: uid,
     members: { [uid]: { name: 'You', admin: true, joinedAt: 0 }, sam: { name: 'Sam', joinedAt: 1 } },
     invite: { code: 'examplepreviewinvite01', at: 0 },
+    requests: { alexrequest: { name: 'Alex', at: 2, invite: 'examplepreviewinvite01' } },
     recurring: {
       pay: { id: 'pay', kind: 'income', amount: 260000, description: 'Paycheck', day: 1, start: last },
       sampay: { id: 'sampay', kind: 'income', amount: 180000, description: 'Sam\u2019s paycheck', day: 1, start: last },

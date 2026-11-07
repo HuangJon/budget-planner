@@ -1,6 +1,6 @@
 /** Starts the app: picks the backend, follows the link, keeps data live and draws the screens. */
 import { A, actions, inputs, changes, setRender } from './ui/state.js';
-import { esc, svg, ICON, closeSheet, today } from './ui/dom.js';
+import { esc, svg, ICON, closeSheet, sheetBack, today } from './ui/dom.js';
 import { applyLook } from './ui/look.js';
 import { homeScreen } from './ui/home.js';
 import { budgetScreen, catSheet } from './ui/budget.js';
@@ -8,6 +8,7 @@ import { transactionsScreen } from './ui/transactions.js';
 import { planScreen } from './ui/plan.js';
 import { trendsScreen } from './ui/trends.js';
 import { peopleScreen, joinScreen, openJoin } from './ui/people.js';
+import { helpButton, describe } from './ui/help.js';
 import { openTxForm } from './ui/tx-form.js';
 import { openCatEditor } from './ui/cat-edit.js';
 import { createLocalBackend } from './data/backend-local.js';
@@ -44,6 +45,7 @@ function follow(id) {
   const s2 = A.repo.watchTransactions(id, list => { A.transactions[id] = list; addDueCopies(id); render(); });
   stops.set(id, () => { s1(); s2(); });
 }
+A.repo.watchMyPending(list => { A.pending = list; render(); });
 A.repo.watchMyBudgets(ids => {
   A.budgetIds = ids;
   ids.forEach(follow);
@@ -59,6 +61,8 @@ function readRoute() {
   const names = { activity: 'transactions', plan: 'plan', trends: 'trends', people: 'people' };
   A.route = m ? { name: names[m[2]] || 'budget', id: m[1] } : { name: 'home' };
   A.confirmRemove = null; A.confirmLeave = false;
+  // Plan money starts each visit with a fresh undo point and no open preview.
+  if (A.route.name === 'plan') { A.planSnapshot = null; A.fundPreview = false; }
   if (m) follow(m[1]);
 }
 addEventListener('hashchange', () => { closeSheet(); readRoute(); render(); scrollTo(0, 0); });
@@ -71,6 +75,7 @@ function topbar(b) {
   return `<header class="topbar">
     <a class="icon-btn" href="#home" aria-label="All budgets">${svg(ICON.home)}</a>
     <h1 class="grow">${esc(b.name)}</h1>
+    ${helpButton(A.route.name)}
     <button type="button" class="icon-btn ava-btn" data-action="account" aria-label="You and settings"><span class="ava" style="background:var(--m1)">${esc([...(A.user?.displayName || 'Y')][0].toUpperCase())}</span></button>
   </header>`;
 }
@@ -108,7 +113,7 @@ function render() {
     app.innerHTML = `<section class="panel empty"><h2>This budget can't be opened</h2><p class="muted">It may have been removed, or you weren't added to it.</p><a class="btn" href="#home">See your budgets</a></section>`;
   } else {
     document.title = `${b.name} · ${APP_NAME}`;
-    app.innerHTML = A.route.name === 'plan' ? planScreen(b) : topbar(b) + ({ transactions: transactionsScreen, trends: trendsScreen, people: peopleScreen }[A.route.name] || budgetScreen)(b);
+    app.innerHTML = A.route.name === 'plan' ? planScreen(b) : topbar(b) + describe(A.route.name) + ({ transactions: transactionsScreen, trends: trendsScreen, people: peopleScreen }[A.route.name] || budgetScreen)(b);
   }
   drawTabs(b);
   if (keep) {
@@ -128,6 +133,7 @@ setRender(render);
 
 /* ---------- Events ---------- */
 actions['close-sheet'] = () => closeSheet();
+actions['sheet-back'] = () => sheetBack();
 actions['edit-cats'] = () => openCatEditor();
 actions['preview-reset'] = () => { backend.reset(exampleData(A.user.uid)); closeSheet(); location.hash = '#home'; location.reload(); };
 actions.undo = () => { const u = A.undo; A.undo = null; document.getElementById('toast').hidden = true; u?.(); };
@@ -151,7 +157,24 @@ document.addEventListener('change', e => { const el = e.target.closest('[data-ch
 // Tapping the dimmed area outside a sheet closes it, like the menus.
 const dlg = document.getElementById('dlg');
 dlg.addEventListener('click', e => { if (e.target === dlg) closeSheet(); });
-dlg.addEventListener('close', () => { A.sheet = null; A.form = null; });
+dlg.addEventListener('close', () => { A.sheet = null; A.form = null; A.sheetStack = []; });
+
+/*
+ * A new month while the app sits open (or in the background overnight): if you were looking at
+ * the month that just ended, move to the new one, and add any repeats that came due.
+ */
+let seenMonth = thisMonth();
+function catchUp() {
+  const now = thisMonth();
+  if (now !== seenMonth) {
+    if (A.month === seenMonth) A.month = now;
+    seenMonth = now;
+  }
+  A.budgetIds.forEach(addDueCopies);
+  render();
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') catchUp(); });
+setInterval(() => { if (document.visibilityState === 'visible' && thisMonth() !== seenMonth) catchUp(); }, 60000);
 
 /** On a phone, tapping away from a box closes the keyboard, which brings the save button back. */
 document.addEventListener('pointerdown', ev => {

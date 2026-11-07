@@ -211,3 +211,26 @@ test('save by a date in the current month asks for all of what is missing', () =
   const s = monthSummary({ categories: { v: trip }, assigned: { '2026-11': { v: 10000 } } }, [], '2026-11');
   assert.equal(s.categories.v.needed, 40000);
 });
+
+import { copyLastMonth } from '../../js/core/budget.js';
+
+test('copying last month fills only categories with nothing planned yet', () => {
+  const b = { categories: { a: { name: 'A' }, b: { name: 'B' }, c: { name: 'C', hidden: true }, d: { name: 'D' } }, assigned: { '2026-10': { a: 100, b: 200, c: 300, d: 0 }, '2026-11': { b: 50 } } };
+  const { assigned, copied } = copyLastMonth(b, '2026-11');
+  assert.deepEqual(assigned, { a: 100, b: 50 });
+  assert.deepEqual(copied, { a: 100 });
+});
+
+test('copying across the new year uses December', () => {
+  const b = { categories: { a: { name: 'A' } }, assigned: { '2026-12': { a: 700 } } };
+  assert.deepEqual(copyLastMonth(b, '2027-01').copied, { a: 700 });
+});
+
+test('a yearly target that starts in January asks for nothing before then', () => {
+  const clothes = { name: 'Clothes', target: { type: 'yearly', amount: 240000, start: '2027-01' } };
+  let s = monthSummary({ categories: { c: clothes }, assigned: {} }, [], '2026-11');
+  assert.equal(s.categories.c.needed, 0);
+  assert.equal(s.categories.c.target.notStarted, true);
+  s = monthSummary({ categories: { c: clothes }, assigned: {} }, [], '2027-01');
+  assert.equal(s.categories.c.needed, 20000, '$2,400 over 12 months');
+});

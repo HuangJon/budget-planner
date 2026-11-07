@@ -3,6 +3,7 @@
  * Spending here means spending minus refunds; income and transfers in are counted apart.
  */
 import { addMonths, monthOf, liveTransactions, monthSummary, targetType } from './budget.js';
+import { occurrences } from './recurring.js';
 
 const dayOf = date => Number(date.slice(8, 10));
 const net = t => (t.kind === 'spend' ? t.amount : t.kind === 'refund' ? -t.amount : 0);
@@ -177,12 +178,10 @@ export function upcomingBills(budget, transactionList, today, days = 30) {
   const endDate = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`;
   const list = [];
   for (const r of Object.values(budget.recurring || {})) {
-    if (!r || r.stopped || !Number.isInteger(r.amount) || !r.day) continue;
-    for (let m = monthOf(today); ; m = addMonths(m, 1)) {
-      const date = `${m}-${String(r.day).padStart(2, '0')}`;
-      if (date > endDate) break;
-      if (date < today || m < r.start || have.has(`r-${r.id}-${m}`)) continue;
-      list.push({ ruleId: r.id, date, kind: r.kind, amount: r.amount, description: r.description || '', categoryId: r.categoryId || null });
+    if (!r || r.stopped) continue;
+    for (const o of occurrences(r, today, endDate)) {
+      if (have.has(o.id)) continue;
+      list.push({ ruleId: r.id, date: o.date, kind: r.kind, amount: r.amount, description: r.description || '', categoryId: r.categoryId || null });
     }
   }
   list.sort((a, b) => a.date.localeCompare(b.date) || b.amount - a.amount);

@@ -41,11 +41,40 @@ export function closeSheet() {
   const d = sheet();
   A.form = null;
   A.sheet = null;
+  A.sheetStack = [];
   parkToast();
   if (d.open) d.close();
   d.innerHTML = '';
 }
-export const sheetHead = (title, right = '', left = 'Cancel') => `<div class="sheet-head"><button type="button" class="btn small" data-action="close-sheet">${left}</button><h2>${esc(title)}</h2><div class="sheet-right">${right}</div></div>`;
+
+/*
+ * Popups opened from another popup remember where they came from, so the back arrow returns
+ * there (a category, then Add spending, then back to the category). Each kind of popup
+ * registers how to draw itself.
+ */
+const drawers = {};
+export const registerSheet = (kind, draw) => { drawers[kind] = draw; };
+/** Opens a popup on top of the one showing now, if any, so Back returns to it. */
+export function openChild(next, draw) {
+  if (A.sheet && sheet().open) A.sheetStack = [...(A.sheetStack || []), { sheet: A.sheet, form: A.form }];
+  A.sheet = next;
+  draw();
+}
+/** Back to the popup underneath, or closed when there isn't one. */
+export function sheetBack() {
+  const prev = (A.sheetStack || []).at(-1);
+  if (!prev || !drawers[prev.sheet.kind]) { closeSheet(); return; }
+  A.sheetStack = A.sheetStack.slice(0, -1);
+  A.sheet = prev.sheet;
+  A.form = prev.form;
+  drawers[prev.sheet.kind]();
+}
+/** After saving: back to where this popup was opened from, or closed. */
+export const finishSheet = () => ((A.sheetStack || []).length ? sheetBack() : closeSheet());
+
+const BACK = '<path d="M15 5l-7 7 7 7"/>';
+/** Every popup has a back arrow on the left: to the popup underneath, or out to the screen. */
+export const sheetHead = (title, right = '') => `<div class="sheet-head"><button type="button" class="btn small back-btn" data-action="sheet-back" aria-label="Back">${svg(BACK)}<span>Back</span></button><h2>${esc(title)}</h2><div class="sheet-right">${right}</div></div>`;
 
 let toastTimer;
 export function toast(message, undo) {

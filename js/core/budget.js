@@ -27,6 +27,13 @@ export function addMonths(month, n) {
   const total = y * 12 + (m - 1) + n;
   return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}`;
 }
+/** The date a new entry starts with: today, or the same day in the month being viewed (clamped to its length). */
+export function defaultDateFor(todayIso, viewing) {
+  if (!viewing || viewing === todayIso.slice(0, 7)) return todayIso;
+  const [y, m] = viewing.split('-').map(Number);
+  const last = new Date(y, m, 0).getDate();
+  return `${viewing}-${String(Math.min(Number(todayIso.slice(8, 10)), last)).padStart(2, '0')}`;
+}
 export const thisMonth = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 
 export function isValidTransaction(t) {
@@ -157,6 +164,9 @@ export function targetStatus(category, { month, assigned = 0, carried = 0, avail
     return { needed: Math.max(0, t.amount - assigned), target: { type, amount: t.amount, dueDay: t.dueDay || null } };
   }
   if (type === 'yearly') {
+    // A yearly target can wait for a later month (usually next January) instead of asking
+    // for the whole year's amount in what's left of this one.
+    if (isMonth(t.start) && month < t.start) return { needed: 0, target: { type, amount: t.amount, start: t.start, notStarted: true, perMonth: 0, spentThisYear: 0 } };
     const monthsLeft = 13 - Number(month.slice(5, 7));
     const perMonth = Math.ceil(Math.max(0, t.amount - assignedEarlierThisYear) / monthsLeft);
     return { needed: Math.max(0, perMonth - assigned), target: { type, amount: t.amount, perMonth, spentThisYear: Math.max(0, spentThisYear) } };
@@ -225,6 +235,22 @@ export function fundTargets(budget, summary, assignedMonth) {
     left -= give;
   }
   return { assigned: out, funded };
+}
+
+/**
+ * Last month's plan copied into this one, for categories that have nothing planned yet.
+ * Categories already planned this month keep their amount. Returns { assigned, copied: { id: cents } }.
+ */
+export function copyLastMonth(budget, month) {
+  const prev = budget.assigned?.[addMonths(month, -1)] || {};
+  const out = { ...(budget.assigned?.[month] || {}) };
+  const copied = {};
+  for (const [id, c] of Object.entries(budget.categories || {})) {
+    if (c.hidden || (out[id] || 0) !== 0 || !(prev[id] > 0)) continue;
+    out[id] = prev[id];
+    copied[id] = prev[id];
+  }
+  return { assigned: out, copied };
 }
 
 /** Categories grouped and in order, for drawing the budget screen. */
