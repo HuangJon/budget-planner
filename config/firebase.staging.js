@@ -14,5 +14,5 @@ export const environment = 'staging';
 /** A test owner used only on staging. */
 export const appCheckSiteKey = null;
 /** 'enterprise' for a key made in the Google Cloud console, 'v3' for one from google.com/recaptcha/admin. */
-export const appCheckProvider = 'enterprise';
+export const appCheckProvider = 'v3';
 export const FIREBASE_VERSION = '11.10.0';
