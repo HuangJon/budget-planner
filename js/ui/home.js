@@ -9,6 +9,7 @@ import { money, toCents } from '../core/money.js';
 import { LIMITS, APP_NAME, STARTER_CATEGORIES } from '../config/app.js';
 import { starterCategories } from '../data/repository.js';
 import { helpButton } from './help.js';
+import { idlePicker } from './idle.js';
 
 /** Your initial in a circle: opens You and settings, on home and in every budget. */
 export const accountButton = () => `<button type="button" class="icon-btn ava-btn" data-action="account" aria-label="You and settings"><span class="ava" style="background:var(--m1)">${esc([...(A.user?.displayName || 'Y')][0].toUpperCase())}</span></button>`;
@@ -111,6 +112,11 @@ actions.account = () => {
       <span class="label">Export to a spreadsheet</span>
       <div class="two-btns"><button type="button" class="btn" data-action="export-tx">Transactions</button><button type="button" class="btn" data-action="export-plan">Plan by month</button></div>
       <p class="tiny muted">CSV files that open in Numbers, Excel or Google Sheets. A good backup too.</p></section>` : ''}
+    <section class="panel pad stack">
+      <h3>Signing out</h3>
+      ${idlePicker()}
+      <p class="tiny muted">For this device. After that long without use, the app signs out and clears its copy of your budgets.</p>
+    </section>
     <section class="panel pad stack">
       <h3>Your privacy</h3>
       <p class="small muted">Only people in a budget can see it in the app. The developer sees only counts, like how many people use it, and error reports with amounts and anything you typed removed. The owner runs the database, so they could technically look inside it, but the app never shows them your budget.</p>

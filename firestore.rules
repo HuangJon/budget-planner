@@ -94,6 +94,9 @@ service cloud.firestore {
             && request.resource.data.members.keys().hasAny([me()])
             && request.resource.data.members[me()].get('admin', false) == resource.data.members[me()].get('admin', false)
             && request.resource.data.members[me()].get('joinedAt', 0) == resource.data.members[me()].get('joinedAt', 0)
+            // Your own entry holds only these, and your name stays short.
+            && request.resource.data.members[me()].keys().hasOnly(['name', 'admin', 'joinedAt', 'invite', 'approvedBy'])
+            && short(request.resource.data.members[me()].get('name', ''), 40)
           ));
       }
       // Any member can leave.

@@ -98,6 +98,13 @@ try {
   await page.getByText('Sent. Thank you.').waitFor({ timeout: 20000 });
   check('a person reports a problem through the real rules');
 
+  // Left unused longer than allowed: opening the app again signs out first, with a note why.
+  await page.evaluate(() => localStorage.setItem('wmm:lastActive', String(Date.now() - 2 * 3600000)));
+  await page.reload();
+  await page.getByText('Signed out after 15 minutes without use').waitFor({ timeout: 30000 });
+  assert.equal(await page.locator('#authEmail').count(), 1, 'back at sign-in');
+  check('the app signs out after sitting unused too long');
+
   // The owner sees counts, and the page works with the owner's real account.
   const ownerContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
   await ownerContext.addInitScript(() => localStorage.setItem('wmm:tourDone', '1'));

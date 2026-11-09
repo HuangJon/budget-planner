@@ -18,3 +18,13 @@ test('every app file is kept for offline use', () => {
 test('the offline cache and the app version move together', () => {
   assert.equal(sw.match(/const CACHE = '([^']+)'/)[1], APP_VERSION, 'bump both for every release');
 });
+
+test('the page policy allows the one inline script exactly as written', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { createHash } = await import('node:crypto');
+  const html = readFileSync('index.html', 'utf8');
+  const inline = html.match(/<script>(.*?)<\/script>/s)[1];
+  const hash = createHash('sha256').update(inline).digest('base64');
+  assert.ok(html.includes(`'sha256-${hash}'`), 'update the hash in the Content-Security-Policy after changing the inline script');
+  assert.ok(!/\son[a-z]+=/i.test(html), 'no inline event handlers, which the policy would block');
+});

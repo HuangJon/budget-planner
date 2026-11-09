@@ -183,6 +183,11 @@ await ok(bob.repo.importTransactions(B, bank), 'a bank file goes in, 100 rows at
 await ok(bob.repo.unimport(B, bank.map(t => t.id)), 'and Undo takes the whole import back out');
 await ok(bob.repo.importTransactions(B, bank.slice(0, 3), new Set(bank.slice(0, 3).map(t => t.id))), 'deleted imports can be brought back');
 
+/* A member's own entry: a short name and nothing extra. */
+await ok(bob.repo.renameMe(B, 'Bobby'), 'a member renames themselves');
+await no(bob.backend.update(`budgets/${B}`, { [`members.${bob.uid}.name`]: 'x'.repeat(41), changedBy: bob.uid }), 'not with a very long name');
+await no(bob.backend.update(`budgets/${B}`, { [`members.${bob.uid}.secret`]: 'hidden', changedBy: bob.uid }), 'nothing extra can be tucked into a member entry');
+
 /* Accounts to check against: any member can keep them, nobody outside can. */
 await ok(bob.repo.saveAccount(B, 'acc1', { name: 'Checking', kind: 'cash', balance: 120000 }), 'a member adds an account');
 await ok(alice.repo.removeAccount(B, 'acc1'), 'and anyone in the budget can remove it');

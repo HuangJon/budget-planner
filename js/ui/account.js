@@ -2,6 +2,7 @@
  * Signing in. Everyone proves an email address or Google account before seeing anything, and
  * signing out clears this device's copy of the budgets. Ported from Trip Tab.
  */
+import { idleNotice, forgetActivity } from './idle.js';
 import { A, actions, render } from './state.js';
 import { esc, toast, val } from './dom.js';
 import { LIMITS, APP_NAME } from '../config/app.js';
@@ -24,6 +25,7 @@ export function signInView() {
   const mode = A.authMode || 'in', joining = /^#join-/.test(location.hash);
   return `<header class="home-head"><h1>${joining ? 'Sign in to join a budget' : esc(APP_NAME)}</h1>
     <p class="muted">${joining ? 'Someone invited you to share a budget. Sign in first; they let you in after that.' : 'A budget where every dollar gets a job. Sign in with Google or an email address.'}</p></header>
+  ${idleNotice() ? `<p class="notice">${esc(idleNotice())}</p>` : ''}
   <section class="panel pad stack">
     <button type="button" class="btn primary" data-action="auth-google">Continue with Google</button>
     <div class="or small muted">or use email</div>
@@ -81,6 +83,7 @@ actions['sign-out'] = () => {
   if (A.preview) { toast('Signing out works in the real app.'); return; }
   attempt(async () => {
     try { localStorage.removeItem('wmm:tourDone'); } catch { /* the tutorial just won't run again */ }
+    forgetActivity();
     await A.repo.auth.signOut();
     location.hash = '#home';
     location.reload();

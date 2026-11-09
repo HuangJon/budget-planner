@@ -13,6 +13,7 @@ import { openTxForm } from './ui/tx-form.js';
 import './ui/import.js';
 import './ui/report.js';
 import './ui/accounts.js';
+import { startIdleWatch, forgetActivity } from './ui/idle.js';
 import { openCatEditor } from './ui/cat-edit.js';
 import { createLocalBackend } from './data/backend-local.js';
 import { createFirebaseBackend, loadFirebaseSdk } from './data/backend-firebase.js';
@@ -87,8 +88,11 @@ function startData() {
 /** Called whenever the signed-in account changes or gets verified. */
 A.onUser = user => {
   A.user = user;
-  if (!user) { A.status = 'signed-out'; render(); return; }
+  // Signed out: the next sign-in starts a fresh session, whatever was recorded before.
+  if (!user) { forgetActivity(); A.status = 'signed-out'; render(); return; }
   if (!user.verified) { A.status = 'verify'; render(); return; }
+  // Left unused too long on this device: sign out before showing anything.
+  if (!startIdleWatch()) return;
   startData();
 };
 
@@ -108,7 +112,7 @@ async function boot() {
     A.onUser(backend.auth.current());
     backend.auth.onChange(user => { if (user?.uid !== A.user?.uid || user?.verified !== A.user?.verified) A.onUser(user); });
   } catch {
-    document.getElementById('app').innerHTML = '<section class="panel empty"><h2>Can\u2019t reach the app</h2><p class="muted">Check your connection, then reload this page.</p><button type="button" class="btn" onclick="location.reload()">Reload</button></section>';
+    document.getElementById('app').innerHTML = '<section class="panel empty"><h2>Can\u2019t reach the app</h2><p class="muted">Check your connection, then reload this page.</p><button type="button" class="btn" data-action="reload">Reload</button></section>';
   }
 }
 
@@ -205,6 +209,7 @@ setRender(render);
 
 /* ---------- Events ---------- */
 actions['close-sheet'] = () => closeSheet();
+actions.reload = () => location.reload();
 actions['sheet-back'] = () => sheetBack();
 actions['edit-cats'] = () => openCatEditor();
 actions['preview-reset'] = () => { backend.reset(exampleData(A.user.uid)); closeSheet(); location.hash = '#home'; location.reload(); };
@@ -267,7 +272,7 @@ if (!A.preview && 'serviceWorker' in navigator) {
       bar.id = 'updateBar';
       bar.className = 'update-bar';
       bar.setAttribute('role', 'status');
-      bar.innerHTML = '<span>A new version is ready.</span><button type="button" class="btn small primary" onclick="location.reload()">Update</button>';
+      bar.innerHTML = '<span>A new version is ready.</span><button type="button" class="btn small primary" data-action="reload">Update</button>';
       document.body.appendChild(bar);
     },
   });
