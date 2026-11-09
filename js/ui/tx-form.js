@@ -24,8 +24,6 @@ export function openTxForm(budgetId, editing = null, preset = {}) {
 
 export const catOptions = (b, selected) => `<option value="" ${selected ? '' : 'selected'} disabled>Pick one</option>${groupedCategories(b).map(g => `<optgroup label="${esc(g.name)}">${g.categories.map(c => `<option value="${c.id}" ${c.id === selected ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</optgroup>`).join('')}${selected && b.categories[selected]?.hidden ? `<option value="${selected}" selected>${esc(b.categories[selected].name)} (hidden)</option>` : ''}`;
 
-/** How many usual picks show before "more". They wrap, so all of them can be seen on any screen. */
-const QUICK_SHOWN = 4;
 /** Your most used description and category pairs from the last 90 days, most frequent first. */
 export function frequentSpending(b, list, limit = 8) {
   const since = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
@@ -61,7 +59,7 @@ function drawForm() {
   const title = F.editing ? (income ? 'Edit income' : 'Edit spending') : income ? 'Add income' : 'Add spending';
   openSheet(`<form class="sheet tx-form" id="txForm" novalidate>${sheetHead(title)}
     <div class="sheet-body">
-      ${quick.length ? `<div class="quick" aria-label="${income ? 'Recent income' : 'Your usual spending'}"><span class="label">${income ? 'Same as before' : 'Your usual'}</span><div class="quick-row">${quick.slice(0, F.quickAll ? quick.length : QUICK_SHOWN).map((q, i) => `<button type="button" class="chip" data-action="tx-quick" data-id="${i}">${esc(q.description)}${income ? ` · ${money(q.amount)}` : ` · <span class="muted">${esc(b.categories[q.categoryId].name)}</span>`}</button>`).join('')}${quick.length > QUICK_SHOWN ? `<button type="button" class="chip more-chip" data-action="tx-quick-more" aria-expanded="${Boolean(F.quickAll)}">${F.quickAll ? 'Fewer' : `${quick.length - QUICK_SHOWN} more`}</button>` : ''}</div></div>` : ''}
+      ${quick.length ? `<div class="quick" aria-label="${income ? 'Recent income' : 'Your usual spending'}"><span class="label">${income ? 'Same as before' : 'Your usual'}</span><div class="quick-row">${quick.map((q, i) => { const cat = b.categories[q.categoryId]?.name; return `<button type="button" class="chip" data-action="tx-quick" data-id="${i}">${esc(q.description)}${income ? ` · ${money(q.amount)}` : cat && cat.toLowerCase() !== q.description.toLowerCase() ? ` · <span class="muted">${esc(cat)}</span>` : ''}</button>`; }).join('')}</div></div>` : ''}
       <label class="money-in big"><span class="sr">Amount</span><span aria-hidden="true">$</span><input id="fAmount" class="amount-input" inputmode="decimal" autocomplete="off" placeholder="0.00" value="${esc(F.amount)}" data-input="tx-amount"></label>
       <label class="f"><span class="sr">Description</span><input id="fDesc" maxlength="${LIMITS.description}" autocomplete="off" placeholder="${income ? 'Paycheck, gift, side job…' : refund ? 'What was returned?' : 'What was it for?'}" value="${esc(F.description)}" data-input="tx-desc"></label>
       <div class="form-rows">
@@ -203,5 +201,3 @@ actions['edit-tx'] = el => {
 };
 
 registerSheet('tx', () => drawForm());
-
-actions['tx-quick-more'] = () => { keepTyped(); A.form.quickAll = !A.form.quickAll; drawForm(); };
