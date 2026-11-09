@@ -171,7 +171,11 @@ export function budgetScreen(b) {
     }).join('')}
     </div>
     ${f !== 'all' && !groups.length ? `<section class="panel empty"><h2>${f === 'over' ? 'Nothing is over' : 'Nothing needs money'}</h2><p class="muted">${f === 'over' ? 'Every category has money left.' : 'Every bill and target has what it needs this month.'}</p><button type="button" class="btn" data-action="budget-filter" data-id="all">Show all</button></section>` : ''}
-    ${Object.keys(b.categories).length && f === 'all' ? '<button type="button" class="link edit-cats-link" data-action="edit-cats">Edit categories</button>' : ''}
+    ${f === 'all' ? `<div class="budget-tools">
+      <button type="button" class="btn small" data-action="open-import">Import from your bank</button>
+      <button type="button" class="btn small" data-action="open-accounts">Check against your accounts</button>
+      ${Object.keys(b.categories).length ? '<button type="button" class="btn small" data-action="edit-cats">Edit categories</button>' : ''}
+    </div>` : ''}
     ${Object.keys(b.categories).length ? '' : '<section class="panel empty"><h2>No categories yet</h2><p class="muted">Add one from the menu behind your icon.</p></section>'}`;
 }
 

@@ -36,7 +36,7 @@ const HELP = {
       ['Tap a category', 'to see its spending, move money, or set a target. Tap a group’s name to fold it away.'],
       ['Targets', 'are what a pot needs: every month, a yearly limit, or a goal by a date. "Needs $X" means it’s short.'],
       ['Spent', '(the + at the bottom) logs a purchase or a refund. Add income from the Ready to assign card.'],
-      ['Edit categories', 'to add, rename, move or delete them. It’s at the bottom of this screen, and in settings.'],
+      ['At the bottom', 'Import from your bank, Check against your accounts (do your bank balances match the budget?), and Edit categories.'],
     ],
   },
   plan: {

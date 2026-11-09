@@ -373,3 +373,4 @@ a.request-note { display:flex; align-items:center; gap:12px; padding:14px 16px; 
 
 /* The month and its arrows stay in reach while scrolling, tucked under the top bar. */
 .monthbar { position:sticky; top:calc(env(safe-area-inset-top, 0px) + var(--topbar-h, 60px)); z-index:4; background:var(--bar); -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px); margin-inline:-8px; padding:4px 8px; border-radius:0 0 14px 14px }
+.budget-tools { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-top:4px }

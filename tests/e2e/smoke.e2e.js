@@ -411,7 +411,7 @@ await tap('[data-action=sheet-back]');
 
 // Checking the budget against accounts.
 await tap('[data-action=account]');
-await tap('[data-action=open-accounts]');
+await tap('dialog[open] [data-action=open-accounts]');
 await page.getByText('Add the accounts your money is in').waitFor();
 await tap('[data-action=acc-add-open]');
 await page.locator('#accName').fill('Checking');
