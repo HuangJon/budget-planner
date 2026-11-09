@@ -117,8 +117,9 @@ try {
   await ownerPage.locator('[data-action=account]').first().click();
   await ownerPage.locator('a.owner-link').click({ timeout: 30000 });
   await ownerPage.locator('.owner-counts').waitFor({ timeout: 30000 });
-  const budgets = Number(await ownerPage.locator('.owner-counts > div').nth(1).locator('.big-amt').innerText());
-  assert.ok(budgets >= 1, 'the owner sees the budget count');
+  const countText = async () => ownerPage.locator('.owner-counts').innerText().catch(() => '(no counts)');
+  await ownerPage.waitForFunction(() => Number(document.querySelectorAll('.owner-counts > div')[1]?.querySelector('.big-amt')?.textContent.replace(/,/g, '')) >= 1, null, { timeout: 20000 })
+    .catch(async () => assert.fail(`the owner should see at least one budget counted; the page showed: ${(await countText()).replace(/\s+/g, ' ')}`));
   check('the owner opens Usage and feedback from settings and sees the counts');
   const reported = ownerPage.locator('li', { hasText: REPORT });
   await reported.waitFor({ timeout: 20000 });
