@@ -149,6 +149,10 @@ await page.locator('dialog[open]').waitFor({ state: 'detached' });
 // Activity, edit and delete with undo.
 await tap('a.tab[href$="-activity"]');
 await page.locator('.tx-row').first().waitFor();
+// Repeats start folded to one line; open them (the phone remembers).
+if (await page.locator('[data-action=open-rule]').count()) fail('Repeats should start folded');
+await page.locator('.repeats-head', { hasText: 'Next:' }).waitFor();
+await tap('[data-action=toggle-repeats]');
 await eventually(async () => !(!(await page.locator('[data-action=open-rule]', { hasText: 'Music app' }).count())), 'New repeat missing from Every month');
 await shot('activity');
 const count = await page.locator('.tx-list:not(:first-of-type) .tx-row, [data-action=edit-tx].tx-row').count();

@@ -12,4 +12,6 @@ export const firebaseConfig = {
 };
 export const environment = 'live';
 export const appCheckSiteKey = null;
+/** 'enterprise' for a key made in the Google Cloud console, 'v3' for one from google.com/recaptcha/admin. */
+export const appCheckProvider = 'enterprise';
 export const FIREBASE_VERSION = '11.10.0';

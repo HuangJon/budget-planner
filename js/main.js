@@ -105,9 +105,9 @@ async function boot() {
     return;
   }
   try {
-    const { firebaseConfig, appCheckSiteKey, FIREBASE_VERSION } = await import('./config/firebase.js');
+    const { firebaseConfig, appCheckSiteKey, appCheckProvider, FIREBASE_VERSION } = await import('./config/firebase.js');
     const sdk = await loadFirebaseSdk(FIREBASE_VERSION, { appCheck: Boolean(appCheckSiteKey) });
-    const backend = await createFirebaseBackend(firebaseConfig, sdk, { appCheckSiteKey });
+    const backend = await createFirebaseBackend(firebaseConfig, sdk, { appCheckSiteKey, appCheckProvider });
     A.repo = createRepository(backend);
     A.onUser(backend.auth.current());
     backend.auth.onChange(user => { if (user?.uid !== A.user?.uid || user?.verified !== A.user?.verified) A.onUser(user); });

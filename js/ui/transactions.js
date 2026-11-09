@@ -18,19 +18,21 @@ export function transactionsScreen(b) {
   const days = new Map();
   for (const t of list) { if (!days.has(t.date)) days.set(t.date, []); days.get(t.date).push(t); }
   const shared = Object.keys(b.members || {}).length > 1;
+  // The month's totals, then bringing in and checking transactions, then what repeats (folded
+  // to one line until opened), then the transactions themselves.
   return `${monthBar()}
-    ${repeatsPanel(b)}
     <section class="panel pad totals">
       <div><span class="label">Came in</span><span class="amt owed">${money(s.incomeThisMonth)}</span></div>
       <div><span class="label">Spent</span><span class="amt owe">${money(spent)}</span></div>
     </section>
     ${syncBar(b)}
+    ${repeatsPanel(b)}
     ${list.length ? [...days].map(([day, items]) => `<section class="stack tight"><h3 class="date-head">${fmtDate(day)}</h3><div class="panel tx-list">${items.map(t => {
       const cat = t.kind === 'income' ? 'Ready to assign' : b.categories[t.categoryId]?.name || 'Removed category';
       const who = shared ? ` · ${esc(t.createdBy === A.user?.uid ? 'You' : b.members[t.createdBy]?.name || 'Former member')}` : '';
       return `<button type="button" class="tap tx-row" data-action="edit-tx" data-id="${t.id}"><span class="grow stack tight"><strong class="wrap-any two-lines">${esc(t.description || (t.kind === 'income' ? 'Income' : t.kind === 'refund' ? 'Refund' : 'Spending'))}</strong><span class="tiny muted">${esc(cat)}${who}${t.kind === 'refund' ? ' · Refund' : ''}</span></span>${signed(t)}</button>`;
     }).join('')}</div></section>`).join('')
-    : `<section class="panel empty"><h2>Nothing this month yet</h2><p class="muted">Tap Spend to record a purchase. Income goes in from the Budget tab.</p><button type="button" class="btn primary" data-action="add-tx">Add spending</button></section>`}`;
+    : `<section class="panel empty"><h2>Nothing this month yet</h2><p class="muted">Tap Spent to record a purchase, or import from your bank. Income goes in from the Budget tab.</p><button type="button" class="btn primary" data-action="add-tx">Add spending</button></section>`}`;
 }
 
 /* ---------- Repeats ---------- */
@@ -43,13 +45,20 @@ function repeatsPanel(b) {
   if (!list.length) return '';
   const today = todayDate();
   const active = list.filter(r => !r.stopped);
-  return `<section class="stack tight"><h3 class="date-head">Repeats</h3><div class="panel tx-list">${(A.showStopped ? list : active).map(r => {
+  const open = repeatsOpen();
+  const soonest = active.map(r => [r, nextDate(r, today, allIds(b.id))]).filter(([, d]) => d).sort((x, y) => x[1].localeCompare(y[1]))[0];
+  const head = `<button type="button" class="repeats-head" data-action="toggle-repeats" aria-expanded="${open}"><span class="grow stack tight"><strong>Repeats · ${active.length}</strong>${soonest ? `<span class="tiny muted">Next: ${esc(soonest[0].description || 'Repeat')}, ${fmtDate(soonest[1])}</span>` : ''}</span><span class="chev ${open ? 'open' : ''}" aria-hidden="true">▾</span></button>`;
+  if (!open) return `<section class="panel repeats-fold">${head}</section>`;
+  return `<section class="panel repeats-fold">${head}<div class="tx-list">${(A.showStopped ? list : active).map(r => {
     const next = nextDate(r, today, allIds(b.id));
     const where = r.kind === 'income' ? 'Ready to assign' : b.categories[r.categoryId]?.name || 'Removed category';
     return `<button type="button" class="tap tx-row" data-action="open-rule" data-id="${r.id}"><span class="grow stack tight"><strong class="wrap-any two-lines">${esc(r.description || (r.kind === 'income' ? 'Income' : 'Spending'))}</strong><span class="tiny muted">${esc(where)} · ${r.stopped ? 'Stopped' : `${esc(howOften(r, ordinal))}${next ? ` · next ${fmtDate(next)}` : ''}`}</span></span>${signed({ kind: r.kind, amount: r.amount })}</button>`;
   }).join('')}</div>${list.length > active.length ? `<button type="button" class="link small" data-action="toggle-stopped">${A.showStopped ? 'Hide stopped' : `Show stopped (${list.length - active.length})`}</button>` : ''}</section>`;
 }
 actions['toggle-stopped'] = () => { A.showStopped = !A.showStopped; render(); };
+/** Whether Repeats is open, remembered on this device. */
+const repeatsOpen = () => { try { return localStorage.getItem('wmm:repeatsOpen') === '1'; } catch { return Boolean(A.repeatsOpen); } };
+actions['toggle-repeats'] = () => { const next = !repeatsOpen(); try { localStorage.setItem('wmm:repeatsOpen', next ? '1' : '0'); } catch { A.repeatsOpen = next; } render(); };
 
 function ruleSheet() {
   const b = A.budgets[A.route.id], r = b?.recurring?.[A.sheet.id];

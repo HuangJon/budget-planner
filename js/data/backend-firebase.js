@@ -20,11 +20,13 @@ export async function retryRefusal(write, waits = [300, 1000]) {
   }
 }
 
-export async function createFirebaseBackend(config, sdk, { appCheckSiteKey = null, retryWaits } = {}) {
+export async function createFirebaseBackend(config, sdk, { appCheckSiteKey = null, appCheckProvider = 'v3', retryWaits } = {}) {
   const app = sdk.initializeApp(config);
   // App Check has to start before anything talks to the database, or those first requests have no proof.
   if (appCheckSiteKey) {
-    sdk.initializeAppCheck(app, { provider: new sdk.ReCaptchaV3Provider(appCheckSiteKey), isTokenAutoRefreshEnabled: true });
+    // A key made in the Google Cloud console is a reCAPTCHA Enterprise key; one from google.com/recaptcha/admin is v3.
+    const Provider = appCheckProvider === 'enterprise' ? sdk.ReCaptchaEnterpriseProvider : sdk.ReCaptchaV3Provider;
+    sdk.initializeAppCheck(app, { provider: new Provider(appCheckSiteKey), isTokenAutoRefreshEnabled: true });
   }
   let db;
   try {

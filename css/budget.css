@@ -378,3 +378,10 @@ a.request-note { display:flex; align-items:center; gap:12px; padding:14px 16px; 
 .sync-bar .btn { min-width:0; white-space:normal; line-height:1.2; padding-block:8px }
 .acc-status.ok { color:var(--owed); border-color:var(--owed) }
 .acc-status.off { color:var(--warn); border-color:var(--warn); background:var(--warn-soft) }
+/* Repeats on Activity: one line until opened. */
+.repeats-fold { padding:0 }
+.repeats-head { display:flex; align-items:center; gap:10px; width:100%; padding:12px 14px; background:none; border:0; text-align:left; color:var(--ink) }
+.repeats-head .chev { color:var(--muted); transition:transform .15s }
+.repeats-head .chev.open { transform:rotate(180deg) }
+.repeats-fold .tx-list { border-top:1px solid var(--line) }
+.repeats-fold > .link { margin:8px 14px 12px }
