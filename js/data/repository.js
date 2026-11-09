@@ -179,6 +179,21 @@ export function createRepository(backend, now = () => Date.now()) {
         { op: 'update', path: txPath(id, before.id), value: { ...fields, updatedAt: now(), updatedBy: uid() } },
       ]);
     },
+    /**
+     * Moves many transactions to another category at once (a search's results, or everything from
+     * one place). Each keeps its old version, like any edit. Goes in groups to stay within limits.
+     */
+    async recategorize(id, transactions, categoryId) {
+      for (let i = 0; i < transactions.length; i += 100) {
+        await batch(transactions.slice(i, i + 100).flatMap(before => {
+          const rid = randomId();
+          return [
+            { op: 'set', path: `${txPath(id, before.id)}/revisions/${rid}`, value: { id: rid, at: now(), by: uid(), transaction: before } },
+            { op: 'update', path: txPath(id, before.id), value: { categoryId, updatedAt: now(), updatedBy: uid() } },
+          ];
+        }));
+      }
+    },
     /** Only marks it, so it can be restored. */
     deleteTransaction: (id, tid) => backend.update(txPath(id, tid), { deleted: true, deletedAt: now(), deletedBy: uid() }),
     restoreTransaction: (id, tid) => backend.update(txPath(id, tid), { deleted: false, restoredAt: now(), restoredBy: uid() }),

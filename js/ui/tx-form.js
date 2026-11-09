@@ -157,7 +157,18 @@ actions['tx-save'] = () => {
     send(A.repo.updateTransaction(budgetId, before, fields));
     finishSheet();
     const { id, budgetId: _b, createdBy, createdAt, updatedAt, updatedBy, ...old } = before;
-    toast('Saved', () => send(A.repo.updateTransaction(budgetId, { ...before, ...fields }, { note: '', ...old, categoryId: old.categoryId ?? null })));
+    // Changed the category: the others from the same place, in the old category, can follow in one tap.
+    const same = d => String(d || '').trim().toLowerCase();
+    const others = fields.categoryId && before.categoryId && fields.categoryId !== before.categoryId
+      ? liveTransactions(A.transactions[budgetId]).filter(t => t.id !== before.id && t.categoryId === before.categoryId && same(t.description) === same(before.description))
+      : [];
+    const b = A.budgets[budgetId];
+    if (others.length) {
+      toast(`Saved. ${others.length} more from ${before.description} ${others.length === 1 ? 'is' : 'are'} in ${b.categories[before.categoryId]?.name || 'the old category'}`, () => {
+        send(A.repo.recategorize(budgetId, others, fields.categoryId));
+        toast(`Moved ${others.length} more to ${b.categories[fields.categoryId]?.name}`, () => send(A.repo.recategorize(budgetId, others.map(t => ({ ...t, categoryId: fields.categoryId })), before.categoryId)));
+      }, 'Move them too');
+    } else toast('Saved', () => send(A.repo.updateTransaction(budgetId, { ...before, ...fields }, { note: '', ...old, categoryId: old.categoryId ?? null })));
     return;
   }
   let tid;

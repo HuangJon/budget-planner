@@ -500,6 +500,30 @@ await page.locator('dialog[open]').waitFor({ state: 'detached' });
 await page.waitForTimeout(200);
 if ((await page.locator('[data-testid=ready]').innerText()) !== readyBefore) fail('History should not change Ready to assign');
 
+// Search: words, totals, then moving every match (past ones too) to another category, and undo.
+await tap('#app [data-action=open-search]');
+await page.locator('#searchText').fill('mystery shop');
+await page.locator('.search-sum', { hasText: '2 matches' }).waitFor();
+await eventually(async () => (await page.locator('#searchText').evaluate(el => el === document.activeElement)), 'Typing should keep the cursor in the search box');
+await shot('search');
+await tap('[data-action=search-move-open]');
+await page.locator('#moveAllTo').selectOption({ label: 'Gifts' });
+await tap('[data-action=search-move]');
+await page.getByText('Moved 2 to Gifts').waitFor();
+await eventually(async () => (await page.locator('dialog[open] .tx-row', { hasText: 'MYSTERY SHOP' }).filter({ hasText: 'Gifts' }).count()) === 2, 'Both should now be in Gifts');
+await page.locator('#toast [data-action=undo]').click();
+await eventually(async () => (await page.locator('dialog[open] .tx-row', { hasText: 'MYSTERY SHOP' }).filter({ hasText: 'Clothes' }).count()) === 2, 'Undo should put both back');
+// Changing one: the other from the same place can follow.
+await page.locator('dialog[open] .tx-row', { hasText: 'MYSTERY SHOP' }).first().click();
+await page.locator('dialog[open] .sheet-head h2', { hasText: 'Edit' }).waitFor({ timeout: 3000 }).catch(async () => { await page.screenshot({ path: '/tmp/claude-0/-home-claude/2ddb4c4e-a39a-562e-8ff6-380136a568ad/scratchpad/fail.png' }); fail(`Tapping a search result should open it: ${await page.locator('dialog[open] .sheet-head h2').innerText()}`); });
+await page.locator('#fCat').selectOption({ label: 'Hobbies' });
+await tap('[data-action=tx-save]');
+await page.getByText('1 more from MYSTERY SHOP 99').waitFor();
+await page.locator('#toast [data-action=undo]', { hasText: 'Move them too' }).click();
+await eventually(async () => (await page.locator('dialog[open] .tx-row', { hasText: 'MYSTERY SHOP' }).filter({ hasText: 'Hobbies' }).count()) === 2, 'Move them too should move the other one');
+await tap('[data-action=sheet-back]');
+await page.locator('dialog[open]').waitFor({ state: 'detached' });
+
 // Arranging categories on the budget screen: arrows, then dragging by the handle.
 await page.goto(pathToFileURL(resolve('preview-test.html')).href + '#home');
 await tap('a.budget-row');

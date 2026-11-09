@@ -397,3 +397,8 @@ a.request-note { display:flex; align-items:center; gap:12px; padding:14px 16px; 
 .arr-row.dragging { box-shadow:0 6px 18px rgba(0,0,0,.18); position:relative; z-index:2; border-radius:10px }
 .drag-handle { font-size:1.4rem; line-height:1; color:var(--muted); padding:8px 10px; margin:-8px 0 -8px -6px; cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none }
 .arr-drop { height:6px }
+/* Search */
+.search-filters { display:grid; grid-template-columns:1fr 1fr; gap:8px }
+.search-filters select { width:100%; min-width:0 }
+.search-sum { display:grid; gap:6px }
+.move-all select { flex:1; min-width:0 }

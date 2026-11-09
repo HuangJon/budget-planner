@@ -54,8 +54,8 @@ label.f>span:first-child,.flabel { font-size:.84rem; font-weight:600; color:var(
 .tag.you { background:var(--accent-soft); color:var(--accent) } .tag.good { background:var(--owed-soft); color:var(--owed) }
 .ava { width:30px; height:30px; border-radius:50%; display:inline-grid; place-items:center; font-size:.8rem; font-weight:600; color:#fff; flex:none }
 .x { border:0; background:none; width:36px; height:36px; font-size:1.2rem; color:var(--muted); flex:none }
-#toast { position:fixed; z-index:50; left:50%; transform:translateX(-50%); bottom:calc(84px + env(safe-area-inset-bottom,0px)); background:var(--ink); color:var(--ground); padding:10px 14px; border-radius:10px; display:flex; gap:14px; align-items:center; font-size:.9rem; max-width:calc(100vw - 32px); width:max-content }
-#toast button { background:none; border:0; color:inherit; text-decoration:underline; font-weight:600 }
+#toast { pointer-events:none; position:fixed; z-index:50; left:50%; transform:translateX(-50%); bottom:calc(84px + env(safe-area-inset-bottom,0px)); background:var(--ink); color:var(--ground); padding:10px 14px; border-radius:10px; display:flex; gap:14px; align-items:center; font-size:.9rem; max-width:calc(100vw - 32px); width:max-content }
+#toast button { background:none; border:0; color:inherit; text-decoration:underline; font-weight:600; pointer-events:auto }
 .update { position:sticky; top:env(safe-area-inset-top,0px); z-index:8; max-width:680px; margin:8px auto 0; display:flex; justify-content:space-between; align-items:center; gap:12px; padding:8px 12px; background:var(--accent-soft); border-radius:10px; font-size:.9rem }
 @media (prefers-reduced-motion: no-preference) { .fill,.diverge i { transition:width .25s ease } }
 

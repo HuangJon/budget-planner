@@ -12,6 +12,7 @@ import {
 } from '../core/trends.js';
 import { money } from '../core/money.js';
 import { addMonths } from '../core/budget.js';
+import { openSearch } from './search.js';
 
 const short = m => new Date(`${m}-15T12:00:00`).toLocaleDateString('en', { month: 'short' });
 const pct = (a, b) => (b > 0 ? Math.min(100, Math.round((a / b) * 100)) : 0);
@@ -279,6 +280,7 @@ function catTrendSheet() {
       <div class="cols one ${months.length > 6 ? 'many' : ''}" role="img" aria-label="${esc(c.name)} spending by month">${h.rows.map(x => `<div class="col"><span class="col-bars"><i class="out" style="height:${pct(x.spent, max)}%"></i></span><span class="tiny muted">${short(x.month)}</span></div>`).join('')}${h.average ? `<span class="avg-line" style="bottom:calc(22px + (100% - 22px) * ${(pct(h.average, max) / 100).toFixed(3)})" aria-hidden="true"></span>` : ''}</div>
       <p class="tiny muted">${money(h.total)} over ${range() === 'year' ? `${A.month.slice(0, 4)} so far` : 'the last 12 months'}. The line marks the average of months with spending.</p>
     </section>
+    <button type="button" class="btn" data-action="search-category" data-id="${id}">See every ${esc(c.name)} transaction</button>
     <section class="stack tight"><h3 class="date-head">Biggest purchases</h3>${h.biggest.length ? `<div class="panel tx-list">${h.biggest.map(t => `<button type="button" class="tap tx-row" data-action="edit-tx" data-id="${t.id}"><span class="grow stack tight"><strong class="wrap-any two-lines">${esc(t.description || 'Spending')}</strong><span class="tiny muted">${fmtDate(t.date)}</span></span><span class="amt owe">−${money(t.amount)}</span></button>`).join('')}</div>` : '<p class="small muted">None in this time.</p>'}</section>
     <button type="button" class="btn" data-action="trend-open-cat" data-id="${id}">Open ${esc(c.name)} in the budget</button>
   </div></div>`);
@@ -319,3 +321,5 @@ changes['trend-byperson'] = el => {
   send(A.repo.setSetting(b.id, 'byPerson', el.checked));
   toast(el.checked ? 'Spending by person is on for everyone in this budget' : 'Spending by person is off');
 };
+
+actions['search-category'] = el => openSearch(A.route.id, { categoryId: el.dataset.id });

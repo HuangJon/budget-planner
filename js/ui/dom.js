@@ -32,11 +32,17 @@ const toastEl = () => document.getElementById('toast');
 const parkToast = () => { const t = toastEl(); if (t.parentElement !== document.body) document.body.appendChild(t); };
 
 export function openSheet(html) {
-  const d = sheet();
-  parkToast();
+  const d = sheet(), t = toastEl();
+  // A message showing over this popup (with its Undo) stays put through a redraw: everything else
+  // is replaced around it, so it never leaves the page and never ends up hidden behind the popup.
+  const keepToast = d.open && !t.hidden && t.parentElement === d;
+  if (!keepToast) parkToast();
   // Redrawing the same popup (new data arrived) keeps its scroll position.
   const before = d.open ? { title: d.querySelector('.sheet-head h2')?.textContent, top: d.querySelector('.sheet-body')?.scrollTop || 0 } : null;
-  d.innerHTML = html;
+  const tpl = document.createElement('template');
+  tpl.innerHTML = html;
+  for (const child of [...d.childNodes]) if (child !== t) child.remove();
+  d.prepend(tpl.content);
   if (!d.open) d.showModal();
   else if (before && d.querySelector('.sheet-head h2')?.textContent === before.title) {
     const body = d.querySelector('.sheet-body');
@@ -75,7 +81,7 @@ export function redrawKeeping(box, draw) {
   }
 }
 /** Redraws the open popup with the latest data. */
-const LIVE = ['cat', 'cat-edit', 'rule', 'cat-trend', 'account', 'tx', 'import', 'accounts'];
+const LIVE = ['cat', 'cat-edit', 'rule', 'cat-trend', 'account', 'tx', 'import', 'accounts', 'search'];
 export function refreshOpenSheet() {
   const d = sheet();
   if (!d.open || !A.sheet || !LIVE.includes(A.sheet.kind) || !drawers[A.sheet.kind]) return;

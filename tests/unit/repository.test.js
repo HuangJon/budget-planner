@@ -231,3 +231,17 @@ test('arranging saves new orders and groups for several categories at once', asy
   const cats = (await backend.get(`budgets/${budget.id}`)).categories;
   assert.deepEqual([cats.a.order, cats.b.order, cats.c.order, cats.c.group, cats.a.name], [1, 0, 1, 'X', 'A']);
 });
+
+test('many transactions move to another category at once, each keeping its old version', async () => {
+  const { backend, repo } = fresh();
+  const { budget, written } = repo.createBudget({ name: 'Mine', categories: { a: { name: 'A' }, b: { name: 'B' } } });
+  await written;
+  const made = [];
+  for (let i = 0; i < 3; i += 1) { const { transaction, written: w } = repo.addTransaction(budget.id, { kind: 'spend', amount: 100 + i, date: '2026-11-02', categoryId: 'a', description: 'Shop' }); await w; made.push(transaction); }
+  await repo.recategorize(budget.id, made, 'b');
+  for (const t of made) assert.equal((await backend.get(`budgets/${budget.id}/transactions/${t.id}`)).categoryId, 'b');
+  let revisions;
+  backend.watchCollection(`budgets/${budget.id}/transactions/${made[0].id}/revisions`, l => { revisions = l; });
+  await new Promise(r => setTimeout(r));
+  assert.equal(revisions[0].transaction.categoryId, 'a');
+});

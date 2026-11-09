@@ -57,6 +57,7 @@ const HELP = {
       ['Every transaction', 'this month, newest first. Tap one to change or delete it.'],
       ['Repeats', 'are added for you on their day: weekly, every 2 weeks, or monthly. The line shows the next one; tap it to see them all, then tap one to change the amount or stop it.'],
       ['Deleting', 'can be undone from the message that appears.'],
+      ['Search', '(the magnifier at the top, on every budget screen) finds any transaction, every month, by words, category or time, with what they add up to. It can move all the matches to another category at once.'],
       ['Import from your bank', 'brings in a CSV download (Chase, or any bank). You check each row and its category first; card payments and ones already here are left out.'],
       ['Other months', 'are a tap away with the arrows at the top.'],
     ],

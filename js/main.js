@@ -13,6 +13,7 @@ import { openTxForm } from './ui/tx-form.js';
 import './ui/import.js';
 import './ui/report.js';
 import './ui/arrange.js';
+import './ui/search.js';
 import './ui/accounts.js';
 import { startIdleWatch, forgetActivity } from './ui/idle.js';
 import { openCatEditor } from './ui/cat-edit.js';
@@ -140,6 +141,7 @@ function topbar(b) {
   return `<header class="topbar">
     <a class="icon-btn" href="#home" aria-label="All budgets">${svg(ICON.home)}</a>
     <h1 class="grow">${esc(b.name)}</h1>
+    <button type="button" class="icon-btn" data-action="open-search" aria-label="Search transactions">${svg('<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>')}</button>
     ${helpButton(A.route.name)}
     ${accountButton()}
   </header>`;
