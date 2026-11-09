@@ -152,6 +152,10 @@ await no(bob.backend.set(`budgets/${B}/transactions/${tid}`, { id: tid, budgetId
 await no(carol.repo.addTransaction(B, { kind: 'income', amount: 100, date: '2026-11-07', description: 'x', categoryId: null }).written, 'a stranger cannot add to a budget');
 const due = [{ id: 'r-rule1-2026-11', kind: 'spend', amount: 180000, date: '2026-11-01', description: 'Rent', categoryId: catId, recurringId: 'rule1' }];
 await ok(bob.repo.addRecurringCopies(B, due), 'repeats are added by members');
+const bank = Array.from({ length: 130 }, (_, i) => ({ id: `i-test${i}`, kind: i % 10 ? 'spend' : 'refund', amount: 100 + i, date: '2026-11-02', description: `Bank line ${i}`, categoryId: catId }));
+await ok(bob.repo.importTransactions(B, bank), 'a bank file goes in, 100 rows at a time');
+await ok(bob.repo.unimport(B, bank.map(t => t.id)), 'and Undo takes the whole import back out');
+await ok(bob.repo.importTransactions(B, bank.slice(0, 3), new Set(bank.slice(0, 3).map(t => t.id))), 'deleted imports can be brought back');
 
 /* Turned away, removed, leaving. */
 await ok(dave.repo.requestToJoin(code, 'Dave'), 'Dave asks');
