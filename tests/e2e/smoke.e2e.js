@@ -404,6 +404,35 @@ await page.locator('#importFile').setInputFiles({ name: 'statement.pdf', mimeTyp
 await page.getByText('That’s a PDF').waitFor();
 await tap('[data-action=sheet-back]');
 
+// Checking the budget against accounts.
+await tap('[data-action=account]');
+await tap('[data-action=open-accounts]');
+await page.getByText('Add the accounts your money is in').waitFor();
+await tap('[data-action=acc-add-open]');
+await page.locator('#accName').fill('Checking');
+await page.locator('#accBalance').fill('100');
+await tap('[data-action=acc-add]');
+await page.locator('.acc-row', { hasText: 'Checking' }).waitFor();
+await page.getByText('Off by').waitFor();
+const inBudget = await page.locator('.acc-totals > div').nth(1).locator('.amt').innerText();
+const row = page.locator('.acc-row', { hasText: 'Checking' }).locator('input');
+await row.fill(inBudget.replace(/[$,]/g, ''));
+await row.dispatchEvent('change');
+await page.getByText('They match').waitFor();
+await shot('accounts');
+await tap('[data-action=acc-add-open]');
+await page.locator('#accName').fill('Card');
+await tap('[data-action=acc-kind][data-id=card]');
+await eventually(async () => (await page.locator('#accName').inputValue()) === 'Card', 'Switching to Credit card should keep the typed name');
+await page.locator('#accBalance').fill('25');
+await tap('[data-action=acc-add]');
+await page.getByText('Off by $25.00').waitFor();
+await page.locator('.acc-row', { hasText: 'Card' }).locator('[data-action=acc-remove]').click();
+await page.getByText('They match').waitFor();
+await tap('[data-action=sheet-back]');
+await tap('[data-action=sheet-back]');
+await page.locator('dialog[open]').waitFor({ state: 'detached' });
+
 // Feedback from a screen's "?" help.
 await tap('[data-action=help]');
 await tap('[data-action=feedback-open]');

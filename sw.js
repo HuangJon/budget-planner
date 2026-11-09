@@ -20,6 +20,7 @@ const APP_FILES = [
   './js/core/categorize.js',
   './js/core/export.js',
   './js/core/import.js',
+  './js/core/accounts.js',
   './js/core/ids.js',
   './js/core/money.js',
   './js/core/recurring.js',
@@ -48,6 +49,7 @@ const APP_FILES = [
   './js/ui/tx-form.js',
   './js/ui/import.js',
   './js/ui/report.js',
+  './js/ui/accounts.js',
   './js/ui/updates.js',
 ];
 /** The database code and fonts come from Google and have to work offline too. */

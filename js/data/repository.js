@@ -149,6 +149,11 @@ export function createRepository(backend, now = () => Date.now()) {
       const fields = Object.fromEntries(Object.entries(b?.categories || {}).filter(([, c]) => (c.group || 'Other') === from).map(([cid]) => [`categories.${cid}.group`, to]));
       if (Object.keys(fields).length) await backend.update(budgetPath(id), { ...fields, changedBy: uid() });
     },
+    /** An account to check against: its name, whether it's a card, and its balance in cents (a card's is what's owed). */
+    saveAccount(id, accountId, { name, kind, balance }) {
+      return backend.update(budgetPath(id), { [`accounts.${accountId}`]: { name, kind, balance, updatedAt: now(), updatedBy: uid() }, changedBy: uid() });
+    },
+    removeAccount: (id, accountId) => backend.update(budgetPath(id), { [`accounts.${accountId}`]: undefined, changedBy: uid() }),
     addCategory(id, { name, group, order }) {
       const catId = randomId(8);
       return { catId, written: backend.update(budgetPath(id), { [`categories.${catId}`]: { name, group, order }, changedBy: uid() }) };

@@ -12,6 +12,7 @@ import { helpButton, describe } from './ui/help.js';
 import { openTxForm } from './ui/tx-form.js';
 import './ui/import.js';
 import './ui/report.js';
+import './ui/accounts.js';
 import { openCatEditor } from './ui/cat-edit.js';
 import { createLocalBackend } from './data/backend-local.js';
 import { createFirebaseBackend, loadFirebaseSdk } from './data/backend-firebase.js';

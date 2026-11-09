@@ -23,7 +23,7 @@ const HELP = {
       ['Money you have now', 'is checking, plus savings you want to plan with, minus what you owe on credit cards today. Pay that hasn’t arrived yet goes in when it lands.'],
       ['Then plan it', 'by giving every dollar a job in Plan money, starting with bills and the next few weeks. Log spending as you go, or import it from your bank.'],
       ['Waiting to join', 'shows budgets you asked to join until an admin lets you in.'],
-      ['Your initial', 'at the top opens settings: the look of the app, Send feedback, and Sign out.'],
+      ['Your initial', 'at the top opens settings: the look of the app, Send feedback, and Sign out. Inside a budget, settings also has Check against your accounts.'],
     ],
   },
   budget: {

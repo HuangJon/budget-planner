@@ -183,6 +183,11 @@ await ok(bob.repo.importTransactions(B, bank), 'a bank file goes in, 100 rows at
 await ok(bob.repo.unimport(B, bank.map(t => t.id)), 'and Undo takes the whole import back out');
 await ok(bob.repo.importTransactions(B, bank.slice(0, 3), new Set(bank.slice(0, 3).map(t => t.id))), 'deleted imports can be brought back');
 
+/* Accounts to check against: any member can keep them, nobody outside can. */
+await ok(bob.repo.saveAccount(B, 'acc1', { name: 'Checking', kind: 'cash', balance: 120000 }), 'a member adds an account');
+await ok(alice.repo.removeAccount(B, 'acc1'), 'and anyone in the budget can remove it');
+await no(carol.repo.saveAccount(B, 'acc2', { name: 'Mine', kind: 'cash', balance: 1 }), 'a stranger cannot add accounts');
+
 /* Turned away, removed, leaving. */
 await ok(dave.repo.requestToJoin(code, 'Dave'), 'Dave asks');
 await ok(alice.repo.declineRequest(B, dave.uid), 'the admin turns Dave away');

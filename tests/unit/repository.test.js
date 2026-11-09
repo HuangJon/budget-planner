@@ -212,3 +212,13 @@ test('importing saves each bank line once, and taking it back out only marks the
   assert.equal(back.deleted, false);
   assert.ok(back.createdAt, 'brought back, not made again');
 });
+
+test('accounts are saved on the budget and can be removed', async () => {
+  const { backend, repo } = fresh();
+  const { budget, written } = repo.createBudget({ name: 'Mine' });
+  await written;
+  await repo.saveAccount(budget.id, 'acc1', { name: 'Checking', kind: 'cash', balance: 12345 });
+  assert.equal((await backend.get(`budgets/${budget.id}`)).accounts.acc1.balance, 12345);
+  await repo.removeAccount(budget.id, 'acc1');
+  assert.equal((await backend.get(`budgets/${budget.id}`)).accounts.acc1, undefined);
+});

@@ -30,7 +30,7 @@ service cloud.firestore {
 
     function validBudget(d, id) {
       return d.keys().hasOnly(['id', 'schemaVersion', 'name', 'kind', 'categories', 'assigned', 'recurring', 'requests', 'settings',
-          'members', 'createdAt', 'changedBy', 'deleted', 'deletedAt', 'deletedBy', 'invite', 'removed'])
+          'members', 'createdAt', 'changedBy', 'deleted', 'deletedAt', 'deletedBy', 'invite', 'removed', 'accounts'])
         && d.id == id
         && short(d.name, 60) && d.name.size() > 0
         && d.kind in ['personal', 'shared']
@@ -41,7 +41,9 @@ service cloud.firestore {
         && d.requests is map && d.requests.size() <= 50
         && d.members is map && d.members.size() <= 20
         && d.createdAt is number
-        && d.deleted is bool;
+        && d.deleted is bool
+        // Optional accounts to check the budget against: names, kinds and balances, nothing more.
+        && (!('accounts' in d) || (d.accounts is map && d.accounts.size() <= 20));
     }
     function validRequest(q, budgetId) {
       return q.keys().hasOnly(['name', 'at', 'invite'])
@@ -86,7 +88,7 @@ service cloud.firestore {
         return memberOf(resource.data)
           && resource.data.deleted == false
           && request.resource.data.changedBy == me()
-          && changed().hasOnly(['name', 'categories', 'assigned', 'recurring', 'settings', 'changedBy', 'members'])
+          && changed().hasOnly(['name', 'categories', 'assigned', 'recurring', 'settings', 'changedBy', 'members', 'accounts'])
           && (!changed().hasAny(['members']) || (
             membersDiff().affectedKeys().hasOnly([me()])
             && request.resource.data.members.keys().hasAny([me()])

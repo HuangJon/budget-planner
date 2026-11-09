@@ -107,7 +107,7 @@ actions.account = () => {
       <span class="small muted">${esc(A.user?.email || '')}</span>
     </section>
     <section class="panel pad stack">${lookPicker()}</section>
-    ${b ? `<section class="panel pad stack"><h3>${esc(b.name)}</h3><button type="button" class="btn" data-action="edit-cats">Edit categories</button>
+    ${b ? `<section class="panel pad stack"><h3>${esc(b.name)}</h3><button type="button" class="btn" data-action="edit-cats">Edit categories</button><button type="button" class="btn" data-action="open-accounts">Check against your accounts</button>
       <span class="label">Export to a spreadsheet</span>
       <div class="two-btns"><button type="button" class="btn" data-action="export-tx">Transactions</button><button type="button" class="btn" data-action="export-plan">Plan by month</button></div>
       <p class="tiny muted">CSV files that open in Numbers, Excel or Google Sheets. A good backup too.</p></section>` : ''}
