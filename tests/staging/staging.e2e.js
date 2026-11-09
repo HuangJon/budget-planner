@@ -88,14 +88,14 @@ try {
   const ownerContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
   await ownerContext.addInitScript(() => localStorage.setItem('wmm:tourDone', '1'));
   const ownerPage = await ownerContext.newPage();
-  await ownerPage.goto(`${SITE}/#owner`);
+  await ownerPage.goto(SITE);
   await ownerPage.locator('#authEmail').fill(OWNER.email);
   await ownerPage.locator('#authPassword').fill(password);
   await ownerPage.locator('[data-action=auth-in]').click();
   await ownerPage.locator('.owner-counts').waitFor({ timeout: 30000 });
   const budgets = Number(await ownerPage.locator('.owner-counts > div').nth(1).locator('.big-amt').innerText());
   assert.ok(budgets >= 1, 'the owner sees the budget count');
-  check('the owner page shows counts');
+  check('the owner account opens straight to the owner page, with counts');
   await ownerPage.goto(`${SITE}/#b-${ids[0]}`);
   await ownerPage.getByText("This budget can't be opened").waitFor({ timeout: 30000 });
   check("the owner can't open someone else's budget");

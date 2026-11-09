@@ -74,7 +74,8 @@ function startData() {
     render();
   }, () => { A.status = 'ready'; render(); });
   readRoute();
-  if (!A.preview) A.repo.noteVisit().catch(() => {});
+  // The owner account isn't a person using the app, so it isn't counted.
+  if (!A.preview && !isOwnerAccount(A.ownerUid)) A.repo.noteVisit().catch(() => {});
   setUpErrorLog();
 }
 
@@ -174,6 +175,11 @@ function render() {
 }
 let lastDrawn = null;
 function drawScreen() {
+  // The owner account exists only for the owner page, so that is its home screen.
+  if (A.route.name === 'home' && A.status === 'ready' && isOwnerAccount(A.ownerUid)) {
+    A.route = { name: 'owner' };
+    if (!A.owner) queueMicrotask(loadOwner);
+  }
   const b = A.route.id ? A.budgets[A.route.id] : null;
   if (A.route.name === 'owner') {
     document.title = `Owner page · ${APP_NAME}`;

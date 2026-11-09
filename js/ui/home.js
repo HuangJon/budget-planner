@@ -108,8 +108,7 @@ actions.account = () => {
       <h3>Your privacy</h3>
       <p class="small muted">Only people in a budget can see it in the app. The app's owner sees only counts, like how many people use it, and error reports with amounts and anything you typed removed. The owner runs the database, so they could technically look inside it, but the app never shows them your budget.</p>
     </section>
-    ${A.ownerUid && A.user?.uid === A.ownerUid ? '<a class="btn" href="#owner">Owner page</a>' : ''}
-    <button type="button" class="btn" data-action="sign-out">Sign out</button>
+        <button type="button" class="btn" data-action="sign-out">Sign out</button>
     ${A.preview ? '<button type="button" class="btn" data-action="preview-reset">Start the preview over</button>' : ''}
   </div></div>`);
 };

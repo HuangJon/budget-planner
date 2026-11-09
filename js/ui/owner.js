@@ -12,13 +12,15 @@ export const isOwnerAccount = ownerUid => Boolean(ownerUid) && A.user?.uid === o
 export function ownerScreen() {
   const O = A.owner || {};
   if (!O.loaded) return '<section class="panel empty"><h2>Loading counts</h2><p class="muted">One moment.</p></section>';
-  if (O.error) return `<section class="panel empty"><h2>Couldn’t load the owner page</h2><p class="muted">${esc(O.error)}</p><a class="btn" href="#home">Back</a></section>`;
+  if (O.error) return `<section class="panel empty"><h2>Couldn’t load the owner page</h2><p class="muted">${esc(O.error)}</p>${isOwnerAccount(A.ownerUid) ? '<button type="button" class="btn" data-action="owner-refresh">Try again</button><button type="button" class="btn" data-action="sign-out">Sign out</button>' : '<a class="btn" href="#home">Back</a>'}</section>`;
   const s = O.stats || {};
   const weeks = recentWeeks(new Date(), 8);
   const counts = weeks.map(w => ({ w, n: s.weeks?.[w] || 0 }));
   const max = Math.max(1, ...counts.map(c => c.n));
   const errors = O.errors || [];
-  return `<header class="topbar"><a class="icon-btn" href="#home" aria-label="Back">${svg(ICON.back)}</a><h1 class="grow">Owner page</h1></header>
+  // On the owner account this is the home screen: settings (to sign out) instead of a back arrow.
+  const own = isOwnerAccount(A.ownerUid);
+  return `<header class="topbar">${own ? '' : `<a class="icon-btn" href="#home" aria-label="Back">${svg(ICON.back)}</a>`}<h1 class="grow">Owner page</h1>${own ? `<button type="button" class="icon-btn" data-action="account" aria-label="You and settings">${svg(ICON.people)}</button>` : ''}</header>
     <p class="screen-tip">Counts and error reports only. You can't see anyone's budgets, and this page never asks for them.</p>
     <section class="panel pad owner-counts">
       <div><span class="label">People</span><span class="big-amt">${s.people || 0}</span></div>
