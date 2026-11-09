@@ -11,7 +11,7 @@ const STEPS = [
   { sel: '.hero', title: 'Ready to assign', text: 'Money that has come in but has no job yet. Add income here when you’re paid.' },
   { sel: '.hero-actions a.hero-btn', title: 'Plan money', text: 'Give every dollar a job: put money into each category until Ready to assign reaches $0.' },
   { sel: '.groups .cat-row', title: 'Each category is a pot', text: 'What you plan goes in, what you spend comes out. Tap one to add spending, change its plan or set a target.' },
-  { sel: '.spend-tab', title: 'Spend', text: 'Log a purchase here. Your usual ones are one tap, and the category is suggested for you.' },
+  { sel: '.spend-tab', title: 'Spent', text: 'Log a purchase or a refund. It comes out of that category’s money, and your usual ones are one tap.' },
   { sel: 'a.tab[href$="-trends"]', title: 'Trends', text: 'How this month is going, and how your spending compares with usual.' },
   { sel: '.help-btn', title: 'Help any time', text: 'Tap ? on any screen for a short explanation of it.' },
 ];
@@ -30,31 +30,43 @@ export function startTour() {
   drawTour();
 }
 
-/** Draws the highlight and the card for the current step, skipping steps whose part isn't on screen. */
+/**
+ * Draws the highlight and the card for the current step, skipping steps whose part isn't on screen.
+ * The card stays put at the bottom (above the tab bar) for every step; only the highlight moves,
+ * and the page scrolls only when the next part isn't already visible above the card.
+ */
 export function drawTour() {
-  document.getElementById('tour')?.remove();
-  if (!A.tour) return;
+  if (!A.tour) { document.getElementById('tour')?.remove(); return; }
   let target = null;
   while (A.tour.step < STEPS.length && !(target = document.querySelector(STEPS[A.tour.step].sel))) A.tour.step += 1;
   if (!target) { endTour(); return; }
   const s = STEPS[A.tour.step];
-  target.scrollIntoView({ block: 'center', behavior: 'instant' });
-  const r = target.getBoundingClientRect();
-  const pad = 6;
-  const el = document.createElement('div');
-  el.id = 'tour';
-  el.className = 'tour';
-  el.setAttribute('role', 'dialog');
-  el.setAttribute('aria-label', 'Tour');
-  const below = r.top < innerHeight / 2;
-  el.innerHTML = `<div class="tour-ring" style="top:${r.top - pad}px;left:${r.left - pad}px;width:${r.width + pad * 2}px;height:${r.height + pad * 2}px"></div>
-    <div class="tour-card ${below ? 'low' : 'high'}">
-      <span class="tiny muted">${A.tour.step + 1} of ${STEPS.length}</span>
+  let el = document.getElementById('tour');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'tour';
+    el.className = 'tour';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-label', 'Tour');
+    el.innerHTML = '<div class="tour-ring"></div><div class="tour-card" aria-live="polite"></div>';
+    document.body.appendChild(el);
+  }
+  const card = el.querySelector('.tour-card');
+  card.innerHTML = `<span class="tiny muted">${A.tour.step + 1} of ${STEPS.length}</span>
       <h2>${esc(s.title)}</h2>
       <p>${esc(s.text)}</p>
-      <div class="row between"><button type="button" class="link small" data-action="tour-end">Skip</button><div class="row gap8">${A.tour.step > 0 ? '<button type="button" class="btn small" data-action="tour-back">Back</button>' : ''}<button type="button" class="btn small primary" data-action="tour-next">${A.tour.step === STEPS.length - 1 ? 'Done' : 'Next'}</button></div></div>
-    </div>`;
-  document.body.appendChild(el);
+      <div class="row between"><button type="button" class="link small" data-action="tour-end">Skip</button><div class="row gap8">${A.tour.step > 0 ? '<button type="button" class="btn small" data-action="tour-back">Back</button>' : ''}<button type="button" class="btn small primary" data-action="tour-next">${A.tour.step === STEPS.length - 1 ? 'Done' : 'Next'}</button></div></div>`;
+  // Parts fixed to the screen (the tab bar, the header) never need scrolling. Others scroll only
+  // if they aren't already fully in the clear space above the card.
+  const fixed = Boolean(target.closest('#tabs, .topbar, .home-head'));
+  if (!fixed) {
+    // Below the top bar and the month bar, which both stay at the top while scrolling.
+    const room = { top: 116, bottom: card.getBoundingClientRect().top - 12 };
+    const r = target.getBoundingClientRect();
+    if (r.top < room.top || r.bottom > room.bottom) scrollBy({ top: r.top - room.top, behavior: 'instant' });
+  }
+  const r = target.getBoundingClientRect(), pad = 6;
+  Object.assign(el.querySelector('.tour-ring').style, { top: `${r.top - pad}px`, left: `${r.left - pad}px`, width: `${r.width + pad * 2}px`, height: `${r.height + pad * 2}px` });
   el.querySelector('[data-action=tour-next]').focus({ preventScroll: true });
 }
 function endTour() {

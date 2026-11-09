@@ -104,7 +104,7 @@ export function savingThisMonth(budget, transactionList, month) {
   return { income: s.incomeThisMonth, saved, rate: s.incomeThisMonth > 0 ? saved / s.incomeThisMonth : null };
 }
 
-/** Yearly and save-by-a-date targets with how far along they are. */
+/** Yearly and save-by-a-date targets with how far along they are, marking the ones in a saving group. */
 export function targetProgress(budget, transactionList, month) {
   const s = monthSummary(budget, transactionList, month);
   return Object.entries(budget.categories || {})
@@ -112,8 +112,8 @@ export function targetProgress(budget, transactionList, month) {
     .map(([id, c]) => {
       const t = s.categories[id].target;
       return t.type === 'yearly'
-        ? { id, name: c.name, type: 'yearly', amount: t.amount, done: t.spentThisYear, label: 'spent this year' }
-        : { id, name: c.name, type: 'byDate', amount: t.amount, done: t.saved, date: t.date, label: 'saved' };
+        ? { id, name: c.name, type: 'yearly', amount: t.amount, done: t.spentThisYear, label: 'spent this year', saving: isSavingGroup(c.group) }
+        : { id, name: c.name, type: 'byDate', amount: t.amount, done: t.saved, date: t.date, label: 'saved', saving: isSavingGroup(c.group) };
     });
 }
 
@@ -133,11 +133,54 @@ export const isBillCategory = (budget, id) => {
   return Object.values(budget.recurring || {}).some(r => r && !r.stopped && r.kind === 'spend' && r.categoryId === id);
 };
 
-/** Months for a range: '3', '6', '12' back from `month`, or 'year' for January through `month`. */
-export function rangeMonths(range, month) {
-  if (range === 'year') { const n = Number(month.slice(5, 7)); return Array.from({ length: n }, (_, i) => `${month.slice(0, 4)}-${String(i + 1).padStart(2, '0')}`); }
-  const n = Number(range) || 6;
+/**
+ * Months for a range, oldest first: a number of months back from `month` ('3', '6', '12', '24',
+ * '36', '60'), 'year' for January through `month`, 'all' from `first` (the earliest activity),
+ * or 'custom' from `from` to `to`. Never more than 120 months.
+ */
+export function rangeMonths(range, month, { first, from, to } = {}) {
+  const span = (a, b) => {
+    if (!a || !b || a > b) return [b || a || month];
+    const out = [];
+    for (let m = a; m <= b && out.length < 120; m = addMonths(m, 1)) out.push(m);
+    return out;
+  };
+  if (range === 'year') return span(`${month.slice(0, 4)}-01`, month);
+  if (range === 'all') return span(first && first < month ? first : month, month);
+  if (range === 'custom') return span(from, to);
+  const n = Math.min(120, Number(range) || 6);
   return Array.from({ length: n }, (_, i) => addMonths(month, i - n + 1));
+}
+
+/** Month rows added up by year ({ month: '2025', income, spent }), for ranges too long to show monthly. */
+export function byYear(rows) {
+  const years = new Map();
+  for (const r of rows) {
+    const y = r.month.slice(0, 4);
+    const t = years.get(y) || { month: y, income: 0, spent: 0 };
+    t.income += r.income; t.spent += r.spent;
+    years.set(y, t);
+  }
+  return [...years.values()];
+}
+
+/** Month rows added up by quarter ({ month: '2026-Q1', income, spent }), for ranges of one to three years. */
+export function byQuarter(rows) {
+  const qs = new Map();
+  for (const r of rows) {
+    const q = `${r.month.slice(0, 4)}-Q${Math.ceil(Number(r.month.slice(5, 7)) / 3)}`;
+    const t = qs.get(q) || { month: q, income: 0, spent: 0 };
+    t.income += r.income; t.spent += r.spent;
+    qs.set(q, t);
+  }
+  return [...qs.values()];
+}
+
+/** The earliest month with any activity, or null. */
+export function firstMonth(transactionList) {
+  let first = null;
+  for (const t of liveTransactions(transactionList)) if (t.date && (!first || t.date < first)) first = t.date;
+  return first ? first.slice(0, 7) : null;
 }
 
 /**
@@ -214,14 +257,17 @@ export function categoryHistory(transactionList, catId, months, biggest = 5) {
 }
 
 /** The largest single purchases in a month. */
+/** True for a transaction in `month`, or in any of `month` when it's a list of months. */
+const inMonths = (t, month) => (Array.isArray(month) ? month.includes(monthOf(t.date)) : monthOf(t.date) === month);
+/** The biggest purchases in a month, or across a list of months. */
 export const biggestPurchases = (transactionList, month, n = 5) =>
-  liveTransactions(transactionList).filter(t => t.kind === 'spend' && monthOf(t.date) === month).sort((a, b) => b.amount - a.amount).slice(0, n);
+  liveTransactions(transactionList).filter(t => t.kind === 'spend' && inMonths(t, month)).sort((a, b) => b.amount - a.amount).slice(0, n);
 
-/** Spending in a month by who added it, biggest first. */
+/** Spending in a month (or a list of months) by who added it, biggest first. */
 export function byPerson(budget, transactionList, month) {
   const out = {};
   for (const t of liveTransactions(transactionList)) {
-    if (t.kind === 'income' || monthOf(t.date) !== month || t.automatic) continue;
+    if (t.kind === 'income' || !inMonths(t, month) || t.automatic) continue;
     out[t.createdBy] = (out[t.createdBy] || 0) + net(t);
   }
   return Object.entries(out).filter(([, v]) => v > 0).map(([uid, spent]) => ({ uid, name: budget.members?.[uid]?.name || 'Former member', spent })).sort((a, b) => b.spent - a.spent);

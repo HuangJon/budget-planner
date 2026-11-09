@@ -11,7 +11,5 @@ export const firebaseConfig = {
   appId: '1:236246651954:web:1e80f6b535788800c5582b',
 };
 export const environment = 'live';
-/** Jonathan's Firebase user id, filled in after his first sign-in on the live app. */
-export const ownerUid = 'snu95kN1t7RTs7QAkqYWIAQfHrO2';
 export const appCheckSiteKey = null;
 export const FIREBASE_VERSION = '11.10.0';

@@ -12,6 +12,5 @@ export const firebaseConfig = {
 };
 export const environment = 'staging';
 /** A test owner used only on staging. */
-export const ownerUid = 'stagingOwnerTestAccount01';
 export const appCheckSiteKey = null;
 export const FIREBASE_VERSION = '11.10.0';

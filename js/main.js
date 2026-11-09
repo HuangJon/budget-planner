@@ -2,7 +2,7 @@
 import { A, actions, inputs, changes, setRender } from './ui/state.js';
 import { esc, svg, ICON, closeSheet, sheetBack, today, refreshOpenSheet, redrawKeeping } from './ui/dom.js';
 import { applyLook } from './ui/look.js';
-import { homeScreen } from './ui/home.js';
+import { homeScreen, accountButton } from './ui/home.js';
 import { budgetScreen } from './ui/budget.js';
 import { transactionsScreen } from './ui/transactions.js';
 import { planScreen } from './ui/plan.js';
@@ -11,12 +11,13 @@ import { peopleScreen, joinScreen, openJoin } from './ui/people.js';
 import { helpButton, describe } from './ui/help.js';
 import { openTxForm } from './ui/tx-form.js';
 import './ui/import.js';
+import './ui/report.js';
 import { openCatEditor } from './ui/cat-edit.js';
 import { createLocalBackend } from './data/backend-local.js';
 import { createFirebaseBackend, loadFirebaseSdk } from './data/backend-firebase.js';
 import { createRepository } from './data/repository.js';
 import { signInView, verifyView } from './ui/account.js';
-import { ownerScreen, loadOwner, isOwnerAccount } from './ui/owner.js';
+import { ownerScreen, loadOwner } from './ui/owner.js';
 import { setUpErrorLog } from './ui/error-log.js';
 import { watchForUpdates } from './ui/updates.js';
 import { maybeStartTour, drawTour } from './ui/tour.js';
@@ -74,8 +75,11 @@ function startData() {
     render();
   }, () => { A.status = 'ready'; render(); });
   readRoute();
-  // The owner account isn't a person using the app, so it isn't counted.
-  if (!A.preview && !isOwnerAccount(A.ownerUid)) A.repo.noteVisit().catch(() => {});
+  if (!A.preview) {
+    A.repo.noteVisit().catch(() => {});
+    // The owner page link shows only for the account listed as owner in the database.
+    A.repo.amOwner().then(yes => { if (yes) { A.isOwner = true; render(); } });
+  }
   setUpErrorLog();
 }
 
@@ -96,8 +100,7 @@ async function boot() {
     return;
   }
   try {
-    const { firebaseConfig, appCheckSiteKey, FIREBASE_VERSION, ownerUid } = await import('./config/firebase.js');
-    A.ownerUid = ownerUid;
+    const { firebaseConfig, appCheckSiteKey, FIREBASE_VERSION } = await import('./config/firebase.js');
     const sdk = await loadFirebaseSdk(FIREBASE_VERSION, { appCheck: Boolean(appCheckSiteKey) });
     const backend = await createFirebaseBackend(firebaseConfig, sdk, { appCheckSiteKey });
     A.repo = createRepository(backend);
@@ -132,7 +135,7 @@ function topbar(b) {
     <a class="icon-btn" href="#home" aria-label="All budgets">${svg(ICON.home)}</a>
     <h1 class="grow">${esc(b.name)}</h1>
     ${helpButton(A.route.name)}
-    <button type="button" class="icon-btn ava-btn" data-action="account" aria-label="You and settings"><span class="ava" style="background:var(--m1)">${esc([...(A.user?.displayName || 'Y')][0].toUpperCase())}</span></button>
+    ${accountButton()}
   </header>`;
 }
 
@@ -144,7 +147,7 @@ function drawTabs(b) {
   tabs.innerHTML = `<div class="tabs-in">
     ${tab('budget', '', ICON.wallet, 'Budget')}
     ${tab('transactions', '-activity', ICON.list, 'Activity')}
-    <button type="button" class="tab add-tab spend-tab" data-action="add-tx">${svg(ICON.plus)}<span>Spend</span></button>
+    <button type="button" class="tab add-tab spend-tab" data-action="add-tx">${svg(ICON.plus)}<span>Spent</span></button>
     ${tab('trends', '-trends', ICON.chart, 'Trends')}
     ${tab('people', '-people', ICON.people, 'People')}
   </div>`;
@@ -175,14 +178,9 @@ function render() {
 }
 let lastDrawn = null;
 function drawScreen() {
-  // The owner account exists only for the owner page, so that is its home screen.
-  if (A.route.name === 'home' && A.status === 'ready' && isOwnerAccount(A.ownerUid)) {
-    A.route = { name: 'owner' };
-    if (!A.owner) queueMicrotask(loadOwner);
-  }
   const b = A.route.id ? A.budgets[A.route.id] : null;
   if (A.route.name === 'owner') {
-    document.title = `Owner page · ${APP_NAME}`;
+    document.title = `Usage and feedback · ${APP_NAME}`;
     app.innerHTML = ownerScreen();
   } else if (A.route.name === 'join') {
     document.title = APP_NAME;

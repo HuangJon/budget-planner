@@ -18,3 +18,23 @@ test('hidden categories and short text suggest nothing', () => {
   assert.equal(suggestCategory('a', cats), null);
   assert.equal(suggestCategory('zzzz', cats), null);
 });
+
+test('doctors, dentists, glasses and therapy are Health; the gym is Fitness when there is one', async () => {
+  const { suggestCategory } = await import('../../js/core/categorize.js');
+  const withFit = { h: { name: 'Health' }, f: { name: 'Fitness' }, t: { name: 'Transport' } };
+  const noFit = { h: { name: 'Health' }, t: { name: 'Transport' } };
+  for (const d of ['SAMPLE OPTICAL 0001', 'SAMPLE THERAPY GROUP', 'Sample Dental', 'CVS/PHARMACY #123', 'Dr. Lee']) assert.equal(suggestCategory(d, withFit), 'h', d);
+  assert.equal(suggestCategory('SAMPLE CLIMBING GYM', withFit), 'f');
+  assert.equal(suggestCategory('Planet Fitness', withFit), 'f');
+  assert.equal(suggestCategory('SAMPLE CLIMBING GYM', noFit), 'h', 'no Fitness category: the gym goes to Health');
+});
+
+test('with the Health group: Medical, Fitness and Personal care each get theirs', async () => {
+  const { suggestCategory } = await import('../../js/core/categorize.js');
+  const cats = { m: { name: 'Medical', group: 'Health' }, f: { name: 'Fitness', group: 'Health' }, p: { name: 'Personal care', group: 'Health' } };
+  assert.equal(suggestCategory('Park Slope Dental', cats), 'm');
+  assert.equal(suggestCategory('SAMPLE THERAPY GROUP', cats), 'm');
+  assert.equal(suggestCategory('SAMPLE CLIMBING GYM', cats), 'f');
+  assert.equal(suggestCategory('Sam the Barber', cats), 'p');
+  assert.equal(suggestCategory('SEPHORA 123', cats), 'p');
+});

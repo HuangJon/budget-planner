@@ -164,3 +164,29 @@ test('pace leaves bills out, so rent on the 1st does not blow up the projection'
   assert.equal(p.spent, 6000);
   assert.equal(p.projected, 30000);
 });
+
+test('long, all-time and custom ranges; years add up', async () => {
+  const { rangeMonths, byYear, firstMonth } = await import('../../js/core/trends.js');
+  assert.equal(rangeMonths('24', '2026-11').length, 24);
+  assert.equal(rangeMonths('60', '2026-11')[0], '2021-12');
+  assert.deepEqual(rangeMonths('all', '2026-02', { first: '2025-12' }), ['2025-12', '2026-01', '2026-02']);
+  assert.deepEqual(rangeMonths('all', '2026-02', {}), ['2026-02'], 'no activity yet: just this month');
+  assert.deepEqual(rangeMonths('custom', '2026-11', { from: '2026-03', to: '2026-05' }), ['2026-03', '2026-04', '2026-05']);
+  assert.deepEqual(rangeMonths('custom', '2026-11', { from: '2026-06', to: '2026-05' }), ['2026-05'], 'backwards dates show one month, not nothing');
+  assert.equal(rangeMonths('custom', '2026-11', { from: '2000-01', to: '2026-11' }).length, 120, 'capped at ten years');
+  assert.deepEqual(byYear([{ month: '2025-12', income: 1, spent: 2 }, { month: '2026-01', income: 3, spent: 4 }, { month: '2026-02', income: 5, spent: 6 }]),
+    [{ month: '2025', income: 1, spent: 2 }, { month: '2026', income: 8, spent: 10 }]);
+  assert.equal(firstMonth([{ id: 'a', kind: 'spend', amount: 1, date: '2026-03-04', categoryId: 'x' }, { id: 'b', kind: 'spend', amount: 1, date: '2025-07-01', categoryId: 'x', deleted: true }]), '2026-03');
+});
+
+test('biggest purchases and spending by person can cover several months', async () => {
+  const { biggestPurchases, byPerson } = await import('../../js/core/trends.js');
+  const list = [
+    { id: 'a', kind: 'spend', amount: 500, date: '2026-09-03', categoryId: 'x', createdBy: 'u1' },
+    { id: 'b', kind: 'spend', amount: 900, date: '2026-10-03', categoryId: 'x', createdBy: 'u2' },
+    { id: 'c', kind: 'spend', amount: 100, date: '2026-11-03', categoryId: 'x', createdBy: 'u1' },
+  ];
+  assert.deepEqual(biggestPurchases(list, '2026-11').map(t => t.id), ['c']);
+  assert.deepEqual(biggestPurchases(list, ['2026-09', '2026-10', '2026-11']).map(t => t.id), ['b', 'a', 'c']);
+  assert.deepEqual(byPerson({ members: {} }, list, ['2026-09', '2026-10', '2026-11']).map(r => [r.uid, r.spent]), [['u2', 900], ['u1', 600]]);
+});

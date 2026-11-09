@@ -166,7 +166,7 @@ await eventually(async () => !(await page.locator('[data-action=open-rule]', { h
 // Trends: summary first, then sections that fold, a range, tappable months, and one category's trend.
 await tap('a.tab[href$="-trends"]');
 await page.locator('.summary li').first().waitFor();
-for (const h of ['Pace this month', 'Coming up', 'Where it went', 'Worth a look', 'Month by month', 'Categories over time', 'Biggest purchases', 'Plan vs real', 'Saving', 'By person']) {
+for (const h of ['Pace this month', 'Coming up', 'Where it went', 'Worth a look', 'Over time', 'Categories over time', 'Biggest purchases', 'Plan vs real', 'Saving', 'Limits and goals', 'By person']) {
   await page.getByRole('heading', { name: h, exact: true }).waitFor();
 }
 await eventually(async () => !(!(await page.locator('.trend.folded[data-section=where]').count())), 'Lower Trends sections should start folded');
@@ -176,9 +176,22 @@ await page.locator('.cmp-btn').first().click();
 await page.getByText('Average month').waitFor();
 await shot('category-trend');
 await tap('[data-action=sheet-back]');
+await page.locator('[data-section=months] .overview').getByText('Came in', { exact: true }).waitFor();
+await page.locator('[data-section=months] .col-bars .left').first().waitFor();
+// Long, all-time and custom ranges.
+await page.locator('[data-section=months] [data-change=trend-range]').selectOption('24');
+await page.locator('[data-section=months] .more-range.on > span', { hasText: '2 years' }).waitFor();
+await page.locator('[data-section=months] [data-change=trend-range]').selectOption('all');
+await page.locator('[data-section=months] .overview').getByText('All time', { exact: false }).waitFor();
+await page.locator('[data-section=months] [data-change=trend-range]').selectOption('custom');
+await page.locator('[data-section=months] [data-change=trend-from]').fill('2026-08');
+await page.locator('[data-section=months] [data-change=trend-from]').dispatchEvent('change');
+await page.locator('[data-section=months] .overview').getByText('Aug 2026 to', { exact: false }).waitFor();
+await page.locator('[data-section=months] .more-range.on > span', { hasText: 'Pick months' }).waitFor();
 await page.locator('[data-section=months] [data-action=trend-range][data-id="12"]').click();
+await page.locator('[data-section=months] .more-range:not(.on) > span', { hasText: 'More' }).waitFor();
 await page.locator('[data-action=trend-fold][data-id=categories]').click();
-await page.locator('[data-section=categories]').getByText('last 12 months').waitFor();
+await page.locator('[data-section=categories]').getByText('last 12 months', { exact: true }).waitFor();
 const cols = page.locator('.cols:not(.one) .col');
 await cols.nth(1).click();
 const picked = await page.locator('.col-detail strong').innerText();
@@ -366,12 +379,19 @@ await page.getByText('Pick a category for each one').waitFor();
 await page.locator('.import-row', { hasText: 'MYSTERY SHOP' }).first().locator('select').selectOption({ label: 'Clothes' });
 await page.getByText('Also set 1 more').waitFor();
 await page.locator('.import-row', { hasText: 'MYSTERY SHOP' }).nth(1).locator('select').evaluate(el => { if (el.selectedOptions[0].text !== 'Clothes') throw new Error('One choice should fill the rest from the same place'); });
+// A new category, made without leaving the import.
+await page.locator('.import-row', { hasText: 'SAMPLE NOODLE BAR' }).locator('select').selectOption({ label: '+ New category…' });
+await page.locator('#impNewName').fill('Noodles');
+await tap('[data-action=import-newcat]');
+await page.getByText('Added Noodles').waitFor();
+await eventually(async () => (await page.locator('.import-row', { hasText: 'SAMPLE NOODLE BAR' }).locator('select').evaluate(el => el.selectedOptions[0]?.text)) === 'Noodles', 'The new category should be picked on that row');
 await tap('[data-action=import-skipped]');
 await page.getByText('Paying the card off').waitFor();
 await shot('import');
 await page.locator('[data-action=import-save]', { hasText: 'Add 4' }).click();
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
 await page.locator('.tx-row', { hasText: 'SAMPLE NOODLE BAR' }).waitFor();
+await page.locator('.tx-row', { hasText: 'SAMPLE NOODLE BAR' }).getByText('Noodles').waitFor();
 // The same file again: everything is already in.
 await tap('[data-action=open-import]');
 await page.locator('#importFile').setInputFiles({ name: 'again.csv', mimeType: 'text/csv', buffer: Buffer.from(CSV) });
@@ -383,6 +403,31 @@ await tap('[data-action=open-import]');
 await page.locator('#importFile').setInputFiles({ name: 'statement.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4') });
 await page.getByText('That’s a PDF').waitFor();
 await tap('[data-action=sheet-back]');
+
+// Feedback from a screen's "?" help.
+await tap('[data-action=help]');
+await tap('[data-action=feedback-open]');
+await page.locator('dialog[open] h2', { hasText: 'Send feedback' }).waitFor();
+await tap('[data-action=sheet-back]');
+await page.locator('dialog[open] h2', { hasText: 'Send feedback' }).waitFor({ state: 'detached' });
+await tap('[data-action=sheet-back]');
+await page.locator('dialog[open]').waitFor({ state: 'detached' });
+
+// Reporting a problem from settings.
+await tap('[data-action=account]');
+await tap('[data-action=feedback-open]');
+await tap('[data-action=report-send]');
+await page.getByText('Write a few words').waitFor();
+await tap('[data-action=feedback-type][data-id=idea]');
+await page.getByText('What would make it better?').waitFor();
+await page.locator('#reportText').fill('The import button is hard to find');
+await page.locator('#reportEmail').check();
+await shot('report');
+await tap('[data-action=report-send]');
+await page.getByText('Sending feedback works in the real app').waitFor();
+await tap('[data-action=sheet-back]');
+await tap('[data-action=sheet-back]');
+await page.locator('dialog[open]').waitFor({ state: 'detached' });
 
 // Every theme, on the example budget.
 await page.goto(pathToFileURL(resolve('preview-test.html')).href + '#home');

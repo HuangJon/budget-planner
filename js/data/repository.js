@@ -78,7 +78,13 @@ export function createRepository(backend, now = () => Date.now()) {
     },
     readStats: () => backend.get(STATS),
     listErrors: () => backend.list('errorLog', { orderBy: 'at', limit: 100 }),
+    /** Whether this account is the app's owner (listed in /developers by hand in the Firebase console). */
+    amOwner: async () => Boolean(await backend.get(`developers/${uid()}`).catch(() => null)),
     logError: record => backend.set(`errorLog/${record.id}`, record),
+    /** A problem someone reports in their own words; their email only if they chose to include it. */
+    sendReport: record => backend.set(`reports/${record.id}`, record),
+    listReports: () => backend.list('reports', { orderBy: 'at', limit: 200 }),
+    markReport: (id, done) => backend.update(`reports/${id}`, { done }),
 
     /* ---------- Budgets ---------- */
     createBudget({ name, kind = 'personal', myName = 'You', categories = starterCategories(), startingMoney = 0, today = '' }) {

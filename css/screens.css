@@ -304,3 +304,13 @@ a.btn { text-decoration:none; display:inline-flex; align-items:center; justify-c
 .filter-quick { display:inline-flex; align-items:center; min-height:36px; padding:4px 12px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--ink); font-size:.875rem; font-weight:600 }
 .filter-quick[aria-pressed="true"] { background:var(--accent); border-color:var(--accent); color:var(--accent-ink) }
 .more-filters { justify-self:start }
+.pre-wrap { white-space:pre-wrap; overflow-wrap:anywhere }
+.about-failed { display:grid; gap:2px }
+.help-feedback { margin-top:8px }
+
+
+/* Header buttons line up the same on home and in a budget: 44px, same border, the initial centred. */
+.home-head > .row { grid-column:1 / -1; width:100% }
+.topbar .ava-btn, .home-head .ava-btn { width:44px; height:44px; min-height:44px; padding:0; justify-content:center; display:inline-flex; align-items:center; border:1px solid var(--line); border-radius:999px; background:var(--surface); flex:none }
+.home-head .help-btn { width:44px; height:44px }
+.start-how { margin:0; padding-left:1.1em; display:grid; gap:4px }

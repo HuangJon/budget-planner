@@ -33,3 +33,14 @@ test('platform in one word', () => {
   assert.equal(platformOf('Mozilla/5.0 (Linux; Android 15)'), 'android');
   assert.equal(platformOf('Mozilla/5.0 (Macintosh)'), 'computer');
 });
+
+test('a reported problem keeps the words, adds an email only when chosen, and starts open', async () => {
+  const { reportRecord } = await import('../../js/core/usage.js');
+  const r = reportRecord({ id: 'abc123defg', text: '  Save did nothing  ', screen: 'plan', version: 'wmm-v3', platform: 'iphone', at: 5 });
+  assert.deepEqual(r, { id: 'abc123defg', kind: 'problem', text: 'Save did nothing', screen: 'plan', version: 'wmm-v3', platform: 'iphone', at: 5, done: false });
+  assert.equal(reportRecord({ id: 'x', text: 'a'.repeat(2000), email: 'me@example.com', screen: 'weird', at: 1 }).text.length, 1000);
+  assert.equal(reportRecord({ id: 'x', text: 'hi there', email: 'me@example.com', at: 1 }).email, 'me@example.com');
+  assert.equal(reportRecord({ id: 'x', text: 'hi there', screen: 'weird', at: 1 }).screen, 'other');
+  assert.equal(reportRecord({ id: 'x', kind: 'idea', text: 'dark mode', at: 1 }).kind, 'idea');
+  assert.equal(reportRecord({ id: 'x', kind: 'rant', text: 'hmm', at: 1 }).kind, 'problem');
+});

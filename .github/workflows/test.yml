@@ -69,9 +69,7 @@ jobs:
       - name: Build the staging site
         run: |
           cp config/firebase.staging.js js/config/firebase.js
-          # The staging test owner replaces the real one, only for this publish to the staging project.
-          sed -i -E "s/request\.auth\.uid == '[^']+'/request.auth.uid == 'stagingOwnerTestAccount01'/" firestore.rules
-          grep -q "stagingOwnerTestAccount01" firestore.rules
+          # The owner isn't in the code: the staging test lists its own test owner in /developers.
           mkdir _site
           cp -r index.html manifest.webmanifest css js icons _site/
           if [ -f sw.js ]; then cp sw.js _site/; fi

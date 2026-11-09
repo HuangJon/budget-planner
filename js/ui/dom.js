@@ -75,7 +75,7 @@ export function redrawKeeping(box, draw) {
   }
 }
 /** Redraws the open popup with the latest data. */
-const LIVE = ['cat', 'cat-edit', 'rule', 'cat-trend', 'account', 'tx'];
+const LIVE = ['cat', 'cat-edit', 'rule', 'cat-trend', 'account', 'tx', 'import'];
 export function refreshOpenSheet() {
   const d = sheet();
   if (!d.open || !A.sheet || !LIVE.includes(A.sheet.kind) || !drawers[A.sheet.kind]) return;
@@ -121,9 +121,10 @@ const BACK = '<path d="M15 5l-7 7 7 7"/>';
 export const sheetHead = (title, right = '') => `<div class="sheet-head"><button type="button" class="btn small back-btn" data-action="sheet-back" aria-label="Back">${svg(BACK)}<span>Back</span></button><h2>${esc(title)}</h2><div class="sheet-right">${right}</div></div>`;
 
 let toastTimer;
-export function toast(message, undo) {
+/** A short message; with a function, it gets a button (Undo, or another label like Report). */
+export function toast(message, undo, label = 'Undo') {
   const el = toastEl(), d = sheet();
-  el.innerHTML = `<span>${esc(message)}</span>${undo ? '<button type="button" data-action="undo">Undo</button>' : ''}`;
+  el.innerHTML = `<span>${esc(message)}</span>${undo ? `<button type="button" data-action="undo">${esc(label)}</button>` : ''}`;
   el.hidden = false;
   A.undo = undo || null;
   clearTimeout(toastTimer);
@@ -136,7 +137,7 @@ export function send(promise) {
   promise.catch(e => {
     A.logProblem?.(e?.code === 'permission-denied' ? 'refused-save' : 'failed-save', e?.code || e?.message || 'Save failed');
     const why = e?.code === 'permission-denied' ? "That change was refused. Check that you're on the latest version." : "That change didn't save. Check your connection and try again.";
-    toast(why);
+    failed(why);
   });
 }
 
@@ -149,4 +150,12 @@ export function downloadFile(name, text, type = 'text/csv') {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+/**
+ * Something didn't work: say so, with a Report button that opens Send feedback already saying
+ * what failed. The feedback popup registers itself here, so this file doesn't depend on it.
+ */
+export function failed(message) {
+  toast(message, A.openFeedback ? () => A.openFeedback({ about: message }) : undefined, 'Report');
 }

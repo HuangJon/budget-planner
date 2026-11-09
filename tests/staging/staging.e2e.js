@@ -22,6 +22,7 @@ const auth = getAuth(), db = getFirestore();
 const OWNER = { uid: 'stagingOwnerTestAccount01', email: 'staging-owner@example.com' };
 const PERSON = { uid: 'stagingPersonTestAccount01', email: 'staging-person@example.com' };
 const password = randomBytes(12).toString('hex');
+const REPORT = 'Staging test report: please ignore';
 const check = what => console.log(`ok - ${what}`);
 
 async function freshAccount({ uid, email }, displayName) {
@@ -33,8 +34,10 @@ async function cleanUp() {
     const list = await db.collection(`users/${uid}/budgets`).get().catch(() => ({ docs: [] }));
     for (const d of list.docs) await db.recursiveDelete(db.doc(`budgets/${d.id}`));
     await db.recursiveDelete(db.doc(`users/${uid}`)).catch(() => {});
+    for (const d of (await db.collection('reports').where('text', '==', REPORT).get().catch(() => ({ docs: [] }))).docs) await d.ref.delete();
     await auth.deleteUser(uid).catch(() => {});
   }
+  await db.doc(`developers/${OWNER.uid}`).delete().catch(() => {});
 }
 
 const browser = await chromium.launch();
@@ -43,6 +46,8 @@ try {
   await cleanUp();
   await freshAccount(PERSON, 'Staging Person');
   await freshAccount(OWNER, 'Staging Owner');
+  // The owner is listed in the database, the same way the real developer is on the live app.
+  await db.doc(`developers/${OWNER.uid}`).set({ note: 'staging test owner' });
 
   const context = await browser.newContext({ viewport: { width: 430, height: 900 } });
   await context.addInitScript(() => localStorage.setItem('wmm:tourDone', '1'));
@@ -84,6 +89,15 @@ try {
   assert.equal(saved[0].data().amount, 1234);
   check('spending saves to the real database in whole cents');
 
+  // Reporting a problem, with the person's own email.
+  await page.locator('[data-action=account]').first().click();
+  await page.locator('[data-action=feedback-open]').click();
+  await page.locator('#reportText').fill(REPORT);
+  await page.locator('#reportEmail').check();
+  await page.locator('[data-action=report-send]').click();
+  await page.getByText('Sent. Thank you.').waitFor({ timeout: 20000 });
+  check('a person reports a problem through the real rules');
+
   // The owner sees counts, and the page works with the owner's real account.
   const ownerContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
   await ownerContext.addInitScript(() => localStorage.setItem('wmm:tourDone', '1'));
@@ -92,10 +106,24 @@ try {
   await ownerPage.locator('#authEmail').fill(OWNER.email);
   await ownerPage.locator('#authPassword').fill(password);
   await ownerPage.locator('[data-action=auth-in]').click();
+  await ownerPage.getByText('No budgets yet').waitFor({ timeout: 30000 });
+  await ownerPage.locator('[data-action=account]').first().click();
+  await ownerPage.locator('a.owner-link').click({ timeout: 30000 });
   await ownerPage.locator('.owner-counts').waitFor({ timeout: 30000 });
   const budgets = Number(await ownerPage.locator('.owner-counts > div').nth(1).locator('.big-amt').innerText());
   assert.ok(budgets >= 1, 'the owner sees the budget count');
-  check('the owner account opens straight to the owner page, with counts');
+  check('the owner opens Usage and feedback from settings and sees the counts');
+  const reported = ownerPage.locator('li', { hasText: REPORT });
+  await reported.waitFor({ timeout: 20000 });
+  assert.ok(await reported.getByText(`Reply to ${PERSON.email}`).count(), 'the email they chose to include shows');
+  await reported.locator('[data-action=report-done]').click();
+  for (let i = 0; i < 20; i += 1) {
+    const docs = (await db.collection('reports').where('text', '==', REPORT).get()).docs;
+    if (docs[0]?.data().done) break;
+    if (i === 19) assert.fail('Marking the report fixed did not save');
+    await new Promise(r => setTimeout(r, 500));
+  }
+  check('the owner reads the report and marks it fixed');
   await ownerPage.goto(`${SITE}/#b-${ids[0]}`);
   await ownerPage.getByText("This budget can't be opened").waitFor({ timeout: 30000 });
   check("the owner can't open someone else's budget");

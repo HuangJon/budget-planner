@@ -4,7 +4,7 @@
  * Also reachable from the budget page: "+ Add category" under each group, and from a category's sheet.
  */
 import { A, actions, changes, render } from './state.js';
-import { esc, svg, openSheet, sheetHead, toast, send, val, openChild, registerSheet } from './dom.js';
+import { esc, svg, openSheet, sheetHead, toast, failed, send, val, openChild, registerSheet } from './dom.js';
 import { groupedCategories } from '../core/budget.js';
 import { LIMITS } from '../config/app.js';
 
@@ -188,7 +188,7 @@ actions['cat-delete'] = async el => {
     if (moveTo) toast(`Deleted ${c.name}. Everything moved to ${b.categories[moveTo].name}.`);
     else toast(`Deleted ${c.name}`, () => { send(A.repo.updateCategory(b.id, id, c)); redraw(); });
     redraw();
-  } catch { el.disabled = false; toast("Couldn't delete it. Check your connection and try again."); }
+  } catch { el.disabled = false; failed("Couldn't delete it. Check your connection and try again."); }
 };
 
 /* From the budget page and a category's sheet */

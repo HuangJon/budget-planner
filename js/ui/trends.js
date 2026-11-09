@@ -8,9 +8,10 @@ import { esc, svg, fmtMonth, fmtDate, today, toast, send, openSheet, closeSheet,
 import { monthBar, writeAssigned, catSheet } from './budget.js';
 import {
   monthTotals, categoryCompare, notableChanges, planVsReal, savingThisMonth, targetProgress,
-  pace, upcomingBills, categoryHistory, biggestPurchases, byPerson, categoryTotals, headlines, rangeMonths,
+  pace, upcomingBills, categoryHistory, biggestPurchases, byPerson, categoryTotals, headlines, rangeMonths, byYear, byQuarter, firstMonth,
 } from '../core/trends.js';
 import { money } from '../core/money.js';
+import { addMonths } from '../core/budget.js';
 
 const short = m => new Date(`${m}-15T12:00:00`).toLocaleDateString('en', { month: 'short' });
 const pct = (a, b) => (b > 0 ? Math.min(100, Math.round((a / b) * 100)) : 0);
@@ -23,9 +24,19 @@ const store = (key, fallback) => { try { const v = localStorage.getItem(key); re
 const keep = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch { A[`mem:${key}`] = value; } };
 const range = () => store('wmm:trendsRange', '6');
 // Summary, Pace and Coming up start open; the rest start folded so the page opens short.
-const folded = () => store('wmm:trendsFolded', ['where', 'changes', 'months', 'categories', 'biggest', 'plan', 'saving', 'people']);
-const RANGES = [['3', '3 months'], ['6', '6 months'], ['12', '12 months'], ['year', 'This year']];
-const rangeLabel = (r, month) => (r === 'year' ? `${month.slice(0, 4)} so far` : `last ${r} months`);
+const folded = () => store('wmm:trendsFolded', ['where', 'changes', 'months', 'categories', 'biggest', 'plan', 'saving', 'limits', 'people']);
+const RANGES = [['3', 'Last 3 months'], ['6', 'Last 6 months'], ['12', 'Last 12 months'], ['year', 'This year'], ['24', 'Last 2 years'], ['36', 'Last 3 years'], ['60', 'Last 5 years'], ['all', 'All time'], ['custom', 'Pick months…']];
+const monthShort = m => new Date(`${m}-15T12:00:00`).toLocaleDateString('en', { month: 'short', year: 'numeric' });
+const rangeLabel = (r, month, months) => (r === 'year' ? `${month.slice(0, 4)} so far`
+  : r === 'all' ? 'all time'
+  : r === 'custom' ? `${monthShort(months[0])} to ${monthShort(months.at(-1))}`
+  : Number(r) >= 24 ? `last ${Number(r) / 12} years` : `last ${r} months`);
+/** The months the chosen range covers, with what each kind of range needs. */
+const custom = () => store('wmm:trendsCustom', null);
+const rangeFor = (r, list) => {
+  const c = custom() || { from: addMonths(A.month, -11), to: A.month };
+  return rangeMonths(r, A.month, { first: firstMonth(list), from: c.from, to: c.to });
+};
 
 function section(key, title, body, right = '') {
   const isFolded = folded().includes(key);
@@ -97,27 +108,68 @@ function changesBody(list, c) {
   </li>`).join('')}</ul>`;
 }
 
-function rangePicker() {
-  const r = range();
-  return `<div class="seg range-seg" role="group" aria-label="Time range">${RANGES.map(([k, label]) => `<button type="button" data-action="trend-range" data-id="${k}" aria-pressed="${r === k}">${label}</button>`).join('')}</div>`;
+/**
+ * The three ranges people use most are one tap; everything else (this year, years, all time,
+ * picked months) sits in "More", which shows the choice once one is made.
+ */
+const QUICK = [['3', '3 mo'], ['6', '6 mo'], ['12', '12 mo']];
+function rangePicker(months) {
+  const r = range(), more = !QUICK.some(([k]) => k === r);
+  return `<div class="range-pick">
+    <div class="seg range-seg" role="group" aria-label="Time range">${QUICK.map(([k, label]) => `<button type="button" data-action="trend-range" data-id="${k}" aria-pressed="${r === k}">${label}</button>`).join('')}<label class="more-range ${more ? 'on' : ''}"><span>${more ? esc(RANGES.find(([k]) => k === r)?.[1].replace(/^Last /, '').replace('…', '') || 'More') : 'More'} ▾</span><select aria-label="More time ranges" data-change="trend-range">${more ? '' : '<option value="" selected disabled>More ranges</option>'}${RANGES.filter(([k]) => !QUICK.some(([q]) => q === k)).map(([k, label]) => `<option value="${k}" ${r === k ? 'selected' : ''}>${label}</option>`).join('')}</select></label></div>
+    ${r === 'custom' ? `<div class="range-custom"><label><span class="label">From</span><input type="month" value="${months[0]}" max="${months.at(-1)}" data-change="trend-from"></label><label><span class="label">To</span><input type="month" value="${months.at(-1)}" min="${months[0]}" data-change="trend-to"></label></div>` : ''}
+  </div>`;
+}
+
+/**
+ * The whole range at a glance: what came in, went out and was left over, the share of income
+ * kept, monthly averages, and how that compares with the same stretch just before.
+ */
+const dollars = c => `$${Math.round(Math.abs(c) / 100).toLocaleString('en-US')}`;
+function overview(rows, before, label) {
+  const sum = (list, k) => list.reduce((a, r) => a + r[k], 0);
+  const active = rows.filter(r => r.income || r.spent);
+  if (!active.length) return '';
+  const income = sum(rows, 'income'), spent = sum(rows, 'spent'), left = income - spent;
+  const kept = income > 0 ? Math.round((left / income) * 100) : null;
+  const n = active.length;
+  const prev = before.filter(r => r.income || r.spent);
+  const prevSpent = prev.length ? sum(prev, 'spent') / prev.length : null;
+  const change = prevSpent ? Math.round(((spent / n - prevSpent) / prevSpent) * 100) : null;
+  // A month still under way isn't a fair "best", so only finished months count.
+  const done = active.filter(r => r.month < today().slice(0, 7));
+  const best = done.length ? done.reduce((a, r) => (r.income - r.spent > a.income - a.spent ? r : a)) : null;
+  return `<div class="overview">
+    <div class="ov-grid">
+      <div><span class="label">Came in</span><span class="amt owed">${dollars(income)}</span><span class="tiny muted">${dollars(income / n)} a month</span></div>
+      <div><span class="label">Spent</span><span class="amt owe">${dollars(spent)}</span><span class="tiny muted">${dollars(spent / n)} a month</span></div>
+      <div><span class="label">${left >= 0 ? 'Left over' : 'Short'}</span><span class="amt ${left < 0 ? 'owe' : 'left'}">${dollars(left)}</span><span class="tiny muted">${kept !== null && left >= 0 ? `${kept}% of what came in` : 'more out than in'}</span></div>
+    </div>
+    <p class="small muted">${esc(label[0].toUpperCase() + label.slice(1))}${n < rows.length ? ` (${n} month${n === 1 ? '' : 's'} with activity)` : ''}.${change !== null && Math.abs(change) >= 5 ? ` Spending is ${change > 0 ? 'up' : 'down'} ${Math.abs(change)}% a month on the stretch before.` : prevSpent !== null ? ' Spending is about the same as the stretch before.' : ''}${best && done.length > 1 && best.income - best.spent > 0 ? ` Most left over: ${esc(fmtMonth(best.month))}.` : ''}</p>
+  </div>`;
 }
 
 function monthByMonth(rows) {
-  const max = Math.max(...rows.flatMap(r => [r.income, r.spent]), 1);
+  // Rows are months ('2026-03'), quarters ('2026-Q1') or years ('2026') for longer ranges.
+  const key = rows[0]?.month || '';
+  const unit = key.length === 4 ? 'year' : key.includes('Q') ? 'quarter' : 'month';
+  const lab = m => (unit === 'year' ? m : unit === 'quarter' ? `${m.slice(5)} ’${m.slice(2, 4)}` : short(m));
+  const full = m => (unit === 'year' ? m : unit === 'quarter' ? `${m.slice(5)} ${m.slice(0, 4)}` : fmtMonth(m));
+  const max = Math.max(...rows.flatMap(r => [r.income, r.spent, Math.abs(r.income - r.spent)]), 1);
   const picked = rows.find(r => r.month === A.trendsCol) || rows.at(-1);
   const avg = k => Math.round(rows.reduce((a, r) => a + r[k], 0) / Math.max(1, rows.filter(r => r.income || r.spent).length));
-  return `<div class="cols ${rows.length > 6 ? 'many' : ''}" role="group" aria-label="Income and spending by month">${rows.map(r => `<button type="button" class="col ${r.month === picked.month ? 'picked' : ''}" data-action="trend-col" data-id="${r.month}" aria-pressed="${r.month === picked.month}" aria-label="${esc(fmtMonth(r.month))}: ${money(r.income)} in, ${money(r.spent)} spent">
-      <span class="col-bars"><i class="in" style="height:${pct(r.income, max)}%"></i><i class="out" style="height:${pct(r.spent, max)}%"></i></span>
-      <span class="tiny muted">${short(r.month)}</span>
+  return `<div class="cols ${rows.length > 6 ? 'many' : ''}" role="group" aria-label="Income and spending by ${unit}">${rows.map(r => `<button type="button" class="col ${r.month === picked.month ? 'picked' : ''}" data-action="trend-col" data-id="${r.month}" aria-pressed="${r.month === picked.month}" aria-label="${esc(full(r.month))}: ${money(r.income)} in, ${money(r.spent)} spent, ${money(Math.abs(r.income - r.spent))} ${r.income - r.spent >= 0 ? 'left over' : 'short'}">
+      <span class="col-bars"><i class="in" style="height:${pct(r.income, max)}%"></i><i class="out" style="height:${pct(r.spent, max)}%"></i><i class="${r.income - r.spent >= 0 ? 'left' : 'short'}" style="height:${pct(Math.abs(r.income - r.spent), max)}%"></i></span>
+      <span class="tiny muted">${lab(r.month)}</span>
     </button>`).join('')}</div>
-    <div class="legend small"><span><i class="in"></i>Came in</span><span><i class="out"></i>Spent</span></div>
+    <div class="legend small"><span><i class="in"></i>Came in</span><span><i class="out"></i>Spent</span><span><i class="left"></i>Left over</span>${rows.some(r => r.income < r.spent) ? '<span><i class="short"></i>Short</span>' : ''}</div>
     <div class="col-detail" aria-live="polite">
-      <strong>${esc(fmtMonth(picked.month))}</strong>
+      <strong>${esc(full(picked.month))}</strong>
       <div class="row between"><span class="muted">Came in</span><span class="amt owed">+${money(picked.income)}</span></div>
       <div class="row between"><span class="muted">Spent</span><span class="amt owe">−${money(picked.spent)}</span></div>
-      <div class="row between"><span class="muted">${picked.income - picked.spent >= 0 ? 'Left over' : 'Short'}</span><span class="amt ${picked.income - picked.spent < 0 ? 'owe' : ''}">${money(Math.abs(picked.income - picked.spent))}</span></div>
+      <div class="row between"><span class="muted">${picked.income - picked.spent >= 0 ? 'Left over' : 'Short'}</span><span class="amt ${picked.income - picked.spent < 0 ? 'owe' : 'left'}">${money(Math.abs(picked.income - picked.spent))}</span></div>
     </div>
-    <p class="tiny muted">Tap a month to see its numbers. On average: ${money(avg('income'))} in and ${money(avg('spent'))} spent a month.</p>`;
+    <p class="tiny muted">Tap a ${unit} to see its numbers. On average: ${money(avg('income'))} in and ${money(avg('spent'))} spent a ${unit}.</p>`;
 }
 
 function categoriesOverTime(rows, months, label) {
@@ -130,8 +182,8 @@ function categoriesOverTime(rows, months, label) {
     </button></li>`).join('')}</ul>${rows.length > 12 ? `<p class="tiny muted">And ${rows.length - 12} smaller ones.</p>` : ''}`;
 }
 
-function biggest(list, b) {
-  if (!list.length) return '<p class="small muted">No purchases this month yet.</p>';
+function biggest(list, b, wide) {
+  if (!list.length) return `<p class="small muted">No purchases ${wide ? 'in this time' : 'this month yet'}.</p>`;
   return `<ul class="tx-mini">${list.map(t => `<li><button type="button" class="tap tx-row" data-action="edit-tx" data-id="${t.id}"><span class="grow stack tight"><strong class="wrap-any two-lines">${esc(t.description || 'Spending')}</strong><span class="tiny muted">${esc(b.categories[t.categoryId]?.name || 'Removed category')} · ${fmtDate(t.date)}</span></span><span class="amt owe">−${money(t.amount)}</span></button></li>`).join('')}</ul>`;
 }
 
@@ -144,24 +196,37 @@ function planReal(rows) {
   </li>`).join('')}</ul>`;
 }
 
-function saving(s, targets) {
-  const rate = s.rate === null ? '' : `<p><span class="big-amt amt">${Math.round(s.rate * 100)}%</span> <span class="muted">of this month's income is planned for saving</span></p><p class="small muted">${money(s.saved)} of ${money(s.income)}, counting categories in groups that start with “Sav”.</p>`;
-  return `${rate || '<p class="small muted">Add this month’s income to see how much of it goes to saving.</p>'}
-    ${targets.length ? `<ul class="cmp-list">${targets.map(t => `<li>
+/** Progress bars for yearly limits and save-by-a-date goals. */
+const targetBars = targets => `<ul class="cmp-list">${targets.map(t => `<li>
       <div class="row between"><span class="wrap-any">${esc(t.name)}</span><span class="small muted nowrap">${money(Math.max(0, t.done))} of ${money(t.amount)}</span></div>
       <div class="cmp-track ${t.type === 'byDate' ? 'save' : ''}" aria-hidden="true"><i style="width:${pct(Math.max(0, t.done), t.amount)}%"></i></div>
       <span class="tiny muted">${t.type === 'yearly' ? 'Spent this year' : `Saved toward ${esc(fmtMonth(t.date))}`}</span>
-    </li>`).join('')}</ul>` : ''}`;
+    </li>`).join('')}</ul>`;
+
+/** Only categories in a saving group ("Saving for", "Savings"…): what's planned for saving, and their goals. */
+function saving(s, targets) {
+  const rate = s.rate === null ? '' : `<p><span class="big-amt amt">${Math.round(s.rate * 100)}%</span> <span class="muted">of this month's income is planned for saving</span></p><p class="small muted">${money(s.saved)} of ${money(s.income)}, counting categories in groups that start with “Sav”.</p>`;
+  return `${rate || '<p class="small muted">Add this month’s income to see how much of it goes to saving.</p>'}
+    ${targets.length ? targetBars(targets) : ''}`;
 }
 
-function people(b, list) {
+/** Spending categories with a yearly limit (like Clothes) or a goal by a date (like Gifts for December). */
+const limits = targets => `<p class="small muted">Spending categories with a yearly limit or a goal by a date.</p>${targetBars(targets)}`;
+
+/** "This month" or the range chosen above, for sections where both make sense. */
+const spans = () => store('wmm:trendsSpan', {});
+const spanOf = key => spans()[key] || 'month';
+const spanPicker = (key, label) => `<div class="seg span-seg" role="group" aria-label="Which months"><button type="button" data-action="trend-span" data-id="${key}" data-span="month" aria-pressed="${spanOf(key) === 'month'}">This month</button><button type="button" data-action="trend-span" data-id="${key}" data-span="range" aria-pressed="${spanOf(key) === 'range'}">${esc(label[0].toUpperCase() + label.slice(1))}</button></div>`;
+actions['trend-span'] = el => { keep('wmm:trendsSpan', { ...spans(), [el.dataset.id]: el.dataset.span }); render(); };
+
+function people(b, list, months, label) {
   const on = Boolean(b.settings?.byPerson);
   const admin = Boolean(b.members?.[A.user?.uid]?.admin);
   if (!on && !admin) return '';
-  const rows = on ? byPerson(b, list, A.month) : [];
+  const rows = on ? byPerson(b, list, spanOf('people') === 'range' ? months : A.month) : [];
   const total = rows.reduce((a, r) => a + r.spent, 0);
   const body = `${admin ? `<label class="form-row switch-row bordered"><span class="form-row-label">Show spending by person</span><input type="checkbox" role="switch" data-change="trend-byperson" ${on ? 'checked' : ''}></label><p class="tiny muted">Everyone in this budget will see it. Repeats added automatically aren't counted for anyone.</p>` : ''}
-    ${on ? (rows.length ? `<ul class="cmp-list">${rows.map(r => `<li><div class="row between"><span>${esc(r.uid === A.user?.uid ? 'You' : r.name)}</span><span class="amt">${money(r.spent)}</span></div><div class="cmp-track neutral" aria-hidden="true"><i style="width:${pct(r.spent, total)}%"></i></div><span class="tiny muted">${pct(r.spent, total)}% of spending added</span></li>`).join('')}</ul>` : '<p class="small muted">No spending added this month yet.</p>') : ''}`;
+    ${on ? spanPicker('people', label) : ''}${on ? (rows.length ? `<ul class="cmp-list">${rows.map(r => `<li><div class="row between"><span>${esc(r.uid === A.user?.uid ? 'You' : r.name)}</span><span class="amt">${money(r.spent)}</span></div><div class="cmp-track neutral" aria-hidden="true"><i style="width:${pct(r.spent, total)}%"></i></div><span class="tiny muted">${pct(r.spent, total)}% of spending added</span></li>`).join('')}</ul>` : '<p class="small muted">No spending added this month yet.</p>') : ''}`;
   return section('people', 'By person', body);
 }
 
@@ -169,15 +234,20 @@ export function trendsScreen(b) {
   const list = A.transactions[b.id] || [];
   const now = today();
   const r = range();
-  const months = rangeMonths(r, A.month);
+  const months = rangeFor(r, list);
   const compare = categoryCompare(b, list, A.month, now);
-  const all = monthTotals(list, A.month, months.length);
+  const all = monthTotals(list, months.at(-1), months.length);
   const first = all.findIndex(x => x.income || x.spent);
   const totals = first > 0 && all.length - first >= 2 ? all.slice(first) : all;
   const enough = all.filter(x => x.income || x.spent).length;
   const isNow = A.month === now.slice(0, 7);
   const shared = Object.keys(b.members || {}).length > 1;
-  const label = rangeLabel(r, A.month);
+  const label = rangeLabel(r, A.month, months);
+  const targets = targetProgress(b, list, A.month);
+  // The same length of time just before, to compare against (nothing comes before "all time").
+  const before = r === 'all' ? [] : monthTotals(list, addMonths(months[0], -1), months.length);
+  // Columns stay wide enough to read and tap: months up to a year, quarters up to three years, then years.
+  const chart = totals.length > 36 ? byYear(totals) : totals.length > 12 ? byQuarter(totals) : totals;
   return `${monthBar()}
     ${enough < 2 ? '<p class="notice">Trends get more useful after a month or two of spending. Here’s what there is so far.</p>' : ''}
     ${summary(headlines(b, list, A.month, now), A.month)}
@@ -185,12 +255,13 @@ export function trendsScreen(b) {
     ${isNow ? section('bills', 'Coming up', billsBody(upcomingBills(b, list, now), b)) : ''}
     ${section('where', 'Where it went', whereItWent(compare), money(compare.total))}
     ${section('changes', 'Worth a look', changesBody(notableChanges(compare), compare))}
-    ${section('months', 'Month by month', rangePicker() + monthByMonth(totals))}
-    ${section('categories', 'Categories over time', rangePicker() + categoriesOverTime(categoryTotals(b, list, months), months, label), `<span class="small muted">${esc(label)}</span>`)}
-    ${section('biggest', 'Biggest purchases', biggest(biggestPurchases(list, A.month), b))}
+    ${section('months', 'Over time', rangePicker(months) + overview(totals, before, label) + monthByMonth(chart))}
+    ${section('categories', 'Categories over time', rangePicker(months) + categoriesOverTime(categoryTotals(b, list, months), months, label), `<span class="small muted">${esc(label)}</span>`)}
+    ${section('biggest', 'Biggest purchases', spanPicker('biggest', label) + biggest(biggestPurchases(list, spanOf('biggest') === 'range' ? months : A.month), b, spanOf('biggest') === 'range'))}
     ${section('plan', 'Plan vs real', planReal(planVsReal(b, list, A.month)))}
-    ${section('saving', 'Saving', saving(savingThisMonth(b, list, A.month), targetProgress(b, list, A.month)))}
-    ${shared ? people(b, list) : ''}`;
+    ${section('saving', 'Saving', saving(savingThisMonth(b, list, A.month), targets.filter(t => t.saving)))}
+    ${targets.some(t => !t.saving) ? section('limits', 'Limits and goals', limits(targets.filter(t => !t.saving))) : ''}
+    ${shared ? people(b, list, months, label) : ''}`;
 }
 
 /* ---------- One category's trend ---------- */
@@ -220,7 +291,19 @@ actions['trend-fold'] = el => {
   keep('wmm:trendsFolded', list.includes(key) ? list.filter(k => k !== key) : [...list, key]);
   render();
 };
+changes['trend-range'] = el => { if (!el.value) return; keep('wmm:trendsRange', el.value); A.trendsCol = null; render(); };
 actions['trend-range'] = el => { keep('wmm:trendsRange', el.dataset.id); A.trendsCol = null; render(); };
+const setCustom = (key, value) => {
+  if (!/^\d{4}-\d{2}$/.test(value)) return;
+  const list = A.transactions[A.route.id] || [], months = rangeFor('custom', list);
+  const next = { from: months[0], to: months.at(-1), [key]: value };
+  if (next.from > next.to) next[key === 'from' ? 'to' : 'from'] = value;
+  keep('wmm:trendsCustom', next);
+  A.trendsCol = null;
+  render();
+};
+changes['trend-from'] = el => setCustom('from', el.value);
+changes['trend-to'] = el => setCustom('to', el.value);
 actions['trend-col'] = el => { A.trendsCol = el.dataset.id; render(); };
 actions['cat-trend'] = el => openChild({ kind: 'cat-trend', id: el.dataset.id }, catTrendSheet);
 actions['trend-open-cat'] = el => openChild({ kind: 'cat', budgetId: A.route.id, id: el.dataset.id, open: {} }, catSheet);

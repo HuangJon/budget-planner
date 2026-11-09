@@ -1,6 +1,6 @@
 /** Who's in a budget, inviting people by link, and leaving. */
 import { A, actions, render } from './state.js';
-import { esc, toast, send, val } from './dom.js';
+import { esc, toast, failed, send, val } from './dom.js';
 import { LIMITS } from '../config/app.js';
 
 const inviteLink = code => `${location.origin}${location.pathname}#join-${code}`;
@@ -44,7 +44,7 @@ export function peopleScreen(b) {
 
     <section class="panel pad stack">
       <h3>Privacy</h3>
-      <p class="small muted">Only the people above can see this budget in the app. The app's owner sees counts and error reports, never amounts or what you typed. They run the database, so they could technically look inside it, but the app never shows them your budget.</p>
+      <p class="small muted">Only the people above can see this budget in the app. The developer sees counts and error reports, never amounts or what you typed. They run the database, so they could technically look inside it, but the app never shows them your budget.</p>
     </section>
 
     ${admin ? (A.confirmDelete
@@ -62,7 +62,7 @@ actions['invite-reset'] = async el => {
   try {
     await A.repo.resetInvite(b.id, b.invite?.code, b.name);
     toast(b.invite?.code ? 'New link made. The old one no longer works.' : 'Invite link ready');
-  } catch { toast("Couldn't make a link. Check your connection and try again."); el.disabled = false; }
+  } catch { failed("Couldn't make a link. Check your connection and try again."); el.disabled = false; }
 };
 actions['invite-copy'] = () => {
   const box = document.getElementById('inviteLink');
@@ -138,7 +138,8 @@ actions['join-yes'] = async el => {
     render();
   } catch (e) {
     el.disabled = false;
-    toast(e?.code === 'not-found' ? 'This invite no longer works. Ask for a new link.' : "Couldn't send your request. Check your connection and try again.");
+    if (e?.code === 'not-found') toast('This invite no longer works. Ask for a new link.');
+    else failed("Couldn't send your request. Check your connection and try again.");
   }
 };
 actions['request-approve'] = el => {

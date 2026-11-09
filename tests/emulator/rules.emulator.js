@@ -10,7 +10,7 @@ import * as store from 'firebase/firestore';
 import * as authSdk from 'firebase/auth';
 import { createFirebaseBackend } from '../../js/data/backend-firebase.js';
 import { createRepository } from '../../js/data/repository.js';
-import { errorRecord } from '../../js/core/usage.js';
+import { reportRecord, errorRecord } from '../../js/core/usage.js';
 import { randomId } from '../../js/core/ids.js';
 
 const PROJECT = 'demo-wmm';
@@ -41,16 +41,20 @@ let people = 0;
 async function newPhone(email = `person${people += 1}@example.com`) {
   const backend = await createFirebaseBackend(config, phoneSdk(), quick);
   await authSdk.signInWithCredential(backend.firebaseAuth, authSdk.GoogleAuthProvider.credential(JSON.stringify({ sub: email, email, email_verified: true, name: email })));
-  return { backend, repo: createRepository(backend), uid: backend.uid() };
+  return { backend, repo: createRepository(backend), uid: backend.uid(), email };
 }
-/** The owner's account has the exact id written in firestore.rules, made through the emulator's admin door. */
+/** The owner is listed in /developers, which only an admin can write (here, the emulator's admin door). */
 async function ownerPhone() {
-  const ownerUid = readFileSync('firestore.rules', 'utf8').match(/request\.auth\.uid == '([^']+)'/)[1];
+  const ownerUid = 'ownerTestAccount01';
   const res = await fetch(`http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/projects/${PROJECT}/accounts`, {
     method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer owner' },
     body: JSON.stringify({ localId: ownerUid, email: 'owner@example.com', password: 'password1', emailVerified: true }),
   });
   assert.ok(res.ok, `could not make the owner account: ${res.status}`);
+  const listed = await fetch(`http://127.0.0.1:8181/v1/projects/${PROJECT}/databases/(default)/documents/developers/${ownerUid}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer owner' }, body: JSON.stringify({ fields: {} }),
+  });
+  assert.ok(listed.ok, `could not list the owner: ${listed.status}`);
   const backend = await createFirebaseBackend(config, phoneSdk(), quick);
   await authSdk.signInWithEmailAndPassword(backend.firebaseAuth, 'owner@example.com', 'password1');
   assert.equal(backend.uid(), ownerUid);
@@ -95,6 +99,13 @@ await no(owner.backend.get(`budgets/${B}`), "the owner can't read anyone's budge
 await no(owner.backend.list(`budgets/${B}/transactions`), "the owner can't read anyone's transactions");
 await no(carol.backend.set(`budgets/${'c'.repeat(24)}`, { ...budget, id: 'c'.repeat(24), members: { [alice.uid]: { name: 'x', admin: true, joinedAt: 1 } }, changedBy: carol.uid }), "nobody makes a budget for someone else");
 
+/* Who the owner is lives in the database, not the code, and nobody can make themselves owner. */
+assert.equal(await owner.repo.amOwner(), true, 'the owner is told they are the owner');
+assert.equal(await carol.repo.amOwner(), false, 'anyone else is told they are not');
+await no(carol.backend.set(`developers/${carol.uid}`, {}), 'nobody adds themselves as owner');
+await no(carol.backend.get(`developers/${owner.uid}`), "nobody checks whether someone else is the owner");
+await no(carol.backend.list('developers'), 'nobody lists the owners');
+
 /* The owner sees counts and error reports, nothing more. */
 const stats = await owner.repo.readStats();
 assert.equal(stats.people, 2);
@@ -109,6 +120,21 @@ await no(carol.backend.set(`errorLog/${randomId()}`, { ...report, message: 'from
 await no(carol.backend.set(`errorLog/${randomId()}`, { ...report, uid: carol.uid }), 'a report naming its account is refused');
 await no(carol.repo.listErrors(), 'only the owner reads error reports');
 assert.equal((await owner.repo.listErrors()).length, 1);
+
+/* Problems people report: their words, their own email only if they choose, read only by the owner. */
+const bug = reportRecord({ id: randomId(), text: 'Save on a repeat did nothing', screen: 'plan', version: 'wmm-v3', platform: 'iphone', at: 1 });
+await ok(carol.repo.sendReport(bug), 'anyone signed in can report a problem');
+await ok(carol.repo.sendReport({ ...bug, id: randomId(), email: carol.email }), 'with their own email if they choose');
+await no(carol.repo.sendReport({ ...bug, id: randomId(), email: 'someone@else.com' }), "not with someone else's email");
+await no(carol.repo.sendReport({ ...bug, id: randomId(), text: 'x'.repeat(1001) }), 'a report over 1,000 characters is refused');
+await no(carol.repo.sendReport({ ...bug, id: randomId(), done: true }), 'a report starts open');
+await no(carol.repo.sendReport({ ...bug, id: randomId(), uid: carol.uid }), 'nothing extra rides along');
+await no(carol.repo.sendReport({ ...bug, id: randomId(), kind: 'rant' }), 'feedback is a problem or an idea');
+await no(carol.repo.listReports(), 'only the owner reads reports');
+assert.equal((await owner.repo.listReports()).length, 2);
+await no(carol.repo.markReport(bug.id, true), 'only the owner marks a report fixed');
+await ok(owner.repo.markReport(bug.id, true), 'the owner marks it fixed');
+await no(owner.backend.update(`reports/${bug.id}`, { text: 'changed' }), "the owner can't change what someone wrote");
 
 /* Invite links: one code can be looked up, the list never. */
 const code1 = await alice.repo.resetInvite(B, null, 'Home');

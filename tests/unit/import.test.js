@@ -43,7 +43,7 @@ test('a Chase card file: purchases are spending, returns are refunds, the card p
 test('a Chase checking file: pay is income, paying the card is skipped, bills are spending', () => {
   const { format, rows } = readStatement(CHECKING);
   assert.equal(format, 'chase-checking');
-  assert.deepEqual(rows.map(r => [r.kind, r.amount, r.skip]), [['income', 250000, null], ['spend', 80000, 'transfer'], ['spend', 9210, null]]);
+  assert.deepEqual(rows.map(r => [r.kind, r.amount, r.skip]), [['income', 250000, null], ['spend', 80000, 'card'], ['spend', 9210, null]]);
 });
 
 test('other banks work with Debit and Credit columns', () => {
@@ -84,4 +84,39 @@ test('one imported then deleted can be imported again', () => {
   const rows = readStatement(CARD).rows;
   const marked = markExisting(rows, [{ id: rows[0].key, amount: rows[0].amount, kind: 'spend', date: rows[0].date, deleted: true }]);
   assert.equal(marked[0].skip, null);
+});
+
+test('an Ally file: bills tidy, card payments and transfers left out, interest is income', () => {
+  const ally = `Date, Time, Amount, Type, Description
+2026-11-09,00:57:50,-10.00,Withdrawal,SAMPLE WIRELESS PAYMENTS~ Future Amount: 10.00 ~ Tran: ACHDW
+2026-10-25,23:26:49,0.20,Deposit,Interest Paid
+2026-10-20,01:09:01,-27.85,Withdrawal,NGRID38 NGRID38WEB~ Future Amount: 27.85 ~ Tran: ACHDW
+2026-10-13,04:38:01,-107.16,Withdrawal,CHASE CREDIT CRD EPAY
+2026-10-10,18:41:17,3000.00,Deposit,Internet transfer from Savings account XXXXXX0000
+`;
+  const { rows } = readStatement(ally);
+  assert.deepEqual(rows.map(r => [r.description, r.kind, r.amount, r.skip]), [
+    ['SAMPLE WIRELESS PAYMENTS', 'spend', 1000, null],
+    ['Interest Paid', 'income', 20, null],
+    ['NGRID38 NGRID38WEB', 'spend', 2785, null],
+    ['CHASE CREDIT CRD EPAY', 'spend', 10716, 'card'],
+    ['Internet transfer from Savings account XXXXXX0000', 'income', 300000, 'transfer'],
+  ]);
+  assert.equal(guessCategory(rows[2], { u: { name: 'Utilities' } }, []), 'u');
+});
+
+test('an Ally savings file: Zelle shows who it went to, a brokerage transfer is Investing', () => {
+  const { rows } = readStatement(`Date, Time, Amount, Type, Description
+2026-11-04,16:19:15,5000.00,Deposit,SAMPLE EMPLOYER PAYROLL
+2026-10-25,21:38:58,-1000.00,Withdrawal,Zelle payment from Sam Person (Ally Savings Account XXXXXX0000) to PAT  LANDLORD
+2026-10-10,18:41:17,-3000.00,Withdrawal,Internet transfer to Spending account XXXXXX0000
+2026-09-18,12:42:54,-500.00,Withdrawal,FID BKG SVC LLC MONEYLINE
+`);
+  assert.deepEqual(rows.map(r => [r.description, r.kind, r.skip]), [
+    ['SAMPLE EMPLOYER PAYROLL', 'income', null],
+    ['Zelle to PAT LANDLORD', 'spend', null],
+    ['Internet transfer to Spending account XXXXXX0000', 'spend', 'transfer'],
+    ['FID BKG SVC LLC MONEYLINE', 'spend', null],
+  ]);
+  assert.equal(guessCategory(rows[3], { i: { name: 'Investing' }, s: { name: 'Shopping' } }, []), 'i');
 });

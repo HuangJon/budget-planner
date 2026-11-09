@@ -4,7 +4,13 @@
  */
 const WORDS = [
   [/rent|landlord|mortgage/, ['rent', 'housing', 'mortgage']],
-  [/electric|con ?ed|gas bill|water|power|utilit/, ['utilities', 'power']],
+  // Money sent to a brokerage or retirement account is investing, not spending.
+  [/fid bkg|fidelity|vanguard|schwab|robinhood|betterment|wealthfront|e\*?trade|brokerage|moneyline|\bira\b|401k/, ['investing', 'investments']],
+  // Gym and classes before Health, so a climbing gym isn't filed as a doctor's visit.
+  [/\bgym|fitness|climbing|boulder|yoga|pilates|crossfit|peloton|equinox|classpass|climbing gym/, ['fitness', 'gym', 'health']],
+  [/haircut|barber|salon|sephora|ulta|nail|\bspa\b|cosmet|skincare|toiletr/, ['personal care', 'personal']],
+  [/doctor|\bdr\.? |dental|dentist|orthodont|optical|optometr|eyeglass|\beye|pharma|cvs|walgreens|duane reade|rite aid|clinic|medical|hospital|urgent care|therap|copay|labcorp|quest diag|zocdoc|one medical/, ['medical', 'health']],
+  [/electric|con ?ed|ngrid|national grid|pseg|gas bill|water|power|utilit/, ['utilities', 'power']],
   [/phone|verizon|t-?mobile|at&t|mint mobile/, ['phone']],
   [/internet|wifi|comcast|spectrum|fios/, ['internet']],
   [/insur/, ['insurance']],

@@ -12,7 +12,9 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // The app's owner. Publishing to the staging project swaps in a test account.
-    function isOwner() { return signedIn() && request.auth.uid == 'snu95kN1t7RTs7QAkqYWIAQfHrO2'; }
+    // The owner is whoever has a document in /developers, added by hand in the Firebase console.
+    // No account id is written here, so nothing about the owner is in the public code.
+    function isOwner() { return signedIn() && exists(/databases/$(database)/documents/developers/$(request.auth.uid)); }
     function signedIn() { return request.auth != null && request.auth.token.email_verified == true; }
     function me() { return request.auth.uid; }
     function short(v, n) { return v is string && v.size() <= n; }
@@ -263,6 +265,32 @@ service cloud.firestore {
         && request.resource.data.platform in ['iphone', 'android', 'computer']
         && request.resource.data.at is number;
       allow update, delete: if false;
+    }
+
+    // Who the owner is. You can only ask about yourself, and nobody can add to it from the app.
+    match /developers/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid;
+      allow list, create, update, delete: if false;
+    }
+
+    // Feedback people send on purpose (a problem or an idea), in their own words. Their email is included only when
+    // they tick the box, and then only their own. Only the owner reads them or marks them done.
+    match /reports/{id} {
+      allow get, list: if isOwner();
+      allow create: if signedIn() && id.matches('^[a-z0-9]{10,40}$')
+        && request.resource.data.keys().hasOnly(['id', 'kind', 'text', 'email', 'screen', 'version', 'platform', 'at', 'done'])
+        && request.resource.data.keys().hasAll(['id', 'kind', 'text', 'screen', 'version', 'platform', 'at', 'done'])
+        && request.resource.data.kind in ['problem', 'idea']
+        && request.resource.data.id == id
+        && request.resource.data.text is string && request.resource.data.text.size() >= 3 && request.resource.data.text.size() <= 1000
+        && (!('email' in request.resource.data) || request.resource.data.email == request.auth.token.email)
+        && request.resource.data.screen in ['home', 'budget', 'plan', 'transactions', 'trends', 'people', 'join', 'owner', 'sign-in', 'other']
+        && short(request.resource.data.version, 20) && request.resource.data.version.matches('^[A-Za-z0-9.-]*$')
+        && request.resource.data.platform in ['iphone', 'android', 'computer']
+        && request.resource.data.at is number
+        && request.resource.data.done == false;
+      allow update: if isOwner() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['done']) && request.resource.data.done is bool;
+      allow delete: if false;
     }
   }
 }

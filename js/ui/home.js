@@ -10,12 +10,15 @@ import { LIMITS, APP_NAME, STARTER_CATEGORIES } from '../config/app.js';
 import { starterCategories } from '../data/repository.js';
 import { helpButton } from './help.js';
 
+/** Your initial in a circle: opens You and settings, on home and in every budget. */
+export const accountButton = () => `<button type="button" class="icon-btn ava-btn" data-action="account" aria-label="You and settings"><span class="ava" style="background:var(--m1)">${esc([...(A.user?.displayName || 'Y')][0].toUpperCase())}</span></button>`;
+
 export function homeScreen() {
   const all = A.budgetIds.filter(id => A.budgets[id]);
   const ids = all.filter(id => !A.budgets[id].deleted);
   const daysLeft = b => Math.max(0, RESTORE_DAYS - Math.floor((Date.now() - (b.deletedAt || 0)) / 864e5));
   const deleted = all.filter(id => A.budgets[id].deleted && A.budgets[id].members?.[A.user?.uid]?.admin && daysLeft(A.budgets[id]) > 0);
-  return `<header class="home-head"><div class="row between"><h1>${esc(APP_NAME)}</h1>${helpButton('home')}</div><p class="muted">Every dollar gets a job. Start a budget for yourself, or one to share.</p></header>
+  return `<header class="home-head"><div class="row between gap8"><h1 class="grow">${esc(APP_NAME)}</h1>${helpButton('home')}${accountButton()}</div><p class="muted">Every dollar gets a job. Start a budget for yourself, or one to share.</p></header>
     ${ids.length ? `<section class="panel">${ids.map(id => {
       const b = A.budgets[id];
       const s = summaryFor(b);
@@ -52,9 +55,13 @@ function drawNewBudget() {
     button = 'Next';
   } else if (S.step === 2) {
     body = `<h3>How much money do you have right now?</h3>
-      <p class="small muted">Add up what's in checking and savings that you want to budget. Leave out money you'd never touch, like retirement accounts.</p>
+      <ul class="small muted start-how">
+        <li><strong>Add</strong> what's in checking, and savings you want to plan with (like an emergency fund).</li>
+        <li><strong>Take off</strong> what you owe on credit cards today. It's already spent, so it isn't free to plan.</li>
+        <li><strong>Leave out</strong> retirement and investments you won't touch, and pay that hasn't arrived yet.</li>
+      </ul>
       <label class="money-in big"><span class="sr">Money you have now</span><span aria-hidden="true">$</span><input id="nbMoney" class="amount-input" inputmode="decimal" autocomplete="off" placeholder="0.00" value="${esc(S.money)}"></label>
-      <p class="small muted">It goes into Ready to assign, so you can give it jobs straight away. You can skip this and add income later.</p>`;
+      <p class="small muted">It goes into Ready to assign, so you can give it jobs straight away. Paychecks go in when they land: tap Ready to assign, then Add income, or set them to repeat.</p>`;
     button = 'Next';
   } else {
     body = `<h3>Pick your categories</h3><p class="small muted">Tap to add or remove. You can rename them and add your own any time.</p>
@@ -106,8 +113,10 @@ actions.account = () => {
       <p class="tiny muted">CSV files that open in Numbers, Excel or Google Sheets. A good backup too.</p></section>` : ''}
     <section class="panel pad stack">
       <h3>Your privacy</h3>
-      <p class="small muted">Only people in a budget can see it in the app. The app's owner sees only counts, like how many people use it, and error reports with amounts and anything you typed removed. The owner runs the database, so they could technically look inside it, but the app never shows them your budget.</p>
+      <p class="small muted">Only people in a budget can see it in the app. The developer sees only counts, like how many people use it, and error reports with amounts and anything you typed removed. The owner runs the database, so they could technically look inside it, but the app never shows them your budget.</p>
     </section>
+        ${A.isOwner ? '<a class="btn owner-link" href="#owner">Usage and feedback</a>' : ''}
+        <button type="button" class="btn" data-action="feedback-open">Send feedback</button>
         <button type="button" class="btn" data-action="sign-out">Sign out</button>
     ${A.preview ? '<button type="button" class="btn" data-action="preview-reset">Start the preview over</button>' : ''}
   </div></div>`);

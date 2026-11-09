@@ -32,6 +32,11 @@ const ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", '#39': "'" 
 /** Banks send "COFFEE &amp; DES" and runs of spaces; tidy that up. */
 export const cleanDescription = s => String(s || '')
   .replace(/&(amp|lt|gt|quot|apos|#39);/g, (_, e) => ENTITIES[e])
+  // Ally adds "~ Future Amount: 27.85 ~ Tran: ACHDW" after the name; it says nothing new.
+  .replace(/\s*~.*$/, '')
+  // "Zelle payment from PAT SMITH (Savings Account XXXX) to SAM LEE": who it went to is what matters.
+  .replace(/^zelle payment from .*?\bto\s+(.+)$/i, 'Zelle to $1')
+  .replace(/^zelle payment to\s+(.+?)\s+from\s+.*$/i, 'Zelle to $1')
   .replace(/\s+/g, ' ').trim().slice(0, 80);
 
 /** "11/04/2026", "11/4/26" or "2026-11-04" to "2026-11-04". */
@@ -53,11 +58,13 @@ const head = h => String(h || '').trim().toLowerCase();
 const find = (heads, names) => heads.findIndex(h => names.includes(h));
 
 /** Card payments and moves between your own accounts: real, but not spending or income. */
-const MOVING = /payment thank you|autopay|payment to chase card|credit crd|crd epay|card payment|online transfer|transfer (to|from)|zelle payment to .* (savings|checking)/i;
+const CARD_PAYMENT = /payment thank you|autopay|payment to chase card|credit crd|crd epay|card payment|cardmember serv|amex epayment|discover e-?payment|capital one.*pmt|citi.*autopay/i;
+const MOVING = /online transfer|internet transfer|transfer (to|from)|zelle payment to .* (savings|checking)/i;
 
 export const SKIP = {
   payment: 'Paying the card off. Your spending is already counted from the purchases.',
   transfer: 'Looks like moving money between your own accounts.',
+  card: 'Paying off a credit card. The purchases count when you import that card.',
   already: 'Looks like one that’s already in.',
   imported: 'Already imported.',
 };
@@ -98,10 +105,11 @@ export function readStatement(text) {
     let kind, skip = null;
     if (format === 'chase-card') {
       kind = signedCents < 0 ? 'spend' : 'refund';
-      if (type === 'payment' || MOVING.test(description)) skip = 'payment';
+      if (type === 'payment' || CARD_PAYMENT.test(description) || MOVING.test(description)) skip = 'payment';
     } else {
       kind = signedCents < 0 ? 'spend' : 'income';
-      if (/acct_xfer|loan_pmt/.test(type) || MOVING.test(description)) skip = 'transfer';
+      if (CARD_PAYMENT.test(description)) skip = 'card';
+      else if (/acct_xfer|loan_pmt/.test(type) || MOVING.test(description)) skip = 'transfer';
     }
     // The same purchase always gets the same id, so importing an overlapping file skips it.
     const base = [date, r[heads.indexOf('post date')] || r[heads.indexOf('posting date')] || '', description.toLowerCase(), signedCents].join('|');
@@ -152,10 +160,10 @@ const BANK = {
   automotive: ['transport', 'transportation', 'car'],
   travel: ['travel', 'transport', 'transportation'],
   'bills & utilities': ['utilities', 'bills', 'phone', 'internet'],
-  'health & wellness': ['health', 'health & wellness', 'medical', 'fitness'],
+  'health & wellness': ['medical', 'health', 'health & wellness', 'fitness'],
   entertainment: ['entertainment', 'fun'],
   shopping: ['shopping', 'clothes'],
-  personal: ['personal', 'personal care', 'shopping'],
+  personal: ['personal care', 'personal', 'shopping'],
   home: ['household', 'home'],
   'gifts & donations': ['gifts', 'giving', 'donations'],
   education: ['education', 'school'],

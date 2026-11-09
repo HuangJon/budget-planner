@@ -56,3 +56,11 @@ export function errorRecord({ id, kind, message, screen, version, platform, at }
 
 /** Which kind of device, in one word, without the details a user-agent string gives away. */
 export const platformOf = (ua = '') => (/iPhone|iPad|iPod/.test(ua) ? 'iphone' : /Android/.test(ua) ? 'android' : 'computer');
+
+/** Feedback someone sends: a problem or an idea, their words (up to 1,000 characters), their email only if they chose. */
+export function reportRecord({ id, kind, text, email, screen, version, platform, at }) {
+  const r = errorRecord({ id, kind: 'app-error', message: '', screen, version, platform, at });
+  const out = { id, kind: kind === 'idea' ? 'idea' : 'problem', text: String(text || '').trim().slice(0, 1000), screen: r.screen, version: r.version, platform: r.platform, at, done: false };
+  if (email) out.email = email;
+  return out;
+}

@@ -4,7 +4,7 @@
  * When you add a file under css/ or js/, add it to APP_FILES (a unit test checks this), and bump
  * CACHE together with APP_VERSION in js/config/app.js for every release.
  */
-const CACHE = 'wmm-v2';
+const CACHE = 'wmm-v3';
 const APP_FILES = [
   './', './index.html', './manifest.webmanifest',
   './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png',
@@ -47,6 +47,7 @@ const APP_FILES = [
   './js/ui/tour.js',
   './js/ui/tx-form.js',
   './js/ui/import.js',
+  './js/ui/report.js',
   './js/ui/updates.js',
 ];
 /** The database code and fonts come from Google and have to work offline too. */

@@ -75,6 +75,11 @@ export function createLocalBackend({ delay = 25, area = safeStorage(), user = { 
       docs = next; persist();
       for (const path of new Set(writes.map(w => w.path))) emit(path);
     },
+    async list(col, { orderBy, limit } = {}) {
+      let out = docsIn(col);
+      if (orderBy) out.sort((a, b) => (a[orderBy] > b[orderBy] ? 1 : a[orderBy] < b[orderBy] ? -1 : 0));
+      return limit ? out.slice(0, limit) : out;
+    },
     watchDoc(path, cb) {
       queueMicrotask(() => cb(clone(docs[path]) ?? null));
       return add(docWatchers, path, cb);

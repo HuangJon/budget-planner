@@ -1,7 +1,7 @@
 /** Tunable values and lists. Nothing here touches the page or storage. */
 export const SCHEMA_VERSION = 1;
 /** Shown on the owner page and in error reports; bump with the offline cache in sw.js. */
-export const APP_VERSION = 'wmm-v2';
+export const APP_VERSION = 'wmm-v3';
 export const APP_NAME = "Where's my money";
 export const CURRENCY = 'USD';
 
@@ -17,8 +17,10 @@ export const STARTER_CATEGORIES = [
   ] },
   { group: 'Everyday', items: [
     { name: 'Groceries', on: true }, { name: 'Eating out', on: true }, { name: 'Transport', on: true },
-    { name: 'Household', on: true }, { name: 'Health', on: true }, { name: 'Personal care' },
-    { name: 'Pets' }, { name: 'Kids' },
+    { name: 'Household', on: true }, { name: 'Pets' }, { name: 'Kids' },
+  ] },
+  { group: 'Health', items: [
+    { name: 'Medical', on: true }, { name: 'Fitness', on: true }, { name: 'Personal care', on: true },
   ] },
   { group: 'Fun', items: [
     { name: 'Entertainment', on: true }, { name: 'Shopping', on: true }, { name: 'Clothes' },
