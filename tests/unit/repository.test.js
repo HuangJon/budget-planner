@@ -194,3 +194,21 @@ test('a batch that fails changes nothing', async () => {
   await assert.rejects(backend.batch([{ op: 'update', path: 'a/1', value: { x: 2 } }, { op: 'update', path: 'a/missing', value: { y: 1 } }]));
   assert.equal((await backend.get('a/1')).x, 1);
 });
+
+test('importing saves each bank line once, and taking it back out only marks them', async () => {
+  const { backend, repo } = fresh();
+  const { budget, written } = repo.createBudget({ name: 'Mine', categories: { a: { name: 'A' } } });
+  await written;
+  const list = Array.from({ length: 230 }, (_, i) => ({ id: `i-x${i}`, kind: 'spend', amount: 100 + i, date: '2026-11-02', description: `Shop ${i}`, categoryId: 'a' }));
+  await repo.importTransactions(budget.id, list);
+  let got;
+  repo.watchTransactions(budget.id, l => { got = l; });
+  await new Promise(r => setTimeout(r));
+  assert.equal(got.length, 230);
+  await repo.unimport(budget.id, list.map(t => t.id));
+  assert.equal((await backend.get(`budgets/${budget.id}/transactions/i-x5`)).deleted, true);
+  await repo.importTransactions(budget.id, [{ ...list[5], categoryId: 'a' }], new Set(['i-x5']));
+  const back = await backend.get(`budgets/${budget.id}/transactions/i-x5`);
+  assert.equal(back.deleted, false);
+  assert.ok(back.createdAt, 'brought back, not made again');
+});

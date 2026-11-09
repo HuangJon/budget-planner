@@ -22,7 +22,7 @@ export function openTxForm(budgetId, editing = null, preset = {}) {
   if (!editing) document.getElementById('fAmount')?.focus();
 }
 
-const catOptions = (b, selected) => `<option value="" ${selected ? '' : 'selected'} disabled>Pick one</option>${groupedCategories(b).map(g => `<optgroup label="${esc(g.name)}">${g.categories.map(c => `<option value="${c.id}" ${c.id === selected ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</optgroup>`).join('')}${selected && b.categories[selected]?.hidden ? `<option value="${selected}" selected>${esc(b.categories[selected].name)} (hidden)</option>` : ''}`;
+export const catOptions = (b, selected) => `<option value="" ${selected ? '' : 'selected'} disabled>Pick one</option>${groupedCategories(b).map(g => `<optgroup label="${esc(g.name)}">${g.categories.map(c => `<option value="${c.id}" ${c.id === selected ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</optgroup>`).join('')}${selected && b.categories[selected]?.hidden ? `<option value="${selected}" selected>${esc(b.categories[selected].name)} (hidden)</option>` : ''}`;
 
 /** Your most used description and category pairs from the last 90 days, most frequent first. */
 export function frequentSpending(b, list, limit = 6) {

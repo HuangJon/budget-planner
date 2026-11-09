@@ -346,6 +346,44 @@ await tap('a.tab[href$="-activity"]');
 await page.locator('[data-action=open-rule]', { hasText: 'Side job' }).locator('text=every other').waitFor();
 await tap('a.tab[href^="#b-"]:not([href$="-activity"])');
 
+// Importing a bank file: made-up rows in Chase's card layout.
+const CSV = ['Transaction Date,Post Date,Description,Category,Type,Amount,Memo',
+  '11/04/2026,11/05/2026,SAMPLE NOODLE BAR,Food & Drink,Sale,-23.45,',
+  '11/03/2026,11/04/2026,MYSTERY SHOP 99,,Sale,-10.00,',
+  '11/03/2026,11/04/2026,MYSTERY SHOP 99,,Sale,-5.00,',
+  '11/02/2026,11/02/2026,SAMPLE CLOTHES,Shopping,Return,40.00,',
+  '11/01/2026,11/01/2026,Payment Thank You-Mobile,,Payment,500.00,'].join('\n');
+await page.goto(pathToFileURL(resolve('preview-test.html')).href + '#home');
+await tap('a.budget-row');
+await tap('a.tab[href$="-activity"]');
+await tap('[data-action=open-import]');
+await page.locator('#importFile').setInputFiles({ name: 'Chase_Activity.CSV', mimeType: 'text/csv', buffer: Buffer.from(CSV) });
+await page.locator('.import-row').first().waitFor();
+if ((await page.locator('.import-row').count()) !== 4) fail('The card payment should be left out of the list');
+await page.getByText('2 still need a category').waitFor();
+await page.locator('[data-action=import-save]').click();
+await page.getByText('Pick a category for each one').waitFor();
+await page.locator('.import-row', { hasText: 'MYSTERY SHOP' }).first().locator('select').selectOption({ label: 'Clothes' });
+await page.getByText('Also set 1 more').waitFor();
+await page.locator('.import-row', { hasText: 'MYSTERY SHOP' }).nth(1).locator('select').evaluate(el => { if (el.selectedOptions[0].text !== 'Clothes') throw new Error('One choice should fill the rest from the same place'); });
+await tap('[data-action=import-skipped]');
+await page.getByText('Paying the card off').waitFor();
+await shot('import');
+await page.locator('[data-action=import-save]', { hasText: 'Add 4' }).click();
+await page.locator('dialog[open]').waitFor({ state: 'detached' });
+await page.locator('.tx-row', { hasText: 'SAMPLE NOODLE BAR' }).waitFor();
+// The same file again: everything is already in.
+await tap('[data-action=open-import]');
+await page.locator('#importFile').setInputFiles({ name: 'again.csv', mimeType: 'text/csv', buffer: Buffer.from(CSV) });
+await page.locator('[data-action=import-save]', { hasText: 'Nothing ticked' }).waitFor();
+await tap('[data-action=sheet-back]');
+await page.locator('dialog[open]').waitFor({ state: 'detached' });
+// A PDF gets a clear message.
+await tap('[data-action=open-import]');
+await page.locator('#importFile').setInputFiles({ name: 'statement.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4') });
+await page.getByText('That’s a PDF').waitFor();
+await tap('[data-action=sheet-back]');
+
 // Every theme, on the example budget.
 await page.goto(pathToFileURL(resolve('preview-test.html')).href + '#home');
 await tap('a.budget-row');

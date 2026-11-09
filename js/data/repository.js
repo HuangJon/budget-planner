@@ -165,6 +165,25 @@ export function createRepository(backend, now = () => Date.now()) {
     deleteTransaction: (id, tid) => backend.update(txPath(id, tid), { deleted: true, deletedAt: now(), deletedBy: uid() }),
     restoreTransaction: (id, tid) => backend.update(txPath(id, tid), { deleted: false, restoredAt: now(), restoredBy: uid() }),
 
+    /**
+     * Saves reviewed rows from a bank file. Each keeps the id made from its bank line, so the same
+     * line imported again is recognised. One deleted earlier comes back instead of being made twice.
+     * Writes go in groups so a large file stays inside the database's limits.
+     */
+    async importTransactions(id, list, deletedIds = new Set()) {
+      for (let i = 0; i < list.length; i += 100) {
+        await batch(list.slice(i, i + 100).map(t => (deletedIds.has(t.id)
+          ? { op: 'update', path: txPath(id, t.id), value: { kind: t.kind, amount: t.amount, date: t.date, description: t.description, categoryId: t.categoryId ?? null, deleted: false, restoredAt: now(), restoredBy: uid() } }
+          : { op: 'set', path: txPath(id, t.id), value: { note: '', ...t, categoryId: t.categoryId ?? null, budgetId: id, createdBy: uid(), createdAt: now() } })));
+      }
+    },
+    /** Takes a whole import back out (only marks them, like any delete). */
+    async unimport(id, ids) {
+      for (let i = 0; i < ids.length; i += 100) {
+        await batch(ids.slice(i, i + 100).map(tid => ({ op: 'update', path: txPath(id, tid), value: { deleted: true, deletedAt: now(), deletedBy: uid() } })));
+      }
+    },
+
     /* ---------- Repeats ---------- */
     newRuleId: () => randomId(10),
     saveRule: (id, rule) => backend.update(budgetPath(id), { [`recurring.${rule.id}`]: rule, changedBy: uid() }),

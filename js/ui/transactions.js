@@ -23,6 +23,7 @@ export function transactionsScreen(b) {
       <div><span class="label">Came in</span><span class="amt owed">${money(s.incomeThisMonth)}</span></div>
       <div><span class="label">Spent</span><span class="amt owe">${money(spent)}</span></div>
     </section>
+    <button type="button" class="btn small import-open" data-action="open-import">Import from your bank</button>
     ${list.length ? [...days].map(([day, items]) => `<section class="stack tight"><h3 class="date-head">${fmtDate(day)}</h3><div class="panel tx-list">${items.map(t => {
       const cat = t.kind === 'income' ? 'Ready to assign' : b.categories[t.categoryId]?.name || 'Removed category';
       const who = shared ? ` · ${esc(t.createdBy === A.user?.uid ? 'You' : b.members[t.createdBy]?.name || 'Former member')}` : '';

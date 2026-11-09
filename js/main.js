@@ -10,6 +10,7 @@ import { trendsScreen } from './ui/trends.js';
 import { peopleScreen, joinScreen, openJoin } from './ui/people.js';
 import { helpButton, describe } from './ui/help.js';
 import { openTxForm } from './ui/tx-form.js';
+import './ui/import.js';
 import { openCatEditor } from './ui/cat-edit.js';
 import { createLocalBackend } from './data/backend-local.js';
 import { createFirebaseBackend, loadFirebaseSdk } from './data/backend-firebase.js';
