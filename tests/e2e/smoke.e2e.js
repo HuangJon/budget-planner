@@ -447,7 +447,16 @@ await eventually(async () => (await page.locator('#accName').inputValue()) === '
 await page.locator('#accBalance').fill('25');
 await tap('[data-action=acc-add]');
 await page.locator('dialog[open] .acc-verdict', { hasText: 'Off by $25.00' }).waitFor();
+// More in the accounts than the budget (money it doesn't know about yet): starting money can fill the gap.
 await page.locator('.acc-row', { hasText: 'Card' }).locator('[data-action=acc-remove]').click();
+await page.locator('dialog[open] .acc-verdict', { hasText: 'They match' }).waitFor();
+const chk = page.locator('.acc-row', { hasText: 'Checking' }).locator('input');
+const was = await chk.inputValue();
+await chk.fill(String((Number(was) + 40).toFixed(2)));
+await chk.dispatchEvent('change');
+await page.locator('dialog[open] .acc-verdict', { hasText: 'Off by $40.00' }).waitFor();
+await tap('dialog[open] [data-action=acc-fix-start]');
+await page.getByText('starting money of $40.00').waitFor();
 await page.locator('dialog[open] .acc-verdict', { hasText: 'They match' }).waitFor();
 await tap('[data-action=sheet-back]');
 await tap('[data-action=sheet-back]');
@@ -526,6 +535,28 @@ await page.locator('#toast [data-action=undo]', { hasText: 'Move them too' }).cl
 await eventually(async () => (await page.locator('dialog[open] .tx-row', { hasText: 'MYSTERY SHOP' }).filter({ hasText: 'Hobbies' }).count()) === 2, 'Move them too should move the other one');
 await tap('[data-action=sheet-back]');
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
+
+// Backfilling: start in October, import an October purchase into an unplanned category, then
+// Plan money offers to fill October in so nothing shows overspent.
+await tap('[data-action=account]');
+await page.locator('dialog[open] [data-change=budget-start]').fill('2026-10-01');
+await page.locator('dialog[open] [data-change=budget-start]').dispatchEvent('change');
+await page.getByText('Budget start saved').waitFor();
+await tap('[data-action=sheet-back]');
+await tap('#app [data-action=open-import]');
+await page.locator('#importFile').setInputFiles({ name: 'oct.csv', mimeType: 'text/csv', buffer: Buffer.from('Transaction Date,Post Date,Description,Category,Type,Amount,Memo\n10/20/2026,10/21/2026,BACKFILL SAMPLE,,Sale,-50.00,\n') });
+await page.locator('.import-row').first().locator('select').selectOption({ label: 'Hobbies' });
+await tap('[data-action=import-save]');
+await page.getByText('Last step').waitFor();
+await tap('[data-action=sheet-back]');
+await page.locator('dialog[open]').waitFor({ state: 'detached' });
+await page.locator('.hero-actions a.hero-btn').click();
+await page.locator('.backfill', { hasText: 'October 2026' }).waitFor();
+await shot('backfill');
+await tap('[data-action=plan-backfill]');
+await page.getByText('Filled in 1 month').waitFor();
+await page.locator('.backfill').waitFor({ state: 'detached' });
+await page.locator('.topbar a.btn').click();
 
 // Arranging categories on the budget screen: arrows, then dragging by the handle.
 await page.goto(pathToFileURL(resolve('preview-test.html')).href + '#home');

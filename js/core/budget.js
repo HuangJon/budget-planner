@@ -275,3 +275,32 @@ export function groupedCategories(budget) {
   }
   return [...groups].map(([name, categories]) => ({ name, categories }));
 }
+
+/**
+ * Backfilling: for months already over, plan each category with just enough to cover what was
+ * really spent, month by month (money left over carries forward, so later months need less).
+ * Nothing is ever lowered. Returns { changes: { month: { categoryId: newPlan } }, total, months }.
+ */
+export function backfillPlan(budget, transactionList, today) {
+  const list = budgetTransactions(budget, transactionList);
+  const start = budgetStart(budget)?.slice(0, 7) || list.reduce((m, t) => (!m || t.date.slice(0, 7) < m ? t.date.slice(0, 7) : m), null);
+  const current = today.slice(0, 7);
+  const changes = {};
+  let total = 0, months = 0;
+  if (!start) return { changes, total, months };
+  const working = { ...budget, assigned: JSON.parse(JSON.stringify(budget.assigned || {})) };
+  for (let m = start; m < current; m = addMonths(m, 1)) {
+    const s = monthSummary(working, list, m);
+    let touched = false;
+    for (const [id, c] of Object.entries(s.categories)) {
+      if (c.available >= 0 || budget.categories[id]?.hidden) continue;
+      const plan = (working.assigned[m]?.[id] || 0) - c.available;
+      (working.assigned[m] ||= {})[id] = plan;
+      (changes[m] ||= {})[id] = plan;
+      total += -c.available;
+      touched = true;
+    }
+    if (touched) months += 1;
+  }
+  return { changes, total, months };
+}

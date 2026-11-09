@@ -4,7 +4,8 @@
  * means a transaction is missing or entered twice. Names and balances only, never account numbers.
  */
 import { A, actions, changes } from './state.js';
-import { esc, openSheet, sheetHead, openChild, registerSheet, toast, send, val, today } from './dom.js';
+import { esc, openSheet, sheetHead, openChild, registerSheet, toast, send, val, today, fmtDate } from './dom.js';
+import { budgetStart, isStartingMoney, liveTransactions } from '../core/budget.js';
 import { money, toCents } from '../core/money.js';
 import { accountCheck, ACCOUNT_KINDS, MAX_ACCOUNTS } from '../core/accounts.js';
 import { randomId } from '../core/ids.js';
@@ -49,7 +50,9 @@ function verdict(r) {
   const why = off < 100 ? '' : r.gap > 0
     ? '<ul class="small muted acc-why"><li>Spending that isn’t in the budget yet, from an account you haven’t imported lately.</li><li>Income added twice.</li><li>A card balance that’s out of date.</li></ul>'
     : '<ul class="small muted acc-why"><li>Income, interest or a refund that isn’t in the budget yet.</li><li>Spending added twice, typed and imported.</li><li>A balance that’s out of date.</li></ul>';
-  return `${head}${why}`;
+  // After importing everything since the budget started, the gap is the starting money being off.
+  const fix = off < 100 ? '' : `<div class="acc-fix stack tight"><button type="button" class="btn small" data-action="acc-fix-start">Set starting money so they match</button><p class="tiny muted">Use this once you’ve imported every account since the budget started (${esc(budgetStart(A.budgets[A.sheet.budgetId]) ? fmtDate(budgetStart(A.budgets[A.sheet.budgetId])) : 'the beginning')}). It works out what you had then from what you have now.</p></div>`;
+  return `${head}${why}${fix}`;
 }
 
 function drawAccounts() {
@@ -115,6 +118,23 @@ actions['acc-remove'] = el => {
   if (!a) return;
   send(A.repo.removeAccount(b.id, id));
   toast(`Removed ${a.name}`, () => send(A.repo.saveAccount(b.id, id, a)));
+};
+
+/** Starting money becomes whatever makes the budget equal today's balances. */
+actions['acc-fix-start'] = () => {
+  const b = budget(), r = accountCheck(b, A.transactions[b.id] || [], today());
+  const start = liveTransactions(A.transactions[b.id]).filter(isStartingMoney).sort((x, y) => x.date.localeCompare(y.date))[0];
+  const amount = (start?.amount || 0) - r.gap;
+  if (amount <= 0) { toast('That would make the starting money $0 or less. Look for something imported twice first.'); return; }
+  if (start) {
+    send(A.repo.updateTransaction(b.id, start, { amount }));
+    toast(`Starting money is now ${money(amount)}`, () => send(A.repo.updateTransaction(b.id, { ...start, amount }, { amount: start.amount })));
+  } else {
+    const date = budgetStart(b) || today();
+    const { written } = A.repo.addTransaction(b.id, { kind: 'income', amount, date, description: 'Starting money', categoryId: null });
+    send(written);
+    toast(`Added starting money of ${money(amount)}`);
+  }
 };
 
 registerSheet('accounts', drawAccounts);

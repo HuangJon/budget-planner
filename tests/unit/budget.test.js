@@ -253,3 +253,24 @@ test('before the budget starts is history: it never moves money, except the star
   assert.equal(budgetMoney(list, '2026-11-09', b), 300000 - 5000);
   assert.equal(monthSummary({ ...b, settings: {} }, list, '2026-11').readyToAssign, 800000 - 20000, 'without a start date everything counts, as before');
 });
+
+test('backfilling plans past months to cover what was spent, carrying leftovers, never lowering', async () => {
+  const { backfillPlan, monthSummary } = await import('../../js/core/budget.js');
+  const b = { categories: { g: { name: 'Groceries' }, r: { name: 'Rent' } }, assigned: { '2026-02': { r: 200000 } }, settings: { startDate: '2026-01-01' } };
+  const list = [
+    { id: 's', kind: 'income', amount: 1000000, date: '2026-01-01', description: 'Starting money' },
+    { id: 'g1', kind: 'spend', amount: 30000, date: '2026-01-05', categoryId: 'g' },
+    { id: 'r1', kind: 'spend', amount: 150000, date: '2026-01-01', categoryId: 'r' },
+    { id: 'g2', kind: 'spend', amount: 20000, date: '2026-02-05', categoryId: 'g' },
+    { id: 'r2', kind: 'spend', amount: 150000, date: '2026-02-01', categoryId: 'r' },
+    { id: 'g3', kind: 'spend', amount: 9000, date: '2026-03-02', categoryId: 'g' },
+  ];
+  const { changes, total, months } = backfillPlan(b, list, '2026-03-10');
+  assert.deepEqual(changes, { '2026-01': { g: 30000, r: 150000 }, '2026-02': { g: 20000 } }, 'February rent was already planned with more than enough');
+  assert.equal(total, 200000);
+  assert.equal(months, 2);
+  const after = { ...b, assigned: { '2026-01': changes['2026-01'], '2026-02': { ...b.assigned['2026-02'], ...changes['2026-02'] } } };
+  const feb = monthSummary(after, list, '2026-02');
+  assert.equal(feb.overspent.length, 0, 'nothing overspent once filled in');
+  assert.equal(monthSummary(after, list, '2026-03').categories.g.available, -9000, 'the current month is left for you to plan');
+});
