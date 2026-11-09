@@ -502,6 +502,9 @@ if ((await page.locator('[data-testid=ready]').innerText()) !== readyBefore) fai
 
 // Search: words, totals, then moving every match (past ones too) to another category, and undo.
 await tap('#app [data-action=open-search]');
+// Nothing typed lists everything, without the option to move it all.
+await page.locator('.search-sum', { hasText: 'All ' }).waitFor();
+if (await page.locator('[data-action=search-move-open]').count()) fail('Moving everything at once should not be offered');
 await page.locator('#searchText').fill('mystery shop');
 await page.locator('.search-sum', { hasText: '2 matches' }).waitFor();
 await eventually(async () => (await page.locator('#searchText').evaluate(el => el === document.activeElement)), 'Typing should keep the cursor in the search box');

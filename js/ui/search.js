@@ -1,5 +1,5 @@
 /**
- * Search: every transaction in the budget, history included. Type words (like "amzn" or "gym"),
+ * Search: every transaction in the budget, history included. Type words (like "coffee" or "gym"),
  * pick a category or a time, and see the matches with what they add up to. "Change category"
  * moves all of the matches at once, past ones included, and can be undone.
  */
@@ -35,22 +35,25 @@ function drawSearch() {
   if (!b) return;
   const matches = searchTransactions(A.transactions[b.id] || [], { text: S.text, categoryId: S.categoryId, ...datesFor(S.when) });
   const t = searchTotals(matches);
-  const any = S.text.trim() || S.categoryId || S.when;
+  // With nothing typed or picked, it lists everything: every transaction, newest first.
+  const any = true;
+  const filtered = Boolean(S.text.trim() || S.categoryId || S.when);
   const cats = b.categories;
   openSheet(`<div class="sheet">${sheetHead('Search')}<div class="sheet-body">
-    <input id="searchText" type="search" placeholder="Search, like amzn, gym or rent" value="${esc(S.text)}" data-input="search-text" autocomplete="off" enterkeyhint="search">
+    <input id="searchText" type="search" placeholder="Search, like coffee, gym or rent" value="${esc(S.text)}" data-input="search-text" autocomplete="off" enterkeyhint="search">
     <div class="search-filters">
       <select aria-label="Category" data-change="search-cat"><option value="">Any category</option>${catOptions(b, S.categoryId).replace(/^<option value="" [^>]*>Pick one<\/option>/, '')}</select>
       <select aria-label="When" data-change="search-when">${WHEN.map(([k, l]) => `<option value="${k}" ${S.when === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
     </div>
     ${any ? `<section class="panel pad search-sum">
-      <div class="row between"><span class="label">${t.count} ${t.count === 1 ? 'match' : 'matches'}</span>${t.income ? `<span class="small owed">+${money(t.income)} came in</span>` : ''}</div>
+      <div class="row between"><span class="label">${filtered ? `${t.count} ${t.count === 1 ? 'match' : 'matches'}` : `All ${t.count} transactions`}</span>${t.income ? `<span class="small owed">+${money(t.income)} came in</span>` : ''}</div>
       <div class="row between"><span class="amt big-amt owe">${money(t.spent)}</span><span class="small muted">${t.months > 1 ? `${money(t.perMonth)} a month over ${t.months} months` : t.months === 1 ? 'in one month' : ''}</span></div>
       ${!S.categoryId && t.byCategory.length > 1 ? `<div class="small muted">${t.byCategory.slice(0, 4).map(c => `${esc(cats[c.id]?.name || 'Removed category')} ${money(c.amount)}`).join(' · ')}</div>` : ''}
-      ${matches.some(m => m.kind !== 'income') ? (S.moving
+      ${filtered && matches.some(m => m.kind !== 'income') ? (S.moving
         ? `<div class="move-all stack tight"><label class="small">Move all ${matches.filter(m => m.kind !== 'income').length} to</label><div class="row gap8"><select id="moveAllTo">${catOptions(b, '')}</select><button type="button" class="btn small primary" data-action="search-move">Move</button><button type="button" class="btn small" data-action="search-move-cancel">Cancel</button></div><p class="tiny muted">Past ones too. Each keeps its old version, and you can undo.</p></div>`
         : '<button type="button" class="link small" data-action="search-move-open">Change category for all of these</button>') : ''}
-    </section>` : '<p class="small muted">Searches everything in this budget, every month, history included.</p>'}
+    </section>` : ''}
+    ${filtered ? '' : '<p class="tiny muted">Everything in this budget, every month, history included. Type or pick above to narrow it down.</p>'}
     ${any && matches.length ? `<div class="panel tx-list">${matches.slice(0, SHOWN).map(m => `<button type="button" class="tap tx-row" data-action="edit-tx" data-id="${m.id}"><span class="grow stack tight"><strong class="wrap-any two-lines">${esc(m.description || 'Spending')}</strong><span class="tiny muted">${fmtDate(m.date)} · ${esc(m.kind === 'income' ? 'Ready to assign' : cats[m.categoryId]?.name || 'Removed category')}${m.kind === 'refund' ? ' · Refund' : ''}${isHistory(b, m) ? ' · History' : ''}</span></span><span class="amt ${m.kind === 'spend' ? 'owe' : 'owed'}">${m.kind === 'spend' ? '−' : '+'}${money(m.amount)}</span></button>`).join('')}</div>
     ${matches.length > SHOWN ? `<p class="tiny muted">Showing the newest ${SHOWN} of ${matches.length}. The totals count them all.</p>` : ''}` : any ? '<p class="small muted">Nothing matches.</p>' : ''}
   </div></div>`);
