@@ -12,7 +12,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // The app's owner. Publishing to the staging project swaps in a test account.
-    function isOwner() { return signedIn() && request.auth.uid == 'OWNER_NOT_SET_YET'; }
+    function isOwner() { return signedIn() && request.auth.uid == 'snu95kN1t7RTs7QAkqYWIAQfHrO2'; }
     function signedIn() { return request.auth != null && request.auth.token.email_verified == true; }
     function me() { return request.auth.uid; }
     function short(v, n) { return v is string && v.size() <= n; }
