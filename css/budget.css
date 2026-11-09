@@ -385,3 +385,15 @@ a.request-note { display:flex; align-items:center; gap:12px; padding:14px 16px; 
 .repeats-head .chev.open { transform:rotate(180deg) }
 .repeats-fold .tx-list { border-top:1px solid var(--line) }
 .repeats-fold > .link { margin:8px 14px 12px }
+
+/* Arranging categories on the budget screen */
+.arrange-bar { position:sticky; top:calc(env(safe-area-inset-top, 0px) + 116px); z-index:3; display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:12px; background:var(--accent-soft); color:var(--ink) }
+.arrange-bar span { flex:1; min-width:0 }
+.arrange { display:grid; gap:14px }
+.arr-group-name { font-size:.95rem; color:var(--heading); margin:0 0 6px 4px }
+.arr-list { padding:0; min-height:44px }
+.arr-row { display:flex; align-items:center; gap:8px; padding:8px 10px; border-top:1px solid var(--line); background:var(--surface) }
+.arr-row:first-child { border-top:0 }
+.arr-row.dragging { box-shadow:0 6px 18px rgba(0,0,0,.18); position:relative; z-index:2; border-radius:10px }
+.drag-handle { font-size:1.4rem; line-height:1; color:var(--muted); padding:8px 10px; margin:-8px 0 -8px -6px; cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none }
+.arr-drop { height:6px }

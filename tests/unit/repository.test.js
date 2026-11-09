@@ -222,3 +222,12 @@ test('accounts are saved on the budget and can be removed', async () => {
   await repo.removeAccount(budget.id, 'acc1');
   assert.equal((await backend.get(`budgets/${budget.id}`)).accounts.acc1, undefined);
 });
+
+test('arranging saves new orders and groups for several categories at once', async () => {
+  const { backend, repo } = fresh();
+  const { budget, written } = repo.createBudget({ name: 'Mine', categories: { a: { name: 'A', group: 'X', order: 1 }, b: { name: 'B', group: 'X', order: 2 }, c: { name: 'C', group: 'Y', order: 3 } } });
+  await written;
+  await repo.arrangeCategories(budget.id, { b: { order: 0 }, c: { order: 1, group: 'X' } });
+  const cats = (await backend.get(`budgets/${budget.id}`)).categories;
+  assert.deepEqual([cats.a.order, cats.b.order, cats.c.order, cats.c.group, cats.a.name], [1, 0, 1, 'X', 'A']);
+});

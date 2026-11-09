@@ -12,6 +12,7 @@ import { helpButton, describe } from './ui/help.js';
 import { openTxForm } from './ui/tx-form.js';
 import './ui/import.js';
 import './ui/report.js';
+import './ui/arrange.js';
 import './ui/accounts.js';
 import { startIdleWatch, forgetActivity } from './ui/idle.js';
 import { openCatEditor } from './ui/cat-edit.js';
@@ -129,7 +130,7 @@ function readRoute() {
   if (A.route.name === 'plan') { A.planSnapshot = null; A.fundPreview = false; }
   if (m) follow(m[1]);
 }
-addEventListener('hashchange', () => { closeSheet(); readRoute(); render(); scrollTo(0, 0); });
+addEventListener('hashchange', () => { closeSheet(); A.arrange = null; readRoute(); render(); scrollTo(0, 0); });
 readRoute();
 
 /* ---------- Drawing ---------- */
@@ -169,6 +170,10 @@ function render() {
   // New data can arrive while someone is typing on the page (Plan money, a name). Redrawing the
   // same screen keeps what they typed and their cursor; a different screen starts fresh.
   const where = `${A.route.name}:${A.route.id || ''}`;
+  // While categories are being arranged, the screen holds still: new data would undo the moves
+  // on screen. It catches up when Done is tapped.
+  if (A.arrange?.drawn && where === lastDrawn) { drawTabs(A.route.id ? A.budgets[A.route.id] : null); refreshOpenSheet(); return; }
+  if (A.arrange) A.arrange.drawn = A.route.name === 'budget' && A.arrange.budgetId === A.route.id;
   if (where !== lastDrawn) { lastDrawn = where; drawScreen(); }
   else {
     redrawKeeping(app, drawScreen);

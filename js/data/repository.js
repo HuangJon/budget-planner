@@ -118,6 +118,11 @@ export function createRepository(backend, now = () => Date.now()) {
       ...Object.fromEntries(Object.entries(byCategory).map(([cat, v]) => [`assigned.${month}.${cat}`, v])),
       changedBy: uid(),
     }),
+    /** New order (and group, when dragged to another one) for several categories in one save: { catId: { order, group } }. */
+    arrangeCategories: (id, changes) => backend.update(budgetPath(id), {
+      ...Object.fromEntries(Object.entries(changes).flatMap(([catId, f]) => Object.entries(f).map(([k, v]) => [`categories.${catId}.${k}`, v]))),
+      changedBy: uid(),
+    }),
     updateCategory: (id, catId, fields) => backend.update(budgetPath(id), {
       ...Object.fromEntries(Object.entries(fields).map(([k, v]) => [`categories.${catId}.${k}`, v])),
       changedBy: uid(),

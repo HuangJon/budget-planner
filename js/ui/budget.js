@@ -5,6 +5,7 @@ import { monthSummary, groupedCategories, fundTargets, coverOverspending, moveMo
 import { money, toCents, fromCents } from '../core/money.js';
 import { openTxForm } from './tx-form.js';
 import { syncBar } from './accounts.js';
+import { arranging, arrangeList } from './arrange.js';
 
 export const summaryFor = (b, month = A.month) => monthSummary(b, A.transactions[b.id] || [], month);
 const shortMonth = m => fmtMonth(m).split(' ')[0];
@@ -81,6 +82,7 @@ function filterBar(b, s) {
   return `<div class="filter-row">
     <div class="seg" role="group" aria-label="Show">${chip('all', 'All')}${chip('needs', `Needs money${count('needs') ? ` (${count('needs')})` : ''}`)}${chip('over', `Over${count('over') ? ` (${count('over')})` : ''}`)}</div>
     <button type="button" class="btn small view-toggle" data-action="budget-compact" aria-pressed="${compact}">${compact ? 'Roomy' : 'Compact'}</button>
+    <button type="button" class="btn small" data-action="arrange-start">Arrange</button>
   </div>`;
 }
 actions['budget-filter'] = el => { setPref('wmm:budgetFilter', el.dataset.id); render(); };
@@ -158,7 +160,7 @@ export function budgetScreen(b) {
     ${b.members?.[A.user?.uid]?.admin && Object.keys(b.requests || {}).length ? `<a class="panel request-note" href="#b-${b.id}-people"><span class="grow">${esc(Object.values(b.requests).map(r => r.name || 'Someone').join(', '))} asked to join</span><span class="small link">Review</span></a>` : ''}
     ${overspentNotice(b, s)}
     ${s.unknownActivity ? `<p class="notice">${money(-s.unknownActivity)} was spent in a category that has since been removed.</p>` : ''}
-    ${Object.keys(b.categories).length ? filterBar(b, s) : ''}
+    ${arranging() ? arrangeList(b) : `${Object.keys(b.categories).length ? filterBar(b, s) : ''}
     <div class="groups ${compact ? 'compact' : ''}">
     ${groups.map(g => {
       const left = g.all.reduce((a, c) => a + s.categories[c.id].available, 0);
@@ -173,7 +175,7 @@ export function budgetScreen(b) {
     }).join('')}
     </div>
     ${f !== 'all' && !groups.length ? `<section class="panel empty"><h2>${f === 'over' ? 'Nothing is over' : 'Nothing needs money'}</h2><p class="muted">${f === 'over' ? 'Every category has money left.' : 'Every bill and target has what it needs this month.'}</p><button type="button" class="btn" data-action="budget-filter" data-id="all">Show all</button></section>` : ''}
-    ${Object.keys(b.categories).length && f === 'all' ? '<button type="button" class="link edit-cats-link" data-action="edit-cats">Edit categories</button>' : ''}
+    ${Object.keys(b.categories).length && f === 'all' ? '<button type="button" class="link edit-cats-link" data-action="edit-cats">Edit categories</button>' : ''}`}
     ${Object.keys(b.categories).length ? '' : '<section class="panel empty"><h2>No categories yet</h2><p class="muted">Add one from the menu behind your icon.</p></section>'}`;
 }
 
@@ -215,7 +217,7 @@ export function catSheet() {
   const donors = others.filter(([o]) => s.categories[o].available > 0);
   const recent = liveTransactions(A.transactions[budgetId]).filter(t => t.categoryId === id && monthOf(t.date) === A.month).sort((p, q) => q.date.localeCompare(p.date));
   const open = A.sheet.open || {};
-  openSheet(`<div class="sheet">${sheetHead(c.name)}<div class="sheet-body">
+  openSheet(`<div class="sheet">${sheetHead(c.name, '<button type="button" class="btn small" data-action="edit-this-cat">Edit</button>')}<div class="sheet-body">
     <section class="panel pad stack">
       <div class="row between"><span class="label">${x.available < 0 ? 'Over in' : 'To spend in'} ${esc(shortMonth(A.month))}</span><span class="big-amt amt ${x.available < 0 ? 'owe' : ''}">${money(Math.abs(x.available))}</span></div>
       <p class="small">${catStatus(c, x)}</p>
@@ -249,7 +251,7 @@ export function catSheet() {
       <button type="button" class="form-row" data-action="cat-open" data-id="target" aria-expanded="${Boolean(open.target)}"><span class="form-row-label">Target</span><span class="form-row-value">${esc(targetLabel(c))}</span></button>
       ${open.target ? `<div class="more-body stack">${targetEditor(c)}</div>` : ''}
       <button type="button" class="form-row" data-action="cat-trend" data-id="${id}"><span class="form-row-label">See trend</span><span class="form-row-value muted">Past months and biggest purchases</span></button>
-      <button type="button" class="form-row" data-action="edit-this-cat"><span class="form-row-label">Name and group</span><span class="form-row-value muted">Rename, move or hide</span></button>
+      <button type="button" class="form-row" data-action="edit-this-cat"><span class="form-row-label">Edit category</span><span class="form-row-value muted">Rename, change group, hide or delete</span></button>
       <button type="button" class="form-row" data-action="cat-open" data-id="move" aria-expanded="${Boolean(open.move)}"><span class="form-row-label">Move money</span><span class="form-row-value muted">To another category</span></button>
       ${open.move ? `<div class="more-body stack">
         <div class="row gap8">${amountBox('moveAmt', 0, 'Amount to move')}</div>

@@ -471,6 +471,37 @@ await tap('[data-action=sheet-back]');
 await tap('[data-action=sheet-back]');
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
 
+// Arranging categories on the budget screen: arrows, then dragging by the handle.
+await page.goto(pathToFileURL(resolve('preview-test.html')).href + '#home');
+await tap('a.budget-row');
+await page.locator('[data-action=budget-filter][data-id=all]').click();
+await tap('[data-action=arrange-start]');
+const names = () => page.locator('#arrangeList .arr-row .grow').allInnerTexts();
+const arrBefore = await names();
+await page.locator('#arrangeList .arr-row').first().locator('[data-action=arr-move][data-dir="1"]').click();
+const afterArrow = await names();
+if (afterArrow[0] !== arrBefore[1] || afterArrow[1] !== arrBefore[0]) fail('The down arrow should swap the first two');
+await page.locator('#arrangeList .arr-row').nth(0).evaluate(el => el.scrollIntoView({ block: 'center' }));
+const h = await page.locator('#arrangeList .arr-row').nth(0).locator('.drag-handle').boundingBox();
+const t = await page.locator('#arrangeList .arr-row').nth(2).boundingBox();
+await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
+await page.mouse.down();
+await page.mouse.move(h.x + h.width / 2, t.y + t.height * 0.75, { steps: 8 });
+await page.mouse.up();
+const afterDrag = await names();
+if (afterDrag[2] !== afterArrow[0]) fail(`Dragging should move the row down two places: ${afterDrag.slice(0, 3)}`);
+await shot('arrange');
+await tap('[data-action=arrange-done]');
+await page.getByText('New order saved').waitFor();
+await eventually(async () => (await page.locator('.groups .cat-row .cat-name').first().innerText()) === afterDrag[0], 'The budget should show the new order');
+// The category popup has an Edit button that opens the editor on that category.
+await page.locator('.groups .cat-row').first().click();
+await page.locator('dialog[open] .sheet-head [data-action=edit-this-cat]').click();
+await page.locator('dialog[open] #editName').waitFor();
+await tap('[data-action=sheet-back]');
+await tap('[data-action=sheet-back]');
+await page.locator('dialog[open]').waitFor({ state: 'detached' });
+
 // Every theme, on the example budget.
 await page.goto(pathToFileURL(resolve('preview-test.html')).href + '#home');
 await tap('a.budget-row');

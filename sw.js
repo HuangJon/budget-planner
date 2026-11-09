@@ -51,6 +51,7 @@ const APP_FILES = [
   './js/ui/report.js',
   './js/ui/accounts.js',
   './js/ui/idle.js',
+  './js/ui/arrange.js',
   './js/ui/updates.js',
 ];
 /** The database code and fonts come from Google and have to work offline too. */
