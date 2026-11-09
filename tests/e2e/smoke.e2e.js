@@ -398,6 +398,14 @@ await page.locator('.import-row', { hasText: '<img src=x' }).locator('select').s
 await page.locator('[data-action=import-save]', { hasText: 'Add 5' }).click();
 // The last step of an import is checking the accounts.
 await page.getByText('Added 5. Last step').waitFor();
+// Adding an account right there works (the popup that came before had just closed).
+await page.waitForTimeout(100);
+await tap('dialog[open] [data-action=acc-add-open]');
+await page.locator('#accName').fill('Imported check');
+await page.locator('#accBalance').fill('10');
+await tap('dialog[open] [data-action=acc-add]');
+await page.locator('.acc-row', { hasText: 'Imported check' }).waitFor();
+await page.locator('.acc-row', { hasText: 'Imported check' }).locator('[data-action=acc-remove]').click();
 await tap('[data-action=sheet-back]');
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
 await page.locator('.tx-row', { hasText: 'SAMPLE NOODLE BAR' }).waitFor();

@@ -239,7 +239,9 @@ document.addEventListener('change', e => { const el = e.target.closest('[data-ch
 // Tapping the dimmed area outside a sheet closes it, like the menus.
 const dlg = document.getElementById('dlg');
 dlg.addEventListener('click', e => { if (e.target === dlg) closeSheet(); });
-dlg.addEventListener('close', () => { A.sheet = null; A.form = null; A.sheetStack = []; });
+// The close event arrives a moment after closing. If another popup has opened since (an import
+// going straight on to the accounts check), it belongs to that one, so leave it alone.
+dlg.addEventListener('close', () => { if (dlg.open) return; A.sheet = null; A.form = null; A.sheetStack = []; });
 
 /*
  * A new month while the app sits open (or in the background overnight): if you were looking at
