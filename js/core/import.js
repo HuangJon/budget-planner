@@ -59,7 +59,8 @@ const find = (heads, names) => heads.findIndex(h => names.includes(h));
 
 /** Card payments and moves between your own accounts: real, but not spending or income. */
 const CARD_PAYMENT = /payment thank you|autopay|payment to chase card|credit crd|crd epay|card payment|cardmember serv|amex epayment|discover e-?payment|capital one.*pmt|citi.*autopay/i;
-const MOVING = /online transfer|internet transfer|transfer (to|from)|zelle payment to .* (savings|checking)/i;
+// Includes moving money between your bank and your own Venmo or PayPal balance (a "cashout" or "add money").
+const MOVING = /online transfer|internet transfer|transfer (to|from)|zelle payment to .* (savings|checking)|venmo\s*\*?\s*cashout|venmo.*(add|transfer)|paypal\s*\*?\s*transfer|cash app\s*\*?\s*(cash out|transfer)/i;
 
 export const SKIP = {
   payment: 'Paying the card off. Your spending is already counted from the purchases.',

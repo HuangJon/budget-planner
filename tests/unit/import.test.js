@@ -120,3 +120,12 @@ test('an Ally savings file: Zelle shows who it went to, a brokerage transfer is 
   ]);
   assert.equal(guessCategory(rows[3], { i: { name: 'Investing' }, s: { name: 'Shopping' } }, []), 'i');
 });
+
+test('moving money between the bank and your own Venmo is left out', () => {
+  const { rows } = readStatement(`Date, Time, Amount, Type, Description
+2026-11-02,10:00:00,120.00,Deposit,VENMO CASHOUT
+2026-11-03,10:00:00,-50.00,Withdrawal,VENMO ADD FUNDS
+2026-11-04,10:00:00,-30.00,Withdrawal,VENMO PAYMENT 1234
+`);
+  assert.deepEqual(rows.map(r => r.skip), ['transfer', 'transfer', null], 'paying someone through Venmo from the bank is still spending');
+});
