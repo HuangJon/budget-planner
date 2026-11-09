@@ -45,6 +45,17 @@ export function isValidTransaction(t) {
 
 export const liveTransactions = list => (list || []).filter(t => !t.deleted && isValidTransaction(t));
 
+/**
+ * When the budget starts (YYYY-MM-DD), or null for "from the beginning". Anything dated earlier is
+ * history: it shows in Trends and search, but doesn't move any money in the budget. Starting money
+ * always counts, whatever its date.
+ */
+export const budgetStart = budget => (/^\d{4}-\d{2}-\d{2}$/.test(budget?.settings?.startDate || '') ? budget.settings.startDate : null);
+export const isStartingMoney = t => t.kind === 'income' && t.description === 'Starting money';
+export const isHistory = (budget, t) => { const s = budgetStart(budget); return Boolean(s) && t.date < s && !isStartingMoney(t); };
+/** The transactions that move money in the budget: live, and not history. */
+export const budgetTransactions = (budget, list) => liveTransactions(list).filter(t => !isHistory(budget, t));
+
 /** The effect of one transaction on its category: spending lowers it, a refund raises it. */
 const categoryEffect = t => (t.kind === 'spend' ? -t.amount : t.kind === 'refund' ? t.amount : 0);
 
@@ -75,7 +86,7 @@ function activityByMonth(transactions) {
  *           overspent: [ids], unknownActivity }
  */
 export function monthSummary(budget, transactionList, month) {
-  const transactions = liveTransactions(transactionList);
+  const transactions = budgetTransactions(budget, transactionList);
   const cats = budget.categories || {};
   const assignedAll = budget.assigned || {};
   const activity = activityByMonth(transactions);

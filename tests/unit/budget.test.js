@@ -234,3 +234,22 @@ test('a yearly target that starts in January asks for nothing before then', () =
   s = monthSummary({ categories: { c: clothes }, assigned: {} }, [], '2027-01');
   assert.equal(s.categories.c.needed, 20000, '$2,400 over 12 months');
 });
+
+test('before the budget starts is history: it never moves money, except the starting money', async () => {
+  const { monthSummary, isHistory } = await import('../../js/core/budget.js');
+  const { budgetMoney } = await import('../../js/core/accounts.js');
+  const b = { categories: { g: { name: 'Groceries' } }, assigned: { '2026-11': { g: 20000 } }, settings: { startDate: '2026-11-01' } };
+  const list = [
+    { id: 'old', kind: 'spend', amount: 9999, date: '2026-03-04', categoryId: 'g' },
+    { id: 'oldpay', kind: 'income', amount: 500000, date: '2026-03-01', description: 'Pay' },
+    { id: 'start', kind: 'income', amount: 300000, date: '2026-10-31', description: 'Starting money' },
+    { id: 'now', kind: 'spend', amount: 5000, date: '2026-11-03', categoryId: 'g' },
+  ];
+  const s = monthSummary(b, list, '2026-11');
+  assert.equal(s.readyToAssign, 300000 - 20000, 'old pay and old spending leave Ready to assign alone');
+  assert.equal(s.categories.g.available, 15000, 'old spending never makes Groceries overspent');
+  assert.equal(isHistory(b, list[0]), true);
+  assert.equal(isHistory(b, list[2]), false, 'starting money counts whatever its date');
+  assert.equal(budgetMoney(list, '2026-11-09', b), 300000 - 5000);
+  assert.equal(monthSummary({ ...b, settings: {} }, list, '2026-11').readyToAssign, 800000 - 20000, 'without a start date everything counts, as before');
+});

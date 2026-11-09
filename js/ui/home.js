@@ -1,5 +1,5 @@
 /** Your budgets, starting a new one, and your account menu. */
-import { A, actions, render } from './state.js';
+import { A, actions, changes, render } from './state.js';
 import { esc, openSheet, closeSheet, sheetHead, toast, send, val, today, registerSheet, downloadFile } from './dom.js';
 import { transactionsCsv, planCsv, exportName } from '../core/export.js';
 import { RESTORE_DAYS } from '../data/repository.js';
@@ -111,7 +111,9 @@ actions.account = () => {
     ${b ? `<section class="panel pad stack"><h3>${esc(b.name)}</h3><button type="button" class="btn" data-action="edit-cats">Edit categories</button><button type="button" class="btn" data-action="open-accounts">Check against your accounts</button>
       <span class="label">Export to a spreadsheet</span>
       <div class="two-btns"><button type="button" class="btn" data-action="export-tx">Transactions</button><button type="button" class="btn" data-action="export-plan">Plan by month</button></div>
-      <p class="tiny muted">CSV files that open in Numbers, Excel or Google Sheets. A good backup too.</p></section>` : ''}
+      <p class="tiny muted">CSV files that open in Numbers, Excel or Google Sheets. A good backup too.</p>
+      <label class="form-row bordered"><span class="form-row-label">Budget starts</span><input type="date" value="${esc(b.settings?.startDate || '')}" data-change="budget-start" aria-label="Budget starts on"></label>
+      <p class="tiny muted">Anything before this date is history: it shows in Trends and search, but doesn’t change your money. Set it to the day you counted your starting money.</p></section>` : ''}
     <section class="panel pad stack">
       <h3>Signing out</h3>
       ${idlePicker()}
@@ -133,3 +135,10 @@ actions['export-plan'] = () => { const b = A.budgets[A.route.id]; downloadFile(e
 actions['set-look'] = el => { setLook(el.dataset.id); actions.account(); };
 export const refreshAccount = () => render();
 actions['budget-restore'] = el => { send(A.repo.restoreBudget(el.dataset.id)); toast('Budget restored'); };
+
+changes['budget-start'] = el => {
+  const b = A.budgets[A.route.id];
+  if (!b || (el.value && !/^\d{4}-\d{2}-\d{2}$/.test(el.value))) return;
+  send(A.repo.setSetting(b.id, 'startDate', el.value || undefined));
+  toast(el.value ? 'Budget start saved' : 'Everything counts again');
+};

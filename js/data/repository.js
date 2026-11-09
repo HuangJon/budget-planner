@@ -90,7 +90,9 @@ export function createRepository(backend, now = () => Date.now()) {
     createBudget({ name, kind = 'personal', myName = 'You', categories = starterCategories(), startingMoney = 0, today = '' }) {
       const id = randomId(24);
       const budget = {
-        id, schemaVersion: SCHEMA_VERSION, name, kind, categories, assigned: {}, recurring: {}, requests: {}, settings: {},
+        id, schemaVersion: SCHEMA_VERSION, name, kind, categories, assigned: {}, recurring: {}, requests: {},
+        // The budget starts today: anything imported from earlier is history, not money to plan.
+        settings: /^\d{4}-\d{2}-\d{2}$/.test(today) ? { startDate: today } : {},
         members: { [uid()]: { name: myName, admin: true, joinedAt: now() } }, createdAt: now(), changedBy: uid(), deleted: false,
       };
       const writes = [

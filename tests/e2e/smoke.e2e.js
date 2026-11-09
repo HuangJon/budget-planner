@@ -479,6 +479,27 @@ await tap('[data-action=sheet-back]');
 await tap('[data-action=sheet-back]');
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
 
+// History: with a start date set, an older import shows in Activity but never moves money.
+await page.goto(pathToFileURL(resolve('preview-test.html')).href + '#home');
+await tap('a.budget-row');
+await tap('[data-action=account]');
+await page.locator('dialog[open] [data-change=budget-start]').fill('2026-11-01');
+await page.locator('dialog[open] [data-change=budget-start]').dispatchEvent('change');
+await page.getByText('Budget start saved').waitFor();
+await tap('[data-action=sheet-back]');
+await page.locator('dialog[open]').waitFor({ state: 'detached' });
+const readyBefore = await page.locator('[data-testid=ready]').innerText();
+await tap('#app [data-action=open-import]');
+await page.locator('#importFile').setInputFiles({ name: 'old.csv', mimeType: 'text/csv', buffer: Buffer.from('Transaction Date,Post Date,Description,Category,Type,Amount,Memo\n01/15/2026,01/16/2026,OLD SAMPLE SHOP,Groceries,Sale,-77.00,\n') });
+await page.getByText('from before your budget started').waitFor();
+await page.locator('.import-row').first().locator('select').selectOption({ label: 'Groceries' });
+await tap('[data-action=import-save]');
+await page.getByText('Last step').waitFor();
+await tap('[data-action=sheet-back]');
+await page.locator('dialog[open]').waitFor({ state: 'detached' });
+await page.waitForTimeout(200);
+if ((await page.locator('[data-testid=ready]').innerText()) !== readyBefore) fail('History should not change Ready to assign');
+
 // Arranging categories on the budget screen: arrows, then dragging by the handle.
 await page.goto(pathToFileURL(resolve('preview-test.html')).href + '#home');
 await tap('a.budget-row');

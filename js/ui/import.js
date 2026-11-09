@@ -5,7 +5,7 @@
  */
 import { A, actions, changes } from './state.js';
 import { LIMITS } from '../config/app.js';
-import { groupedCategories } from '../core/budget.js';
+import { groupedCategories, budgetStart } from '../core/budget.js';
 import { esc, openSheet, closeSheet, sheetHead, toast, send, fmtDate, openChild, registerSheet, val } from './dom.js';
 import { readStatement, markExisting, guessCategory, SKIP } from '../core/import.js';
 import { money } from '../core/money.js';
@@ -48,8 +48,11 @@ function drawImport() {
   const skipped = rows.filter(r => r.skip);
   const shown = rows.map((r, i) => [r, i]).filter(([r]) => !r.skip || S.showSkipped);
   const dates = rows.map(r => r.date).sort();
+  const start = budgetStart(b);
+  const history = start ? adding.filter(r => r.date < start).length : 0;
   openSheet(`<div class="sheet">${sheetHead('Check and add')}<div class="sheet-body">
     <p class="small muted">${esc(S.fileName)} · ${fmtDate(dates[0])} to ${fmtDate(dates.at(-1))}</p>
+    ${history ? `<p class="notice">${history} ${history === 1 ? 'is' : 'are'} from before your budget started (${fmtDate(start)}). ${history === 1 ? 'It’s' : 'They’re'} kept as history for Trends and search, and won’t change your money.</p>` : ''}
     ${needCat ? `<p class="small owe">${needCat} still need${needCat === 1 ? 's' : ''} a category.</p>` : '<p class="small muted">Categories are guessed from what you picked before. Changing one changes the rest from the same place.</p>'}
     <div class="panel import-list">${shown.map(([r, i]) => row(b, r, i)).join('')}</div>
     ${skipped.length ? `<button type="button" class="link small" data-action="import-skipped">${S.showSkipped ? 'Hide the ones left out' : `Show ${skipped.length} left out`}</button>` : ''}
