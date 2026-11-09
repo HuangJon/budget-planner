@@ -257,9 +257,11 @@ service cloud.firestore {
     // ---------- Error reports ----------
     // A short note when something breaks: what kind, which screen, which version, which kind of
     // device. No account, no budget, and the rules refuse any digit or "@" in the message.
+    // Only verified accounts can send them, so throwaway accounts made with the public key can't
+    // fill the log (there's no App Check on the free plan).
     match /errorLog/{id} {
       allow get, list: if isOwner();
-      allow create: if request.auth != null && id.matches('^[a-z0-9]{10,40}$')
+      allow create: if signedIn() && id.matches('^[a-z0-9]{10,40}$')
         && request.resource.data.keys().hasOnly(['id', 'kind', 'message', 'screen', 'version', 'platform', 'at'])
         && request.resource.data.keys().hasAll(['id', 'kind', 'message', 'screen', 'version', 'platform', 'at'])
         && request.resource.data.id == id

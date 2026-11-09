@@ -95,6 +95,7 @@ await no(carol.backend.get(`budgets/${B}`), 'a stranger cannot read a budget');
 await no(carol.backend.list(`budgets/${B}/transactions`), "a stranger cannot read a budget's transactions");
 await no(carol.backend.list('budgets'), 'nobody can list budgets');
 await no(unverified.get(`budgets/${B}`), 'an unverified account gets nothing');
+await no(unverified.set(`errorLog/${randomId()}`, { id: 'x', kind: 'app-error', message: 'spam', screen: 'other', version: 'v', platform: 'computer', at: 1 }), 'an unverified account cannot fill the error log');
 await no(owner.backend.get(`budgets/${B}`), "the owner can't read anyone's budget");
 await no(owner.backend.list(`budgets/${B}/transactions`), "the owner can't read anyone's transactions");
 await no(carol.backend.set(`budgets/${'c'.repeat(24)}`, { ...budget, id: 'c'.repeat(24), members: { [alice.uid]: { name: 'x', admin: true, joinedAt: 1 } }, changedBy: carol.uid }), "nobody makes a budget for someone else");
