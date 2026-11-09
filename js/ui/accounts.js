@@ -16,8 +16,28 @@ const ago = at => {
   return days <= 0 ? 'updated today' : days === 1 ? 'updated yesterday' : `updated ${days} days ago`;
 };
 
-export function openAccounts(budgetId) {
-  openChild({ kind: 'accounts', budgetId, adding: false }, drawAccounts);
+/** `afterImport`: how many rows were just imported, to show this as the last step of an import. */
+export function openAccounts(budgetId, { afterImport = 0 } = {}) {
+  openChild({ kind: 'accounts', budgetId, adding: false, afterImport }, drawAccounts);
+}
+
+/**
+ * The bar under Ready to assign (and at the top of Activity): bring in transactions, then see at a
+ * glance whether the budget still matches your accounts and how fresh the balances are.
+ */
+export function syncBar(b) {
+  const r = accountCheck(b, A.transactions[b.id] || [], today());
+  const age = r.oldest ? Math.floor((Date.now() - r.oldest) / 864e5) : null;
+  const when = age === null ? '' : age <= 0 ? ' · today' : age === 1 ? ' · yesterday' : ` · ${age} days ago`;
+  const status = !r.accounts.length
+    ? { cls: '', text: 'Check your accounts' }
+    : Math.abs(r.gap) < 100
+      ? { cls: 'ok', text: `✓ Accounts match${when}` }
+      : { cls: 'off', text: `Accounts off by ${money(Math.abs(r.gap))}${when}` };
+  return `<div class="sync-bar">
+    <button type="button" class="btn small" data-action="open-import">Import from your bank</button>
+    <button type="button" class="btn small acc-status ${status.cls}" data-action="open-accounts">${esc(status.text)}</button>
+  </div>`;
 }
 
 function verdict(r) {
@@ -37,6 +57,7 @@ function drawAccounts() {
   if (!b) return;
   const r = accountCheck(b, A.transactions[b.id] || [], today());
   openSheet(`<div class="sheet">${sheetHead('Check against your accounts')}<div class="sheet-body">
+    ${S.afterImport ? `<p class="notice">Added ${S.afterImport}. Last step: update your balances below to make sure nothing’s missing or doubled.</p>` : ''}
     <p class="small muted">The budget tracks what your money is for. Your accounts say where it sits. Added up, the two should match.</p>
     ${r.accounts.length ? `<section class="panel pad acc-totals">
       <div><span class="label">Your accounts</span><span class="amt">${money(r.inAccounts)}</span></div>

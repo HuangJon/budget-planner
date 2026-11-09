@@ -4,6 +4,7 @@ import { esc, svg, ICON, fmtMonth, ordinal, openSheet, closeSheet, sheetHead, to
 import { monthSummary, groupedCategories, fundTargets, coverOverspending, moveMoney, addMonths, thisMonth, monthOf, liveTransactions, targetType } from '../core/budget.js';
 import { money, toCents, fromCents } from '../core/money.js';
 import { openTxForm } from './tx-form.js';
+import { syncBar } from './accounts.js';
 
 export const summaryFor = (b, month = A.month) => monthSummary(b, A.transactions[b.id] || [], month);
 const shortMonth = m => fmtMonth(m).split(' ')[0];
@@ -152,6 +153,7 @@ export function budgetScreen(b) {
   const groups = groupedCategories(b).map(g => ({ ...g, all: g.categories, categories: g.categories.filter(c => keepIt(s.categories[c.id])) })).filter(g => f === 'all' || g.categories.length);
   return `${monthBar()}
     ${hero(b, s)}
+    ${syncBar(b)}
     ${newMonthCard(b, s)}
     ${b.members?.[A.user?.uid]?.admin && Object.keys(b.requests || {}).length ? `<a class="panel request-note" href="#b-${b.id}-people"><span class="grow">${esc(Object.values(b.requests).map(r => r.name || 'Someone').join(', '))} asked to join</span><span class="small link">Review</span></a>` : ''}
     ${overspentNotice(b, s)}
@@ -171,11 +173,7 @@ export function budgetScreen(b) {
     }).join('')}
     </div>
     ${f !== 'all' && !groups.length ? `<section class="panel empty"><h2>${f === 'over' ? 'Nothing is over' : 'Nothing needs money'}</h2><p class="muted">${f === 'over' ? 'Every category has money left.' : 'Every bill and target has what it needs this month.'}</p><button type="button" class="btn" data-action="budget-filter" data-id="all">Show all</button></section>` : ''}
-    ${f === 'all' ? `<div class="budget-tools">
-      <button type="button" class="btn small" data-action="open-import">Import from your bank</button>
-      <button type="button" class="btn small" data-action="open-accounts">Check against your accounts</button>
-      ${Object.keys(b.categories).length ? '<button type="button" class="btn small" data-action="edit-cats">Edit categories</button>' : ''}
-    </div>` : ''}
+    ${Object.keys(b.categories).length && f === 'all' ? '<button type="button" class="link edit-cats-link" data-action="edit-cats">Edit categories</button>' : ''}
     ${Object.keys(b.categories).length ? '' : '<section class="panel empty"><h2>No categories yet</h2><p class="muted">Add one from the menu behind your icon.</p></section>'}`;
 }
 

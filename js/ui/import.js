@@ -10,6 +10,7 @@ import { esc, openSheet, closeSheet, sheetHead, toast, send, fmtDate, openChild,
 import { readStatement, markExisting, guessCategory, SKIP } from '../core/import.js';
 import { money } from '../core/money.js';
 import { catOptions } from './tx-form.js';
+import { openAccounts } from './accounts.js';
 
 const MAX_ROWS = 1000;
 /** The budget, plus any categories made here that the database hasn't sent back yet. */
@@ -176,6 +177,8 @@ actions['import-save'] = () => {
   const ids = list.map(t => t.id);
   send(A.repo.importTransactions(b.id, list, S.deleted));
   closeSheet();
+  // The last step of an import: check the budget still matches the accounts.
+  openAccounts(b.id, { afterImport: list.length });
   toast(`Added ${list.length}`, () => send(A.repo.unimport(b.id, ids)));
 };
 

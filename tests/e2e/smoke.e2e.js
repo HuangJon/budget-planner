@@ -38,7 +38,7 @@ const ready = async () => page.locator('[data-testid=ready]').innerText();
 // The tour runs on the first budget opened: step through every part, then it stays away.
 await page.locator('.tour-card').waitFor();
 await shot('tour');
-for (let i = 0; i < 6 && await page.locator('.tour-card').count(); i += 1) await page.locator('[data-action=tour-next]').click();
+for (let i = 0; i < 10 && await page.locator('.tour-card').count(); i += 1) await page.locator('[data-action=tour-next]').click();
 await eventually(async () => !(await page.locator('.tour').count()), 'The tour did not finish');
 await page.reload();
 await page.locator('[data-testid=ready]').waitFor();
@@ -392,6 +392,9 @@ await shot('import');
 // Text from a bank file is shown as text, never run as code.
 await page.locator('.import-row', { hasText: '<img src=x' }).locator('select').selectOption({ label: 'Clothes' });
 await page.locator('[data-action=import-save]', { hasText: 'Add 5' }).click();
+// The last step of an import is checking the accounts.
+await page.getByText('Added 5. Last step').waitFor();
+await tap('[data-action=sheet-back]');
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
 await page.locator('.tx-row', { hasText: 'SAMPLE NOODLE BAR' }).waitFor();
 await page.locator('.tx-row', { hasText: 'SAMPLE NOODLE BAR' }).getByText('Noodles').waitFor();
@@ -418,12 +421,12 @@ await page.locator('#accName').fill('Checking');
 await page.locator('#accBalance').fill('100');
 await tap('[data-action=acc-add]');
 await page.locator('.acc-row', { hasText: 'Checking' }).waitFor();
-await page.getByText('Off by').waitFor();
+await page.locator('dialog[open] .acc-verdict', { hasText: 'Off by' }).waitFor();
 const inBudget = await page.locator('.acc-totals > div').nth(1).locator('.amt').innerText();
 const row = page.locator('.acc-row', { hasText: 'Checking' }).locator('input');
 await row.fill(inBudget.replace(/[$,]/g, ''));
 await row.dispatchEvent('change');
-await page.getByText('They match').waitFor();
+await page.locator('dialog[open] .acc-verdict', { hasText: 'They match' }).waitFor();
 await shot('accounts');
 await tap('[data-action=acc-add-open]');
 await page.locator('#accName').fill('Card');
@@ -431,12 +434,13 @@ await tap('[data-action=acc-kind][data-id=card]');
 await eventually(async () => (await page.locator('#accName').inputValue()) === 'Card', 'Switching to Credit card should keep the typed name');
 await page.locator('#accBalance').fill('25');
 await tap('[data-action=acc-add]');
-await page.getByText('Off by $25.00').waitFor();
+await page.locator('dialog[open] .acc-verdict', { hasText: 'Off by $25.00' }).waitFor();
 await page.locator('.acc-row', { hasText: 'Card' }).locator('[data-action=acc-remove]').click();
-await page.getByText('They match').waitFor();
+await page.locator('dialog[open] .acc-verdict', { hasText: 'They match' }).waitFor();
 await tap('[data-action=sheet-back]');
 await tap('[data-action=sheet-back]');
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
+await page.locator('#app .acc-status.ok', { hasText: 'Accounts match' }).waitFor();
 
 // Feedback from a screen's "?" help.
 await tap('[data-action=help]');

@@ -373,4 +373,8 @@ a.request-note { display:flex; align-items:center; gap:12px; padding:14px 16px; 
 
 /* The month and its arrows stay in reach while scrolling, tucked under the top bar. */
 .monthbar { position:sticky; top:calc(env(safe-area-inset-top, 0px) + var(--topbar-h, 60px)); z-index:4; background:var(--bar); -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px); margin-inline:-8px; padding:4px 8px; border-radius:0 0 14px 14px }
-.budget-tools { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-top:4px }
+/* Import, then check: right under Ready to assign. */
+.sync-bar { display:grid; grid-template-columns:1fr 1fr; gap:8px }
+.sync-bar .btn { min-width:0; white-space:normal; line-height:1.2; padding-block:8px }
+.acc-status.ok { color:var(--owed); border-color:var(--owed) }
+.acc-status.off { color:var(--warn); border-color:var(--warn); background:var(--warn-soft) }

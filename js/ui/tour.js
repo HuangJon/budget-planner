@@ -10,6 +10,7 @@ const KEY = 'wmm:tourDone';
 const STEPS = [
   { sel: '.hero', title: 'Ready to assign', text: 'Money that has come in but has no job yet. Add income here when you’re paid.' },
   { sel: '.hero-actions a.hero-btn', title: 'Plan money', text: 'Give every dollar a job: put money into each category until Ready to assign reaches $0.' },
+  { sel: '.sync-bar', title: 'Import, then check', text: 'Bring in your bank’s CSV file, then check the budget still matches your account balances.' },
   { sel: '.groups .cat-row', title: 'Each category is a pot', text: 'What you plan goes in, what you spend comes out. Tap one to add spending, change its plan or set a target.' },
   { sel: '.spend-tab', title: 'Spent', text: 'Log a purchase or a refund. It comes out of that category’s money, and your usual ones are one tap.' },
   { sel: 'a.tab[href$="-trends"]', title: 'Trends', text: 'How this month is going, and how your spending compares with usual.' },

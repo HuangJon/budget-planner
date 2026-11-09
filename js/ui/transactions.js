@@ -6,6 +6,7 @@ import { toCents } from '../core/money.js';
 import { amountBox, monthBar, summaryFor } from './budget.js';
 import { liveTransactions, monthOf } from '../core/budget.js';
 import { money } from '../core/money.js';
+import { syncBar } from './accounts.js';
 
 export const signed = t => `<span class="amt ${t.kind === 'spend' ? 'owe' : 'owed'}">${t.kind === 'spend' ? '−' : '+'}${money(t.amount)}</span>`;
 
@@ -23,7 +24,7 @@ export function transactionsScreen(b) {
       <div><span class="label">Came in</span><span class="amt owed">${money(s.incomeThisMonth)}</span></div>
       <div><span class="label">Spent</span><span class="amt owe">${money(spent)}</span></div>
     </section>
-    <div class="budget-tools"><button type="button" class="btn small" data-action="open-import">Import from your bank</button><button type="button" class="btn small" data-action="open-accounts">Check against your accounts</button></div>
+    ${syncBar(b)}
     ${list.length ? [...days].map(([day, items]) => `<section class="stack tight"><h3 class="date-head">${fmtDate(day)}</h3><div class="panel tx-list">${items.map(t => {
       const cat = t.kind === 'income' ? 'Ready to assign' : b.categories[t.categoryId]?.name || 'Removed category';
       const who = shared ? ` · ${esc(t.createdBy === A.user?.uid ? 'You' : b.members[t.createdBy]?.name || 'Former member')}` : '';
