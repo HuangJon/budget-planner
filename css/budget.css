@@ -402,6 +402,21 @@ a.request-note { display:flex; align-items:center; gap:12px; padding:14px 16px; 
 .search-filters select { width:100%; min-width:0 }
 .search-sum { display:grid; gap:6px }
 .move-all select { flex:1; min-width:0 }
-.link-row { width:100%; background:none; border:0; padding:2px 0; color:inherit; text-align:left; font:inherit } .link-row .amt { white-space:nowrap }
+
 .go-month { margin-top:6px }
 .see-all { width:100%; margin-top:6px }
+
+/*
+ * Tappable parts of the chart and its details show what a tap will do: a column lifts with an
+ * outline on hover (picked ones stay filled), and Came in / Spent / the button get the same
+ * outlined box, so it's clear they open a filtered list. Theme colours, so every look works.
+ */
+.cols .col { outline:2px solid transparent; outline-offset:-2px; transition:background .12s, outline-color .12s }
+.cols:not(.one) .col:hover, .cols:not(.one) .col:focus-visible { background:var(--accent-soft); outline-color:var(--accent) }
+.cols:not(.one) .col.picked { background:var(--sunken); outline-color:var(--accent) }
+.link-row { width:calc(100% + 16px); margin:0 -8px; padding:6px 8px; background:none; border:0; border-radius:10px; color:inherit; text-align:left; font:inherit;
+  cursor:pointer; outline:2px solid transparent; outline-offset:-2px; transition:background .12s, outline-color .12s }
+.link-row .amt { white-space:nowrap }
+.link-row:hover, .link-row:focus-visible, .link-row:active { background:var(--surface); outline-color:var(--accent) }
+.see-all:hover, .see-all:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; background:var(--surface) }
+@media (hover:none) { .link-row { background:color-mix(in srgb, var(--surface) 55%, transparent) } }
