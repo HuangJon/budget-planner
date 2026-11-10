@@ -68,7 +68,7 @@ const HELP = {
       ['The summary', 'picks the few things worth knowing this month.'],
       ['Pace', 'compares how much of your everyday money is gone with how far through the month you are. Bills and saving are left out.'],
       ['Usual', 'is the average of the last few months, counted up to the same day of the month.'],
-      ['Over time', 'adds up 3, 6 or 12 months, or anything under More (this year, 2 to 5 years, all time, or months you pick): what came in, was spent and was left over, and how that compares with the stretch before. The chart shows months, then quarters past a year, then years past three.'],
+      ['Over time', 'adds up 3, 6 or 12 months, or anything under More (this year, 2 to 5 years, all time, or months you pick): what came in, was spent and was left over, and how that compares with the stretch before. The chart shows months, then quarters past a year, then years past three. Tap a column for its numbers, and again to open its transactions in a popup; Back returns here.'],
       ['Tap any category', 'to see its months and biggest purchases.'],
       ['Sections fold.', 'Tap a heading to open or close it; your phone remembers.'],
     ],

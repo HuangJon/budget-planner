@@ -196,19 +196,14 @@ await page.locator('[data-section=months] [data-action=trend-range][data-id="12"
 await page.locator('[data-section=months] .more-range:not(.on) > span', { hasText: 'More' }).waitFor();
 await page.locator('[data-action=trend-fold][data-id=categories]').click();
 await page.locator('[data-section=categories]').getByText('last 12 months', { exact: true }).waitFor();
-// From the chart, jump to a month's Activity, then back.
-const cols0 = page.locator('.cols:not(.one) .col');
-await cols0.nth(1).click();
-const target = await page.locator('.col-detail strong').innerText();
-await page.locator('[data-action=trend-go][data-to=activity]').click();
-await page.locator('.monthbar h2', { hasText: target }).waitFor();
-await page.locator('.repeats-head, .tx-row').first().waitFor();
-await page.goBack();
-await page.locator('[data-section=months] .col-detail').waitFor();
-await tap('[data-action=month][data-id=now]');
 // Tapping the picked column again opens everything from that month.
 await page.locator('.cols:not(.one) .col[aria-pressed=true]').click();
 await page.locator('dialog[open] .search-sum').waitFor();
+// Its biggest categories narrow the list in place; Back returns to Trends where it was.
+const firstCat = page.locator('dialog[open] .by-cat .chip').first();
+const catName = (await firstCat.innerText()).split(' · ')[0];
+await firstCat.click();
+await eventually(async () => (await page.locator('dialog[open] [data-change=search-cat] option:checked').innerText()) === catName, 'Tapping a category should narrow the list to it');
 await tap('[data-action=sheet-back]');
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
 // A month's "Came in" opens exactly what came in that month.

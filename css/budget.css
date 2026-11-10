@@ -403,7 +403,6 @@ a.request-note { display:flex; align-items:center; gap:12px; padding:14px 16px; 
 .search-sum { display:grid; gap:6px }
 .move-all select { flex:1; min-width:0 }
 
-.go-month { margin-top:6px }
 .see-all { width:100%; margin-top:6px }
 
 /*
@@ -420,3 +419,4 @@ a.request-note { display:flex; align-items:center; gap:12px; padding:14px 16px; 
 .link-row:hover, .link-row:focus-visible, .link-row:active { background:var(--surface); outline-color:var(--accent) }
 .see-all:hover, .see-all:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; background:var(--surface) }
 @media (hover:none) { .link-row { background:color-mix(in srgb, var(--surface) 55%, transparent) } }
+.by-cat .chip { font-size:.8125rem; min-height:32px }
