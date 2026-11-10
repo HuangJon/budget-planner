@@ -46,6 +46,21 @@ function pastList(b) {
     </div>`).join('')}</div><p class="tiny muted">Undo takes every row from that file back out. Edits you made to them come back with Bring back.</p></section>`;
 }
 
+/**
+ * Rows from this file that are already in the budget without an account (imported before imports
+ * knew their account, or typed in by hand): saving tags them with the account picked above.
+ */
+export function untagged(b, rows, accountId, existing) {
+  if (!accountId || !b.accounts?.[accountId]) return [];
+  const byId = new Map((existing || []).filter(t => !t.deleted).map(t => [t.id, t]));
+  const ids = new Set();
+  for (const r of rows) {
+    const t = byId.get(r.skip === 'imported' ? r.key : r.skip === 'already' ? r.twin : null);
+    if (t && !t.accountId) ids.add(t.id);
+  }
+  return [...ids];
+}
+
 function drawImport() {
   const S = A.sheet, b = budget();
   if (!b) { closeSheet(); return; }
@@ -72,6 +87,9 @@ function drawImport() {
   const dates = rows.map(r => r.date).sort();
   const start = budgetStart(b);
   const history = start ? adding.filter(r => r.date < start).length : 0;
+  const retag = untagged(b, rows, S.accountId, A.transactions[b.id]);
+  const accName = b.accounts?.[S.accountId]?.name || '';
+  const label = adding.length ? `Add ${adding.length}` : retag.length ? `Tag ${retag.length} as ${accName}` : 'Nothing ticked';
   openSheet(`<div class="sheet">${sheetHead('Check and add')}<div class="sheet-body">
     <p class="small muted">${esc(S.fileName)} · ${fmtDate(dates[0])} to ${fmtDate(dates.at(-1))}</p>
     <label class="form-row bordered"><span class="form-row-label">From</span><select data-change="import-account" aria-label="Which account this file is from">
@@ -79,11 +97,12 @@ function drawImport() {
       ${Object.entries(b.accounts || {}).map(([id, a]) => `<option value="${id}" ${S.accountId === id ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}
       <option value="${NEW}">+ Add an account…</option></select></label>
     ${S.addingAccount ? `<div class="panel pad stack tight"><input id="impAccName" maxlength="40" placeholder="Name, like Chase card" autocomplete="off"><div class="seg" role="group" aria-label="Kind of account"><button type="button" data-action="imp-acc-kind" data-id="cash" aria-pressed="${S.accKind !== 'card'}">Bank or cash</button><button type="button" data-action="imp-acc-kind" data-id="card" aria-pressed="${S.accKind === 'card'}">Credit card</button></div><div class="row gap8"><button type="button" class="btn small primary" data-action="imp-acc-add">Add</button><button type="button" class="btn small" data-action="imp-acc-cancel">Cancel</button></div><p class="tiny muted">Its balance can go in later, in Check your accounts.</p></div>` : ''}
+    ${retag.length ? `<p class="notice">${retag.length} from this file ${retag.length === 1 ? 'is' : 'are'} already here without an account. Saving marks ${retag.length === 1 ? 'it' : 'them'} as ${esc(accName)}.</p>` : ''}
     ${history ? `<p class="notice">${history} ${history === 1 ? 'is' : 'are'} from before your budget started (${fmtDate(start)}). ${history === 1 ? 'It’s' : 'They’re'} kept as history for Trends and search, and won’t change your money.</p>` : ''}
     ${needCat ? `<p class="small owe">${needCat} still need${needCat === 1 ? 's' : ''} a category.</p>` : '<p class="small muted">Categories are guessed from what you picked before. Changing one changes the rest from the same place.</p>'}
     <div class="panel import-list">${shown.map(([r, i]) => row(b, r, i)).join('')}</div>
     ${skipped.length ? `<button type="button" class="link small" data-action="import-skipped">${S.showSkipped ? 'Hide the ones left out' : `Show ${skipped.length} left out`}</button>` : ''}
-  </div><div class="sheet-foot"><button type="button" class="btn primary" data-action="import-save" ${adding.length ? '' : 'disabled'}>${adding.length ? `Add ${adding.length}` : 'Nothing ticked'}</button></div></div>`);
+  </div><div class="sheet-foot"><button type="button" class="btn primary" data-action="import-save" ${adding.length || retag.length ? '' : 'disabled'}>${esc(label)}</button></div></div>`);
 }
 
 function row(b, r, i) {
@@ -206,6 +225,16 @@ actions['import-save'] = () => {
     document.querySelector('.import-list select.needs')?.scrollIntoView({ block: 'center' });
     return;
   }
+  const retag = untagged(b, S.rows, S.accountId, A.transactions[b.id]);
+  if (!adding.length) {
+    if (!retag.length) return;
+    remember(S.format, S.accountId);
+    send(A.repo.tagAccount(b.id, retag, S.accountId));
+    closeSheet();
+    toast(`Marked ${retag.length} as ${b.accounts[S.accountId].name}`, () => send(A.repo.tagAccount(b.id, retag, null)));
+    return;
+  }
+  if (retag.length) send(A.repo.tagAccount(b.id, retag, S.accountId));
   const list = adding.map(r => ({ id: r.key, kind: r.kind, amount: r.amount, date: r.date, description: r.description, categoryId: r.kind === 'income' ? null : r.categoryId }));
   const ids = list.map(t => t.id);
   if (S.accountId) remember(S.format, S.accountId);
@@ -213,7 +242,7 @@ actions['import-save'] = () => {
   closeSheet();
   // The last step of an import: check the budget still matches the accounts.
   openAccounts(b.id, { afterImport: list.length });
-  toast(`Added ${list.length}`, () => send(A.repo.unimport(b.id, ids)));
+  toast(`Added ${list.length}${retag.length ? `, marked ${retag.length} as ${b.accounts[S.accountId].name}` : ''}`, () => { send(A.repo.unimport(b.id, ids)); if (retag.length) send(A.repo.tagAccount(b.id, retag, null)); });
 };
 
 changes['import-account'] = el => {

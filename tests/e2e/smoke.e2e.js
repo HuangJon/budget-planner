@@ -468,6 +468,23 @@ if (await page.evaluate(() => window.__xss || document.querySelectorAll('img[src
 await tap('[data-action=open-import]');
 await page.locator('#importFile').setInputFiles({ name: 'again.csv', mimeType: 'text/csv', buffer: Buffer.from(CSV) });
 await page.locator('[data-action=import-save]', { hasText: 'Nothing ticked' }).waitFor();
+// Picking its account marks the ones already in (imported before they knew their account).
+await page.locator('dialog[open] [data-change=import-account]').selectOption({ label: '+ Add an account…' });
+await page.locator('#impAccName').fill('Old card');
+await tap('dialog[open] [data-action=imp-acc-add]');
+await page.locator('[data-action=import-save]', { hasText: /Tag \d+ as Old card/ }).click();
+await page.getByText(/Marked \d+ as Old card/).waitFor();
+await page.locator('dialog[open]').waitFor({ state: 'detached' });
+await tap('[data-action=open-search]');
+await page.locator('dialog[open] [data-change=search-account]').selectOption({ label: 'From Old card' });
+await page.locator('dialog[open] .tx-row', { hasText: 'SAMPLE NOODLE BAR' }).waitFor();
+await tap('[data-action=sheet-back]');
+await page.locator('dialog[open]').waitFor({ state: 'detached' });
+// Once marked, the same file has nothing left to do.
+await tap('[data-action=open-import]');
+await page.locator('#importFile').setInputFiles({ name: 'again.csv', mimeType: 'text/csv', buffer: Buffer.from(CSV) });
+await page.locator('dialog[open] [data-change=import-account]').selectOption({ label: 'Old card' });
+await page.locator('[data-action=import-save]', { hasText: 'Nothing ticked' }).waitFor();
 await tap('[data-action=sheet-back]');
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
 // Each file says which account it's from (a new one can be added right there), and past imports
@@ -503,6 +520,7 @@ await tap('[data-action=sheet-back]');
 // Tidy up: the later accounts check starts with none.
 await tap('#app [data-action=open-accounts]');
 await page.locator('.acc-row', { hasText: 'Sample card' }).locator('[data-action=acc-remove]').click();
+await page.locator('.acc-row', { hasText: 'Old card' }).locator('[data-action=acc-remove]').click();
 await page.getByText('Add the accounts your money is in').waitFor();
 await tap('[data-action=sheet-back]');
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
