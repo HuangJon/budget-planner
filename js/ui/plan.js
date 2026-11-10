@@ -7,7 +7,7 @@ import { esc, svg, ICON, fmtMonth, toast } from './dom.js';
 import { groupedCategories, copyLastMonth, fundTargets, addMonths, thisMonth } from '../core/budget.js';
 import { money, toCents, fromCents } from '../core/money.js';
 import { helpButton, describe } from './help.js';
-import { summaryFor, catStatus, groupTab, totalNeeded, hasTargets, writeAssigned, isFolded } from './budget.js';
+import { summaryFor, catStatus, groupTab, totalNeeded, hasTargets, writeAssigned, isFolded, catSheet } from './budget.js';
 
 const typedDelta = () => [...document.querySelectorAll('[data-plan]')].reduce((a, el) => a + (toCents(el.value) - Number(el.dataset.saved)), 0);
 
@@ -65,7 +65,7 @@ export function planScreen(b) {
       return `<section class="group">${groupTab(g.name, `${money(planned)} planned`, { toggle: true, folded, level: 2 })}<div class="panel group-card">${g.categories.map(c => {
       const x = s.categories[c.id];
       return `<div class="plan-row">
-        <div class="grow stack tight"><label class="cat-name" for="plan-${c.id}">${esc(c.name)}</label><span class="small">${catStatus(c, x)}</span><span class="tiny muted" id="left-${c.id}" data-saved="${x.available}">${x.available < 0 ? `${money(-x.available)} over` : `${money(x.available)} to spend`}</span></div>
+        <div class="grow stack tight"><button type="button" class="plan-cat" data-action="plan-cat" data-id="${c.id}" aria-label="${esc(c.name)}: target and details"><span class="cat-name">${esc(c.name)}</span><span class="small">${catStatus(c, x)}</span><span class="tiny link">${c.target ? 'Change target ›' : 'Set a target ›'}</span></button><span class="tiny muted" id="left-${c.id}" data-saved="${x.available}">${x.available < 0 ? `${money(-x.available)} over` : `${money(x.available)} to spend`}</span></div>
         <label class="money-in plan-in"><span class="sr">Planned for ${esc(c.name)}</span><span aria-hidden="true">$</span><input id="plan-${c.id}" inputmode="decimal" autocomplete="off" placeholder="0.00" value="${x.assigned ? esc(fromCents(x.assigned)) : ''}" data-plan="${c.id}" data-saved="${x.assigned}" data-input="plan" data-change="plan"></label>
       </div>`;
     }).join('')}<button type="button" class="add-cat" data-action="add-cat-here" data-id="${esc(g.name)}">+ Add category</button></div></section>`;
@@ -74,6 +74,8 @@ export function planScreen(b) {
     <a class="btn primary" href="#b-${b.id}">Done</a>`;
 }
 
+/** A category's name on Plan money opens its popup with Target open: monthly, yearly or by a date. */
+actions['plan-cat'] = el => { A.sheet = { kind: 'cat', budgetId: A.route.id, id: el.dataset.id, open: { target: true } }; catSheet(); };
 actions['plan-copy'] = () => {
   const b = A.budgets[A.route.id];
   const { assigned, copied } = copyLastMonth(b, A.month);

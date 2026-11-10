@@ -304,7 +304,7 @@ await shot('setup-categories');
 await tap('[data-action=nb-next]');
 await page.locator('#planReady').waitFor();
 await eventually(async () => !((await page.locator('#planReady').innerText()) !== '$1,500.00'), 'Starting money should be ready to assign');
-await eventually(async () => !(!(await page.locator('label.cat-name', { hasText: 'Pets' }).count())), 'Picked category missing');
+await eventually(async () => !(!(await page.locator('.plan-cat .cat-name', { hasText: 'Pets' }).count())), 'Picked category missing');
 await shot('setup-plan');
 
 // Round 6: requests to join, filters, compact view, viewed-month dates, yearly start, See trend.
@@ -368,7 +368,12 @@ await page.fill('#newCatName', 'Hobbies');
 await tap('[data-action=cat-add]');
 await page.locator('.ed-row', { hasText: 'Hobbies' }).waitFor();
 await tap('[data-action=sheet-back]');
-await page.locator('label.cat-name', { hasText: 'Hobbies' }).waitFor();
+await page.locator('.plan-cat .cat-name', { hasText: 'Hobbies' }).waitFor();
+// On Plan money, a category's name opens its target, ready to set (monthly, yearly or by a date).
+await page.locator('.plan-cat', { hasText: 'Hobbies' }).click();
+await page.locator('dialog[open] [data-action=target-kind][data-id=yearly]').waitFor();
+await tap('[data-action=sheet-back]');
+await page.locator('dialog[open]').waitFor({ state: 'detached' });
 await tap('.topbar a.btn');
 
 // A paycheck every 2 weeks.
