@@ -172,6 +172,9 @@ await no(bob.backend.update(`budgets/${B}`, { [`members.${alice.uid}.name`]: 'Ha
 const { transaction: t1, written: tw } = bob.repo.addTransaction(B, { kind: 'spend', amount: 1850, date: '2026-11-07', description: 'Groceries', categoryId: catId });
 await ok(tw, 'a member adds spending');
 await ok(alice.repo.updateTransaction(B, t1, { amount: 1900 }), "anyone in the budget can fix anyone's entry");
+await ok(alice.repo.updateTransaction(B, t1, { splits: [{ categoryId: catId, amount: 900 }, { categoryId: catId, amount: 1000 }] }), 'a purchase can be split');
+await no(alice.repo.updateTransaction(B, t1, { splits: Array.from({ length: 21 }, () => ({ categoryId: catId, amount: 1 })) }), 'but not into more than 20 parts');
+await ok(alice.repo.recategorize(B, [t1], catId), 'moving it clears the split');
 await ok(alice.repo.deleteTransaction(B, t1.id), 'deleting only marks it');
 await no(alice.backend.remove(`budgets/${B}/transactions/${t1.id}`), 'nothing is deleted outright');
 await no(bob.backend.set(`budgets/${B}/transactions/${randomId()}`, { id: 'x', budgetId: B, kind: 'spend', amount: 12.5, date: '2026-11-07', description: 'x', categoryId: catId, createdBy: bob.uid, createdAt: 1 }), 'amounts are whole cents');

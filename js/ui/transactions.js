@@ -4,7 +4,7 @@ import { esc, fmtDate, ordinal, openSheet, closeSheet, sheetHead, toast, send, v
 import { isValidRule, nextDate, howOften, every, EVERY } from '../core/recurring.js';
 import { toCents } from '../core/money.js';
 import { amountBox, monthBar, summaryFor } from './budget.js';
-import { liveTransactions, monthOf, budgetStart, isHistory } from '../core/budget.js';
+import { liveTransactions, monthOf, budgetStart, isHistory, categoryLabel } from '../core/budget.js';
 import { money } from '../core/money.js';
 import { syncBar } from './accounts.js';
 
@@ -29,7 +29,7 @@ export function transactionsScreen(b) {
     ${budgetStart(b) && A.month <= budgetStart(b).slice(0, 7) && list.some(t => isHistory(b, t)) ? `<p class="notice small">Your budget starts ${fmtDate(budgetStart(b))}. What’s marked History is from before then: it counts in Trends and search, not in your money.</p>` : ''}
     ${repeatsPanel(b)}
     ${list.length ? [...days].map(([day, items]) => `<section class="stack tight"><h3 class="date-head">${fmtDate(day)}</h3><div class="panel tx-list">${items.map(t => {
-      const cat = t.kind === 'income' ? 'Ready to assign' : b.categories[t.categoryId]?.name || 'Removed category';
+      const cat = categoryLabel(b, t);
       const who = shared ? ` · ${esc(t.createdBy === A.user?.uid ? 'You' : b.members[t.createdBy]?.name || 'Former member')}` : '';
       return `<button type="button" class="tap tx-row" data-action="edit-tx" data-id="${t.id}"><span class="grow stack tight"><strong class="wrap-any two-lines">${esc(t.description || (t.kind === 'income' ? 'Income' : t.kind === 'refund' ? 'Refund' : 'Spending'))}</strong><span class="tiny muted">${esc(cat)}${who}${t.kind === 'refund' ? ' · Refund' : ''}${isHistory(b, t) ? ' · History' : ''}</span></span>${signed(t)}</button>`;
     }).join('')}</div></section>`).join('')

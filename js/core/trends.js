@@ -2,11 +2,13 @@
  * Trends for one budget, worked out on the device from its transactions and plan.
  * Spending here means spending minus refunds; income and transfers in are counted apart.
  */
-import { addMonths, monthOf, liveTransactions, monthSummary, targetType } from './budget.js';
+import { addMonths, monthOf, liveTransactions, monthSummary, targetType, parts } from './budget.js';
 import { occurrences } from './recurring.js';
 
 const dayOf = date => Number(date.slice(8, 10));
 const net = t => (t.kind === 'spend' ? t.amount : t.kind === 'refund' ? -t.amount : 0);
+/** A split part's spending, with the transaction's sign. */
+const partNet = (t, p) => (t.kind === 'spend' ? p.amount : t.kind === 'refund' ? -p.amount : 0);
 
 /** Spending per category per month: { 'YYYY-MM': { catId: cents } }, optionally only up to a day of the month. */
 function byMonthCategory(transactions, uptoDay = 31) {
@@ -15,7 +17,7 @@ function byMonthCategory(transactions, uptoDay = 31) {
     if (t.kind === 'income' || dayOf(t.date) > uptoDay) continue;
     const m = monthOf(t.date);
     out[m] ??= {};
-    out[m][t.categoryId] = (out[m][t.categoryId] || 0) + net(t);
+    for (const p of parts(t)) out[m][p.categoryId] = (out[m][p.categoryId] || 0) + partNet(t, p);
   }
   return out;
 }
@@ -34,7 +36,7 @@ export function monthTotals(transactionList, month, count = 6, budget = null) {
     for (const t of transactions) {
       if (monthOf(t.date) !== m) continue;
       if (t.kind === 'income') income += t.amount;
-      else { spent += net(t); if (saving(t.categoryId)) saved += net(t); }
+      else { spent += net(t); for (const p of parts(t)) if (saving(p.categoryId)) saved += partNet(t, p); }
     }
     rows.push({ month: m, income, spent: Math.max(0, spent), saved: Math.max(0, saved) });
   }
@@ -249,9 +251,10 @@ export function upcomingBills(budget, transactionList, today, days = 30) {
 
 /** One category over a range of months: spending each month, the average of active months, and its biggest purchases. */
 export function categoryHistory(transactionList, catId, months, biggest = 5) {
-  const transactions = liveTransactions(transactionList).filter(t => t.categoryId === catId && months.includes(monthOf(t.date)));
+  const share = t => parts(t).find(p => p.categoryId === catId);
+  const transactions = liveTransactions(transactionList).filter(t => share(t) && months.includes(monthOf(t.date)));
   const byMonth = Object.fromEntries(months.map(m => [m, 0]));
-  for (const t of transactions) byMonth[monthOf(t.date)] += net(t);
+  for (const t of transactions) byMonth[monthOf(t.date)] += partNet(t, share(t));
   const rows = months.map(m => ({ month: m, spent: Math.max(0, byMonth[m]) }));
   const active = rows.filter(r => r.spent > 0);
   return {
@@ -282,8 +285,8 @@ export function byPerson(budget, transactionList, month) {
 export function categoryTotals(budget, transactionList, months) {
   const out = {};
   for (const t of liveTransactions(transactionList)) {
-    if (t.kind === 'income' || !months.includes(monthOf(t.date)) || !budget.categories?.[t.categoryId]) continue;
-    out[t.categoryId] = (out[t.categoryId] || 0) + net(t);
+    if (t.kind === 'income' || !months.includes(monthOf(t.date))) continue;
+    for (const p of parts(t)) if (budget.categories?.[p.categoryId]) out[p.categoryId] = (out[p.categoryId] || 0) + partNet(t, p);
   }
   return Object.entries(out).filter(([, v]) => v > 0).map(([id, spent]) => ({ id, name: budget.categories[id].name, spent, perMonth: Math.round(spent / months.length) })).sort((a, b) => b.spent - a.spent);
 }

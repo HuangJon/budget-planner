@@ -267,3 +267,15 @@ test('a yearly limit counts spending from earlier this year, even when that is h
   assert.equal(s.categories.c.target.spentThisYear, 35000, 'March (history) plus November, not last year');
   assert.equal(s.categories.c.available, -5000, 'history still never moves money');
 });
+
+test('a split purchase comes out of each of its categories, and only counts when the parts add up', async () => {
+  const { monthSummary, parts } = await import('../../js/core/budget.js');
+  const b = { categories: { g: { name: 'Groceries' }, c: { name: 'Clothes' } }, assigned: { '2026-11': { g: 10000, c: 10000 } } };
+  const t = { id: 's', kind: 'spend', amount: 8400, date: '2026-11-04', categoryId: 'g', description: 'Online order', splits: [{ categoryId: 'g', amount: 5400 }, { categoryId: 'c', amount: 3000 }] };
+  const s = monthSummary(b, [t], '2026-11');
+  assert.equal(s.categories.g.available, 4600);
+  assert.equal(s.categories.c.available, 7000);
+  assert.deepEqual(parts({ ...t, splits: [{ categoryId: 'g', amount: 1 }, { categoryId: 'c', amount: 1 }] }), [{ categoryId: 'g', amount: 8400 }], 'parts that don\'t add up are ignored');
+  const refund = { ...t, id: 'r', kind: 'refund', splits: [{ categoryId: 'g', amount: 400 }, { categoryId: 'c', amount: 8000 }] };
+  assert.equal(monthSummary(b, [refund], '2026-11').categories.c.available, 18000, 'a split refund goes back to each');
+});

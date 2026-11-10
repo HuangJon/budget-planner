@@ -2,7 +2,7 @@
  * Spreadsheet files of a budget: every transaction, and the plan for each month. Plain CSV that
  * opens in Numbers, Excel or Google Sheets. Amounts are dollars with two decimals.
  */
-import { liveTransactions } from './budget.js';
+import { liveTransactions, parts } from './budget.js';
 
 /**
  * One spreadsheet cell. Text that starts like a formula gets a leading apostrophe so a spreadsheet
@@ -21,12 +21,13 @@ const dollars = cents => (cents / 100).toFixed(2);
 export function transactionsCsv(budget, transactionList) {
   const lines = [row(['Date', 'Type', 'Description', 'Category', 'Group', 'Amount', 'Note', 'Added by', 'Repeats'])];
   const list = liveTransactions(transactionList).sort((a, b) => a.date.localeCompare(b.date) || (a.createdAt || 0) - (b.createdAt || 0));
-  for (const t of list) {
-    const c = budget.categories?.[t.categoryId];
+  // A split purchase is one line per part, so each category's total adds up in a spreadsheet.
+  for (const t of list) for (const p of (t.kind === 'income' ? [{ categoryId: null, amount: t.amount }] : parts(t))) {
+    const c = budget.categories?.[p.categoryId], split = p.amount !== t.amount;
     lines.push(row([
-      t.date, t.kind === 'income' ? 'Income' : t.kind === 'refund' ? 'Refund' : 'Spending', t.description || '',
+      t.date, t.kind === 'income' ? 'Income' : t.kind === 'refund' ? 'Refund' : 'Spending', `${t.description || ''}${split ? ' (part of a split)' : ''}`,
       t.kind === 'income' ? 'Ready to assign' : c?.name || 'Removed category', t.kind === 'income' ? '' : c?.group || '',
-      dollars(t.kind === 'spend' ? -t.amount : t.amount), t.note || '', budget.members?.[t.createdBy]?.name || '', t.recurringId ? 'Yes' : '',
+      dollars(t.kind === 'spend' ? -p.amount : p.amount), t.note || '', budget.members?.[t.createdBy]?.name || '', t.recurringId ? 'Yes' : '',
     ]));
   }
   return `${lines.join('\r\n')}\r\n`;

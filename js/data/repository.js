@@ -192,7 +192,7 @@ export function createRepository(backend, now = () => Date.now()) {
           const rid = randomId();
           return [
             { op: 'set', path: `${txPath(id, before.id)}/revisions/${rid}`, value: { id: rid, at: now(), by: uid(), transaction: before } },
-            { op: 'update', path: txPath(id, before.id), value: { categoryId, updatedAt: now(), updatedBy: uid() } },
+            { op: 'update', path: txPath(id, before.id), value: { categoryId, splits: null, updatedAt: now(), updatedBy: uid() } },
           ];
         }));
       }

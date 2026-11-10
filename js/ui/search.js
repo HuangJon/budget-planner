@@ -8,7 +8,7 @@ import { esc, openSheet, sheetHead, openChild, registerSheet, toast, send, fmtDa
 import { searchTransactions, searchTotals } from '../core/search.js';
 import { money } from '../core/money.js';
 import { catOptions } from './tx-form.js';
-import { isHistory } from '../core/budget.js';
+import { isHistory, categoryLabel, parts } from '../core/budget.js';
 
 const SHOWN = 150;
 const WHEN = [['', 'Any time'], ['year', 'This year'], ['12', 'Last 12 months'], ['3', 'Last 3 months'], ['month', 'This month']];
@@ -59,7 +59,7 @@ function drawSearch() {
         : '<button type="button" class="link small" data-action="search-move-open">Change category for all of these</button>') : ''}
     </section>` : ''}
     ${filtered ? '' : '<p class="tiny muted">Everything in this budget, every month, history included. Type or pick above to narrow it down.</p>'}
-    ${any && matches.length ? `<div class="panel tx-list">${matches.slice(0, SHOWN).map(m => `<button type="button" class="tap tx-row" data-action="edit-tx" data-id="${m.id}"><span class="grow stack tight"><strong class="wrap-any two-lines">${esc(m.description || 'Spending')}</strong><span class="tiny muted">${fmtDate(m.date)} · ${esc(m.kind === 'income' ? 'Ready to assign' : cats[m.categoryId]?.name || 'Removed category')}${m.kind === 'refund' ? ' · Refund' : ''}${isHistory(b, m) ? ' · History' : ''}${m.accountId && b.accounts?.[m.accountId] ? ` · ${esc(b.accounts[m.accountId].name)}` : ''}</span></span><span class="amt ${m.kind === 'spend' ? 'owe' : 'owed'}">${m.kind === 'spend' ? '−' : '+'}${money(m.amount)}</span></button>`).join('')}</div>
+    ${any && matches.length ? `<div class="panel tx-list">${matches.slice(0, SHOWN).map(m => `<button type="button" class="tap tx-row" data-action="edit-tx" data-id="${m.id}"><span class="grow stack tight"><strong class="wrap-any two-lines">${esc(m.description || 'Spending')}</strong><span class="tiny muted">${fmtDate(m.date)} · ${esc(categoryLabel(b, m))}${m.kind === 'refund' ? ' · Refund' : ''}${isHistory(b, m) ? ' · History' : ''}${m.accountId && b.accounts?.[m.accountId] ? ` · ${esc(b.accounts[m.accountId].name)}` : ''}</span></span><span class="amt ${m.kind === 'spend' ? 'owe' : 'owed'}">${m.kind === 'spend' ? '−' : '+'}${money(m.amount)}</span></button>`).join('')}</div>
     ${matches.length > SHOWN ? `<p class="tiny muted">Showing the newest ${SHOWN} of ${matches.length}. The totals count them all.</p>` : ''}` : any ? '<p class="small muted">Nothing matches.</p>' : ''}
   </div></div>`);
 }
@@ -81,13 +81,16 @@ actions['search-move'] = () => {
   if (!to || !b.categories[to]) { toast('Pick a category.'); return; }
   const matches = searchTransactions(A.transactions[b.id] || [], { text: S.text, categoryId: S.categoryId, kind: S.flow, accountId: S.accountId || '', ...range(S) })
     .filter(m => m.kind !== 'income' && m.categoryId !== to);
+  // Split purchases stay as they are: moving one whole would undo how it was divided.
+  const splitOnes = matches.filter(m => parts(m).length > 1);
+  matches.splice(0, matches.length, ...matches.filter(m => parts(m).length === 1));
   S.moving = false;
   if (!matches.length) { toast(`They’re all in ${b.categories[to].name} already.`); drawSearch(); return; }
   send(A.repo.recategorize(b.id, matches, to));
   // Undo puts each one back where it was.
   const back = {};
   for (const m of matches) (back[m.categoryId] ||= []).push({ ...m, categoryId: to });
-  toast(`Moved ${matches.length} to ${b.categories[to].name}`, () => { for (const [cat, list] of Object.entries(back)) send(A.repo.recategorize(b.id, list, cat)); });
+  toast(`Moved ${matches.length} to ${b.categories[to].name}${splitOnes.length ? `; ${splitOnes.length} split ${splitOnes.length === 1 ? 'one' : 'ones'} left as they are` : ''}`, () => { for (const [cat, list] of Object.entries(back)) send(A.repo.recategorize(b.id, list, cat)); });
   drawSearch();
 };
 actions['open-search'] = () => openSearch(A.route.id);

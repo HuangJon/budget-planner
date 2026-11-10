@@ -56,8 +56,24 @@ export const isHistory = (budget, t) => { const s = budgetStart(budget); return 
 /** The transactions that move money in the budget: live, and not history. */
 export const budgetTransactions = (budget, list) => liveTransactions(list).filter(t => !isHistory(budget, t));
 
-/** The effect of one transaction on its category: spending lowers it, a refund raises it. */
-const categoryEffect = t => (t.kind === 'spend' ? -t.amount : t.kind === 'refund' ? t.amount : 0);
+/**
+ * The categories a transaction's money went to: one, or several when it's split (an Amazon order
+ * for groceries and clothes). Splits only count when they add up to the whole amount.
+ */
+export function parts(t) {
+  const s = t.splits;
+  if (Array.isArray(s) && s.length >= 2 && s.every(p => p && typeof p.categoryId === 'string' && Number.isInteger(p.amount) && p.amount > 0)
+    && s.reduce((a, p) => a + p.amount, 0) === t.amount) return s;
+  return [{ categoryId: t.categoryId, amount: t.amount }];
+}
+/** What to call a transaction's category: its name, or "Split · A, B" for a split one. */
+export function categoryLabel(budget, t) {
+  if (t.kind === 'income') return 'Ready to assign';
+  const ps = parts(t), name = id => budget.categories?.[id]?.name || 'Removed category';
+  return ps.length > 1 ? `Split · ${ps.map(p => name(p.categoryId)).join(', ')}` : name(t.categoryId);
+}
+/** A part's effect on its category, with the transaction's sign. */
+export const partEffect = (t, p) => (t.kind === 'spend' ? -p.amount : t.kind === 'refund' ? p.amount : 0);
 
 /** The first month anything happened in, so carry-over can start there. */
 function firstMonth(budget, transactions, month) {
@@ -74,7 +90,7 @@ function activityByMonth(transactions) {
     if (t.kind === 'income') continue;
     const m = monthOf(t.date);
     out[m] ??= {};
-    out[m][t.categoryId] = (out[m][t.categoryId] || 0) + categoryEffect(t);
+    for (const p of parts(t)) out[m][p.categoryId] = (out[m][p.categoryId] || 0) + partEffect(t, p);
   }
   return out;
 }
@@ -115,8 +131,8 @@ export function monthSummary(budget, transactionList, month) {
   const start = budgetStart(budget);
   if (start && start.slice(0, 4) === year) {
     for (const t of liveTransactions(transactionList)) {
-      if (!isHistory(budget, t) || !t.date.startsWith(year) || !(t.categoryId in spentThisYear)) continue;
-      spentThisYear[t.categoryId] -= categoryEffect(t);
+      if (!isHistory(budget, t) || !t.date.startsWith(year)) continue;
+      for (const p of parts(t)) if (p.categoryId in spentThisYear) spentThisYear[p.categoryId] -= partEffect(t, p);
     }
   }
 

@@ -199,3 +199,13 @@ test('month totals say how much of the spending went to saving groups', () => {
   ];
   assert.deepEqual(monthTotals(list, '2026-09', 1, b)[0], { month: '2026-09', income: 0, spent: 1005000, saved: 1000000 });
 });
+
+test('trends and search count each part of a split', async () => {
+  const { categoryTotals, categoryHistory } = await import('../../js/core/trends.js');
+  const { searchTotals, searchTransactions } = await import('../../js/core/search.js');
+  const b = { categories: { g: { name: 'G' }, c: { name: 'C' } } };
+  const list = [{ id: 's', kind: 'spend', amount: 8400, date: '2026-11-04', categoryId: 'g', description: 'Order', splits: [{ categoryId: 'g', amount: 5400 }, { categoryId: 'c', amount: 3000 }] }];
+  assert.deepEqual(categoryTotals(b, list, ['2026-11']).map(r => [r.id, r.spent]).sort(), [['c', 3000], ['g', 5400]]);
+  assert.equal(categoryHistory(list, 'c', ['2026-11']).total, 3000);
+  assert.deepEqual(searchTotals(searchTransactions(list, { categoryId: 'c' })).byCategory.map(x => [x.id, x.amount]).sort(), [['c', 3000], ['g', 5400]]);
+});

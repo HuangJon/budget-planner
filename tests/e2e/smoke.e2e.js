@@ -119,6 +119,31 @@ await page.locator('.sheet-head h2').tap(); // tap away to close the keyboard
 await tap('[data-action=tx-save]');
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
 
+// One purchase split across two categories: it won't save until the parts add up.
+await tap('.spend-tab');
+await page.fill('#fAmount', '30');
+await page.fill('#fDesc', 'Split order');
+await tap('[data-action=tx-split]');
+await page.locator('select[data-change=split-cat][data-id="0"]').selectOption({ label: 'Groceries' });
+await page.fill('#split-0', '20');
+await page.locator('select[data-change=split-cat][data-id="1"]').selectOption({ index: 2 });
+await page.fill('#split-1', '5');
+await eventually(async () => (await page.locator('#splitLeft').innerText()).includes('$5.00 left'), 'Split should show what is left to divide');
+await page.locator('dialog[open] .sheet-head h2').click(); // tap away, as with the keyboard
+await tap('[data-action=tx-save]');
+await page.waitForTimeout(150);
+if (!(await page.locator('dialog[open] #splitLeft').count())) fail('A split that does not add up should not save');
+await page.fill('#split-1', '10');
+await eventually(async () => (await page.locator('#splitLeft').innerText()) === 'Adds up', 'Split should add up');
+await page.locator('dialog[open] .sheet-head h2').click();
+await tap('[data-action=tx-save]');
+await page.locator('dialog[open]').waitFor({ state: 'detached' });
+await tap('[data-action=open-search]');
+await page.fill('#searchText', 'Split order');
+await eventually(async () => (await page.locator('dialog[open] .tx-row').first().innerText()).includes('Split · Groceries'), 'Search should show the split');
+await tap('[data-action=sheet-back]');
+await page.locator('dialog[open]').waitFor({ state: 'detached' });
+
 // Income comes in from the Ready to assign card, with last paycheck one tap away.
 const beforeIncome = await ready();
 await tap('[data-action=add-income]');

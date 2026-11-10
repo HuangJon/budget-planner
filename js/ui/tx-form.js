@@ -5,7 +5,7 @@
  */
 import { A, actions, inputs, changes } from './state.js';
 import { esc, openSheet, closeSheet, sheetHead, toast, send, today, fmtDate, ordinal, openChild, finishSheet, registerSheet } from './dom.js';
-import { groupedCategories, isValidTransaction, liveTransactions, defaultDateFor } from '../core/budget.js';
+import { groupedCategories, isValidTransaction, liveTransactions, defaultDateFor, parts } from '../core/budget.js';
 import { suggestCategory } from '../core/categorize.js';
 import { recurringId, DAY_MAX, EVERY, howOften } from '../core/recurring.js';
 import { toCents, fromCents, money } from '../core/money.js';
@@ -16,7 +16,8 @@ export const defaultDate = (viewing = A.month) => defaultDateFor(today(), viewin
 
 export function openTxForm(budgetId, editing = null, preset = {}) {
   A.form = editing
-    ? { budgetId, editing, kind: editing.kind, amount: fromCents(editing.amount), description: editing.description || '', categoryId: editing.categoryId || '', date: editing.date, note: editing.note || '', showNote: Boolean(editing.note), touchedCat: true, repeat: false, every: 'month' }
+    ? { budgetId, editing, kind: editing.kind, amount: fromCents(editing.amount), description: editing.description || '', categoryId: editing.categoryId || '', date: editing.date, note: editing.note || '', showNote: Boolean(editing.note), touchedCat: true, repeat: false, every: 'month',
+      splits: parts(editing).length > 1 ? parts(editing).map(p => ({ categoryId: p.categoryId, amount: fromCents(p.amount) })) : null }
     : { budgetId, editing: null, kind: preset.kind || 'spend', amount: '', description: '', categoryId: preset.categoryId || '', date: defaultDate(), note: '', showNote: false, touchedCat: Boolean(preset.categoryId), repeat: false, every: 'month' };
   openChild({ kind: 'tx' }, drawForm);
   if (!editing) document.getElementById('fAmount')?.focus();
@@ -65,7 +66,7 @@ function drawForm() {
       <div class="form-rows">
         ${income
           ? '<div class="form-row"><span class="form-row-label">Goes to</span><span class="form-row-value">Ready to assign</span></div>'
-          : `<label class="form-row"><span class="form-row-label">Category <span class="tiny muted" id="catHint">${F.suggested ? 'Suggested' : ''}</span></span><select id="fCat" data-change="tx-cat">${catOptions(b, F.categoryId)}</select></label>`}
+          : F.splits ? splitRows(b, F) : `<label class="form-row"><span class="form-row-label">Category <span class="tiny muted" id="catHint">${F.suggested ? 'Suggested' : ''}</span></span><select id="fCat" data-change="tx-cat">${catOptions(b, F.categoryId)}</select></label>`}
         <label class="form-row form-row-date"><span class="form-row-label">Date</span><span class="form-row-value" id="fDateShown">${esc(fmtDate(F.date))}</span><input id="fDate" type="date" required value="${esc(F.date)}" data-change="tx-date"></label>
         ${income ? '' : `<label class="form-row switch-row"><span class="form-row-label">This was a refund</span><input type="checkbox" id="fRefund" role="switch" ${refund ? 'checked' : ''} data-change="tx-refund"></label>`}
         ${F.editing
@@ -73,6 +74,7 @@ function drawForm() {
           : refund ? '' : `<label class="form-row switch-row"><span class="form-row-label">Repeat <span class="tiny muted" id="repeatHint">${F.repeat ? esc(howOften(draftRule(F), ordinal)) : ''}</span></span><input type="checkbox" id="fRepeat" role="switch" ${F.repeat ? 'checked' : ''} data-change="tx-repeat"></label>
             ${F.repeat ? `<label class="form-row"><span class="form-row-label">How often</span><select id="fEvery" data-change="tx-every">${Object.entries(EVERY).map(([k, label]) => `<option value="${k}" ${F.every === k ? 'selected' : ''}>${label}</option>`).join('')}</select></label>` : ''}`}
       </div>
+      ${!income && !F.repeat && !F.splits ? '<button type="button" class="link small split-open" data-action="tx-split">Split across categories</button>' : ''}
       ${F.repeat && F.every === 'month' && day > DAY_MAX ? `<p class="small muted">Repeats on the ${ordinal(DAY_MAX)}, so it lands in every month.</p>` : ''}
       ${F.repeat && F.every !== 'month' ? '<p class="small muted">Counted from this date. Paychecks every 2 weeks land in some months three times, and the extra goes to Ready to assign.</p>' : ''}
       ${F.showNote
@@ -84,6 +86,43 @@ function drawForm() {
   </form>`);
 }
 
+/**
+ * One purchase across several categories (an online order of groceries and clothes): a category
+ * and an amount per part, and what's still to divide. The parts must add up to the total.
+ */
+function splitRows(b, F) {
+  const total = toCents(F.amount), used = F.splits.reduce((a, p) => a + (toCents(p.amount) || 0), 0), left = total - used;
+  return `<div class="split-box stack tight">
+    <div class="row between"><span class="form-row-label">Split</span><button type="button" class="link small" data-action="tx-unsplit">Don’t split</button></div>
+    ${F.splits.map((p, i) => `<div class="split-row row gap8">
+      <select aria-label="Category for part ${i + 1}" data-change="split-cat" data-id="${i}">${catOptions(b, p.categoryId)}</select>
+      <label class="money-in split-amt"><span class="sr">Amount for part ${i + 1}</span><span aria-hidden="true">$</span><input id="split-${i}" inputmode="decimal" autocomplete="off" placeholder="0.00" value="${esc(p.amount)}" data-input="split-amt" data-id="${i}"></label>
+      ${F.splits.length > 2 ? `<button type="button" class="icon-btn small-icon" data-action="split-remove" data-id="${i}" aria-label="Remove part ${i + 1}">×</button>` : ''}
+    </div>`).join('')}
+    <div class="row between"><button type="button" class="link small" data-action="split-add">+ Add a part</button><span class="small ${left === 0 ? 'muted' : 'owe'}" id="splitLeft">${left === 0 ? 'Adds up' : left > 0 ? `${money(left)} left to divide` : `${money(-left)} too much`}</span></div>
+  </div>`;
+}
+const splitLeft = () => {
+  const F = A.form, el = document.getElementById('splitLeft');
+  if (!el || !F.splits) return;
+  const left = toCents(document.getElementById('fAmount')?.value || F.amount) - F.splits.reduce((a, p) => a + (toCents(p.amount) || 0), 0);
+  el.textContent = left === 0 ? 'Adds up' : left > 0 ? `${money(left)} left to divide` : `${money(-left)} too much`;
+  el.className = `small ${left === 0 ? 'muted' : 'owe'}`;
+};
+actions['tx-split'] = () => {
+  keepTyped();
+  const F = A.form;
+  // Starts as the whole amount in the category picked so far, plus an empty second part.
+  F.splits = [{ categoryId: F.categoryId || '', amount: F.amount || '' }, { categoryId: '', amount: '' }];
+  drawForm();
+  document.getElementById('split-0')?.select();
+};
+actions['tx-unsplit'] = () => { keepTyped(); const F = A.form; F.categoryId = F.splits?.[0]?.categoryId || F.categoryId; F.splits = null; drawForm(); };
+actions['split-add'] = () => { keepTyped(); A.form.splits.push({ categoryId: '', amount: '' }); drawForm(); document.getElementById(`split-${A.form.splits.length - 1}`)?.focus(); };
+actions['split-remove'] = el => { keepTyped(); A.form.splits.splice(Number(el.dataset.id), 1); drawForm(); };
+changes['split-cat'] = el => { A.form.splits[Number(el.dataset.id)].categoryId = el.value; };
+inputs['split-amt'] = el => { A.form.splits[Number(el.dataset.id)].amount = el.value; splitLeft(); };
+
 /** Keeps what's typed before redrawing the form. */
 const keepTyped = () => {
   const F = A.form;
@@ -93,7 +132,7 @@ const keepTyped = () => {
   }
 };
 
-inputs['tx-amount'] = el => { A.form.amount = el.value; };
+inputs['tx-amount'] = el => { A.form.amount = el.value; splitLeft(); };
 inputs['tx-note'] = el => { A.form.note = el.value; };
 inputs['tx-desc'] = el => {
   const F = A.form;
@@ -145,10 +184,21 @@ actions['tx-save'] = () => {
   const F = A.form;
   const amount = toCents(F.amount);
   if (amount <= 0) { toast('Type an amount.'); document.getElementById('fAmount')?.focus(); return; }
+  let splits = null;
+  if (F.kind !== 'income' && F.splits) {
+    splits = F.splits.map(p => ({ categoryId: p.categoryId, amount: toCents(p.amount) || 0 })).filter(p => p.amount > 0 || p.categoryId);
+    if (splits.length < 2) { toast('A split needs at least two parts.'); return; }
+    if (splits.some(p => !p.categoryId || p.amount <= 0)) { toast('Each part needs a category and an amount.'); return; }
+    const sum = splits.reduce((a, p) => a + p.amount, 0);
+    if (sum !== amount) { toast(sum < amount ? `The parts are ${money(amount - sum)} short of the total.` : `The parts are ${money(sum - amount)} over the total.`); return; }
+    F.categoryId = splits[0].categoryId;
+  }
   if (F.kind !== 'income' && !F.categoryId) { toast('Pick a category.'); document.getElementById('fCat')?.focus(); return; }
   const fields = {
     kind: F.kind, amount, date: F.date, description: F.description.trim(), note: F.note.trim(),
     categoryId: F.kind === 'income' ? null : F.categoryId,
+    // Split into parts, or explicitly not (so turning a split off on an edit clears it).
+    ...(splits ? { splits } : F.editing?.splits ? { splits: null } : {}),
   };
   if (!isValidTransaction({ id: 'check', ...fields, categoryId: fields.categoryId ?? undefined })) { toast('Something is missing. Check the amount and date.'); return; }
   const budgetId = F.budgetId;
@@ -159,7 +209,7 @@ actions['tx-save'] = () => {
     const { id, budgetId: _b, createdBy, createdAt, updatedAt, updatedBy, ...old } = before;
     // Changed the category: the others from the same place, in the old category, can follow in one tap.
     const same = d => String(d || '').trim().toLowerCase();
-    const others = fields.categoryId && before.categoryId && fields.categoryId !== before.categoryId
+    const others = !splits && parts(before).length === 1 && fields.categoryId && before.categoryId && fields.categoryId !== before.categoryId
       ? liveTransactions(A.transactions[budgetId]).filter(t => t.id !== before.id && t.categoryId === before.categoryId && same(t.description) === same(before.description))
       : [];
     const b = A.budgets[budgetId];

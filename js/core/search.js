@@ -2,7 +2,7 @@
  * Searching every transaction in a budget, history included: by words (in the description or
  * note), category, kind and dates. Gives the matches, newest first, and what they add up to.
  */
-import { liveTransactions, monthOf } from './budget.js';
+import { liveTransactions, monthOf, parts } from './budget.js';
 
 const norm = s => String(s || '').toLowerCase();
 
@@ -29,9 +29,9 @@ export function searchTotals(matches) {
   for (const t of matches) {
     months.add(monthOf(t.date));
     if (t.kind === 'income') { income += t.amount; continue; }
-    const v = t.kind === 'spend' ? t.amount : -t.amount;
-    spent += v;
-    byCat[t.categoryId] = (byCat[t.categoryId] || 0) + v;
+    const sign = t.kind === 'spend' ? 1 : -1;
+    spent += sign * t.amount;
+    for (const p of parts(t)) byCat[p.categoryId] = (byCat[p.categoryId] || 0) + sign * p.amount;
   }
   const sorted = [...months].sort();
   let span = 0;

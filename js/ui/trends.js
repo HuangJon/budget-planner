@@ -11,7 +11,7 @@ import {
   pace, upcomingBills, categoryHistory, biggestPurchases, byPerson, categoryTotals, headlines, rangeMonths, byYear, byQuarter, firstMonth,
 } from '../core/trends.js';
 import { money } from '../core/money.js';
-import { addMonths } from '../core/budget.js';
+import { addMonths, categoryLabel } from '../core/budget.js';
 import { openSearch } from './search.js';
 
 const short = m => new Date(`${m}-15T12:00:00`).toLocaleDateString('en', { month: 'short' });
@@ -190,7 +190,7 @@ function categoriesOverTime(rows, months, label) {
 
 function biggest(list, b, wide) {
   if (!list.length) return `<p class="small muted">No purchases ${wide ? 'in this time' : 'this month yet'}.</p>`;
-  return `<ul class="tx-mini">${list.map(t => `<li><button type="button" class="tap tx-row" data-action="edit-tx" data-id="${t.id}"><span class="grow stack tight"><strong class="wrap-any two-lines">${esc(t.description || 'Spending')}</strong><span class="tiny muted">${esc(b.categories[t.categoryId]?.name || 'Removed category')} · ${fmtDate(t.date)}</span></span><span class="amt owe">−${money(t.amount)}</span></button></li>`).join('')}</ul>`;
+  return `<ul class="tx-mini">${list.map(t => `<li><button type="button" class="tap tx-row" data-action="edit-tx" data-id="${t.id}"><span class="grow stack tight"><strong class="wrap-any two-lines">${esc(t.description || 'Spending')}</strong><span class="tiny muted">${esc(categoryLabel(b, t))} · ${fmtDate(t.date)}</span></span><span class="amt owe">−${money(t.amount)}</span></button></li>`).join('')}</ul>`;
 }
 
 function planReal(rows) {

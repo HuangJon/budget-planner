@@ -423,3 +423,8 @@ a.request-note { display:flex; align-items:center; gap:12px; padding:14px 16px; 
 .plan-cat { background:none; border:0; padding:0; text-align:left; color:inherit; display:grid; gap:2px; min-width:0; font:inherit } .plan-cat .link { justify-self:start }
 .import-age { display:block; font-weight:500; color:var(--warn) }
 .search-account { width:100% }
+/* Splitting a purchase */
+.split-box { padding:10px 12px; border-top:1px solid var(--line) }
+.split-row select { flex:1; min-width:0 }
+.split-amt { flex:none; width:118px }
+.split-open { justify-self:start }
