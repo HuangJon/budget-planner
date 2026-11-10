@@ -328,4 +328,4 @@ a.btn { text-decoration:none; display:inline-flex; align-items:center; justify-c
 .acc-row:first-child { border-top:0 }
 .small-money { flex:none; width:120px; display:flex; align-items:center; gap:2px; border:1px solid var(--line); border-radius:10px; padding:0 8px; background:var(--surface) }
 .small-money input { width:100%; min-width:0; border:0; background:none; text-align:right; font-weight:600; padding:8px 0; font-size:16px }
-.acc-name { background:none; border:0; padding:0; text-align:left; color:var(--ink); display:grid; gap:2px; min-width:0 } .acc-name .link { font-weight:500; margin-left:4px }
+.acc-name { background:none; border:0; padding:0; text-align:left; color:var(--ink); display:grid; gap:2px; min-width:0; cursor:text }

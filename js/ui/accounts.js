@@ -77,7 +77,7 @@ function drawAccounts() {
       <div class="acc-row">
         ${A.sheet.renaming === a.id
           ? `<div class="grow stack tight"><input id="accRename" maxlength="40" value="${esc(a.name)}" autocomplete="off" aria-label="Account name"><div class="row gap8"><button type="button" class="btn small primary" data-action="acc-rename-save" data-id="${a.id}">Save</button><button type="button" class="btn small" data-action="acc-rename-cancel">Cancel</button></div></div>`
-          : `<button type="button" class="grow stack tight acc-name" data-action="acc-rename" data-id="${a.id}" aria-label="Rename ${esc(a.name)}"><strong class="wrap-any">${esc(a.name)} <span class="tiny link">Rename</span></strong><span class="tiny muted">${esc(ACCOUNT_KINDS[a.kind] || '')} · ${ago(a.updatedAt)}</span></button>`}
+          : `<button type="button" class="grow stack tight acc-name" data-action="acc-rename" data-id="${a.id}" aria-label="Rename ${esc(a.name)}"><strong class="wrap-any">${esc(a.name)}</strong><span class="tiny muted">${esc(ACCOUNT_KINDS[a.kind] || '')} · ${ago(a.updatedAt)}</span></button>`}
         <label class="money-in small-money"><span class="sr">${a.kind === 'card' ? 'Owed on' : 'Balance of'} ${esc(a.name)}</span><span aria-hidden="true">${a.kind === 'card' ? '−$' : '$'}</span><input class="amount-input" inputmode="decimal" autocomplete="off" value="${(Math.abs(a.balance || 0) / 100).toFixed(2)}" data-change="acc-balance" data-id="${a.id}"></label>
         <button type="button" class="icon-btn small" data-action="acc-remove" data-id="${a.id}" aria-label="Remove ${esc(a.name)}">×</button>
       </div>`).join('')}</section>
@@ -129,6 +129,12 @@ actions['acc-remove'] = el => {
 };
 
 actions['acc-rename'] = el => { A.sheet.renaming = el.dataset.id; drawAccounts(); const i = document.getElementById('accRename'); i?.focus(); i?.select(); };
+// Enter saves the new name, Escape leaves it as it was.
+addEventListener('keydown', ev => {
+  if (ev.target?.id !== 'accRename') return;
+  if (ev.key === 'Enter') { ev.preventDefault(); document.querySelector('[data-action=acc-rename-save]')?.click(); }
+  else if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); actions['acc-rename-cancel'](); }
+}, true);
 actions['acc-rename-cancel'] = () => { A.sheet.renaming = null; drawAccounts(); };
 actions['acc-rename-save'] = el => {
   const b = budget(), a = b?.accounts?.[el.dataset.id], name = val('accRename').trim().slice(0, 40);

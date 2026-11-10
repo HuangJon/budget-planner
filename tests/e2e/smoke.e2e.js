@@ -487,7 +487,7 @@ await page.locator('dialog[open] .acc-verdict', { hasText: 'They match' }).waitF
 // Renaming an account.
 await page.locator('.acc-row', { hasText: 'Checking' }).locator('[data-action=acc-rename]').click();
 await page.locator('#accRename').fill('Everyday checking');
-await tap('dialog[open] [data-action=acc-rename-save]');
+await page.locator('#accRename').press('Enter');
 await page.locator('.acc-row', { hasText: 'Everyday checking' }).waitFor();
 await tap('[data-action=sheet-back]');
 await tap('[data-action=sheet-back]');
