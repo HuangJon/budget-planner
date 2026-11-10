@@ -402,3 +402,4 @@ a.request-note { display:flex; align-items:center; gap:12px; padding:14px 16px; 
 .search-filters select { width:100%; min-width:0 }
 .search-sum { display:grid; gap:6px }
 .move-all select { flex:1; min-width:0 }
+.link-row { width:100%; background:none; border:0; padding:2px 0; color:inherit; text-align:left; font:inherit } .link-row .amt { white-space:nowrap }

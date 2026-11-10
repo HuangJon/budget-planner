@@ -26,24 +26,28 @@ function datesFor(when) {
   return { from: '', to: '' };
 }
 
+/** The dates searched: a month picked from Trends (from/to), or one of the choices in the list. */
+const range = S => (S.from ? { from: S.from, to: S.to || '' } : datesFor(S.when));
+
 export function openSearch(budgetId, preset = {}) {
-  openChild({ kind: 'search', budgetId, text: '', categoryId: '', when: '', moving: false, ...preset }, drawSearch);
+  openChild({ kind: 'search', budgetId, text: '', categoryId: '', when: '', flow: '', moving: false, ...preset }, drawSearch);
 }
 
 function drawSearch() {
   const S = A.sheet, b = budget();
   if (!b) return;
-  const matches = searchTransactions(A.transactions[b.id] || [], { text: S.text, categoryId: S.categoryId, ...datesFor(S.when) });
+  const matches = searchTransactions(A.transactions[b.id] || [], { text: S.text, categoryId: S.categoryId, kind: S.flow, ...range(S) });
   const t = searchTotals(matches);
   // With nothing typed or picked, it lists everything: every transaction, newest first.
   const any = true;
-  const filtered = Boolean(S.text.trim() || S.categoryId || S.when);
+  const filtered = Boolean(S.text.trim() || S.categoryId || S.when || S.flow || S.from);
   const cats = b.categories;
   openSheet(`<div class="sheet">${sheetHead('Search')}<div class="sheet-body">
     <input id="searchText" type="search" placeholder="Search, like coffee, gym or rent" value="${esc(S.text)}" data-input="search-text" autocomplete="off" enterkeyhint="search">
+    <div class="seg flow-seg" role="group" aria-label="Money in or out">${[['', 'All'], ['income', 'Money in'], ['spend', 'Money out']].map(([k, l]) => `<button type="button" data-action="search-flow" data-id="${k}" aria-pressed="${(S.flow || '') === k}">${l}</button>`).join('')}</div>
     <div class="search-filters">
       <select aria-label="Category" data-change="search-cat"><option value="">Any category</option>${catOptions(b, S.categoryId).replace(/^<option value="" [^>]*>Pick one<\/option>/, '')}</select>
-      <select aria-label="When" data-change="search-when">${WHEN.map(([k, l]) => `<option value="${k}" ${S.when === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      ${S.from ? `<button type="button" class="btn small" data-action="search-when-clear" aria-label="Any time instead">${esc(S.fromLabel || S.from)} ×</button>` : `<select aria-label="When" data-change="search-when">${WHEN.map(([k, l]) => `<option value="${k}" ${S.when === k ? 'selected' : ''}>${l}</option>`).join('')}</select>`}
     </div>
     ${any ? `<section class="panel pad search-sum">
       <div class="row between"><span class="label">${filtered ? `${t.count} ${t.count === 1 ? 'match' : 'matches'}` : `All ${t.count} transactions`}</span>${t.income ? `<span class="small owed">+${money(t.income)} came in</span>` : ''}</div>
@@ -63,12 +67,14 @@ function drawSearch() {
 inputs['search-text'] = el => { A.sheet.text = el.value; refreshOpenSheet(); };
 changes['search-cat'] = el => { A.sheet.categoryId = el.value; drawSearch(); };
 changes['search-when'] = el => { A.sheet.when = el.value; drawSearch(); };
+actions['search-when-clear'] = () => { A.sheet.from = ''; A.sheet.to = ''; drawSearch(); };
+actions['search-flow'] = el => { A.sheet.flow = el.dataset.id; if (el.dataset.id === 'income') A.sheet.categoryId = ''; drawSearch(); };
 actions['search-move-open'] = () => { A.sheet.moving = true; drawSearch(); };
 actions['search-move-cancel'] = () => { A.sheet.moving = false; drawSearch(); };
 actions['search-move'] = () => {
   const S = A.sheet, b = budget(), to = document.getElementById('moveAllTo')?.value;
   if (!to || !b.categories[to]) { toast('Pick a category.'); return; }
-  const matches = searchTransactions(A.transactions[b.id] || [], { text: S.text, categoryId: S.categoryId, ...datesFor(S.when) })
+  const matches = searchTransactions(A.transactions[b.id] || [], { text: S.text, categoryId: S.categoryId, kind: S.flow, ...range(S) })
     .filter(m => m.kind !== 'income' && m.categoryId !== to);
   S.moving = false;
   if (!matches.length) { toast(`They’re all in ${b.categories[to].name} already.`); drawSearch(); return; }

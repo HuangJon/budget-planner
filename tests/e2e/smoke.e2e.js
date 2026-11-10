@@ -196,6 +196,12 @@ await page.locator('[data-section=months] [data-action=trend-range][data-id="12"
 await page.locator('[data-section=months] .more-range:not(.on) > span', { hasText: 'More' }).waitFor();
 await page.locator('[data-action=trend-fold][data-id=categories]').click();
 await page.locator('[data-section=categories]').getByText('last 12 months', { exact: true }).waitFor();
+// A month's "Came in" opens exactly what came in that month.
+await page.locator('[data-section=months] [data-action=trend-see][data-flow=income]').click();
+await page.locator('dialog[open] .search-sum').waitFor();
+if (await page.locator('dialog[open] .tx-row .amt.owe').count()) fail('Came in should list only money coming in');
+await tap('[data-action=sheet-back]');
+await page.locator('dialog[open]').waitFor({ state: 'detached' });
 const cols = page.locator('.cols:not(.one) .col');
 await cols.nth(1).click();
 const picked = await page.locator('.col-detail strong').innerText();
@@ -514,6 +520,10 @@ await tap('#app [data-action=open-search]');
 // Nothing typed lists everything, without the option to move it all.
 await page.locator('.search-sum', { hasText: 'All ' }).waitFor();
 if (await page.locator('[data-action=search-move-open]').count()) fail('Moving everything at once should not be offered');
+await tap('[data-action=search-flow][data-id=income]');
+await page.locator('dialog[open] .tx-row', { hasText: 'Paycheck' }).first().waitFor();
+if (await page.locator('dialog[open] .tx-row .amt.owe').count()) fail('Money in should show only money coming in');
+await tap('[data-action=search-flow][data-id=""]');
 await page.locator('#searchText').fill('mystery shop');
 await page.locator('.search-sum', { hasText: '2 matches' }).waitFor();
 await eventually(async () => (await page.locator('#searchText').evaluate(el => el === document.activeElement)), 'Typing should keep the cursor in the search box');

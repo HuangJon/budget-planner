@@ -170,8 +170,8 @@ function monthByMonth(rows) {
     <div class="legend small"><span><i class="in"></i>Came in</span><span><i class="out"></i>Spent</span><span><i class="left"></i>Left over</span>${rows.some(r => r.income < r.spent) ? '<span><i class="short"></i>Short</span>' : ''}</div>
     <div class="col-detail" aria-live="polite">
       <strong>${esc(full(picked.month))}</strong>
-      <div class="row between"><span class="muted">Came in</span><span class="amt owed">+${money(picked.income)}</span></div>
-      <div class="row between"><span class="muted">Spent</span><span class="amt owe">−${money(picked.spent)}</span></div>
+      <button type="button" class="row between link-row" data-action="trend-see" data-id="${picked.month}" data-flow="income"><span class="muted">Came in</span><span class="amt owed">+${money(picked.income)} ›</span></button>
+      <button type="button" class="row between link-row" data-action="trend-see" data-id="${picked.month}" data-flow="spend"><span class="muted">Spent</span><span class="amt owe">−${money(picked.spent)} ›</span></button>
       <div class="row between"><span class="muted">${picked.income - picked.spent >= 0 ? 'Left over' : 'Short'}</span><span class="amt ${picked.income - picked.spent < 0 ? 'owe' : 'left'}">${money(Math.abs(picked.income - picked.spent))}</span></div>
     </div>
     <p class="tiny muted">Tap a ${unit} to see its numbers. On average: ${money(avg('income'))} in and ${money(avg('spent'))} spent a ${unit}.</p>`;
@@ -327,3 +327,12 @@ changes['trend-byperson'] = el => {
 };
 
 actions['search-category'] = el => openSearch(A.route.id, { categoryId: el.dataset.id });
+/** From a month (or quarter or year) in Over time: the transactions behind "Came in" or "Spent". */
+actions['trend-see'] = el => {
+  const k = el.dataset.id;
+  let from, to, label;
+  if (k.length === 4) { from = `${k}-01-01`; to = `${k}-12-31`; label = k; }
+  else if (k.includes('Q')) { const q = Number(k.slice(-1)); from = `${k.slice(0, 4)}-${String(q * 3 - 2).padStart(2, '0')}-01`; to = `${k.slice(0, 4)}-${String(q * 3).padStart(2, '0')}-31`; label = `${k.slice(5)} ${k.slice(0, 4)}`; }
+  else { from = `${k}-01`; to = `${k}-31`; label = fmtMonth(k); }
+  openSearch(A.route.id, { flow: el.dataset.flow, from, to, fromLabel: label });
+};
