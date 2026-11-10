@@ -173,8 +173,10 @@ function monthByMonth(rows) {
       <button type="button" class="row between link-row" data-action="trend-see" data-id="${picked.month}" data-flow="income"><span class="muted">Came in</span><span class="amt owed">+${money(picked.income)} ›</span></button>
       <button type="button" class="row between link-row" data-action="trend-see" data-id="${picked.month}" data-flow="spend"><span class="muted">Spent</span><span class="amt owe">−${money(picked.spent)} ›</span></button>
       <div class="row between"><span class="muted">${picked.income - picked.spent >= 0 ? 'Left over' : 'Short'}</span><span class="amt ${picked.income - picked.spent < 0 ? 'owe' : 'left'}">${money(Math.abs(picked.income - picked.spent))}</span></div>
+      <button type="button" class="btn small see-all" data-action="trend-see" data-id="${picked.month}" data-flow="">See ${esc(unit === 'month' ? fmtMonth(picked.month).split(' ')[0] : full(picked.month))}’s transactions ›</button>
+      ${unit === 'month' ? `<div class="two-btns go-month"><button type="button" class="btn small" data-action="trend-go" data-id="${picked.month}" data-to="activity">Browse ${esc(short(picked.month))} in Activity</button><button type="button" class="btn small" data-action="trend-go" data-id="${picked.month}" data-to="trends">Trends for ${esc(short(picked.month))}</button></div>` : ''}
     </div>
-    <p class="tiny muted">Tap a ${unit} to see its numbers. On average: ${money(avg('income'))} in and ${money(avg('spent'))} spent a ${unit}.</p>`;
+    <p class="tiny muted">Tap a ${unit} for its numbers. Tap it again, or any line with ›, to see the transactions. On average: ${money(avg('income'))} in and ${money(avg('spent'))} spent a ${unit}.</p>`;
 }
 
 function categoriesOverTime(rows, months, label) {
@@ -310,7 +312,13 @@ const setCustom = (key, value) => {
 };
 changes['trend-from'] = el => setCustom('from', el.value);
 changes['trend-to'] = el => setCustom('to', el.value);
-actions['trend-col'] = el => { A.trendsCol = el.dataset.id; render(); };
+// First tap picks a month (or quarter, or year) to show its numbers; tapping it again opens
+// everything from it, the same as tapping its Came in or Spent below.
+actions['trend-col'] = el => {
+  if (el.getAttribute('aria-pressed') === 'true') { actions['trend-see']({ dataset: { id: el.dataset.id, flow: '' } }); return; }
+  A.trendsCol = el.dataset.id;
+  render();
+};
 actions['cat-trend'] = el => openChild({ kind: 'cat-trend', id: el.dataset.id }, catTrendSheet);
 actions['trend-open-cat'] = el => openChild({ kind: 'cat', budgetId: A.route.id, id: el.dataset.id, open: {} }, catSheet);
 registerSheet('cat-trend', () => catTrendSheet());
@@ -335,4 +343,11 @@ actions['trend-see'] = el => {
   else if (k.includes('Q')) { const q = Number(k.slice(-1)); from = `${k.slice(0, 4)}-${String(q * 3 - 2).padStart(2, '0')}-01`; to = `${k.slice(0, 4)}-${String(q * 3).padStart(2, '0')}-31`; label = `${k.slice(5)} ${k.slice(0, 4)}`; }
   else { from = `${k}-01`; to = `${k}-31`; label = fmtMonth(k); }
   openSearch(A.route.id, { flow: el.dataset.flow, from, to, fromLabel: label });
+};
+/** Jump to a month from the chart: its Activity to browse what happened, or this screen for that month. */
+actions['trend-go'] = el => {
+  A.month = el.dataset.id;
+  A.trendsCol = el.dataset.id;
+  if (el.dataset.to === 'activity') location.hash = `#b-${A.route.id}-activity`;
+  else { render(); scrollTo(0, 0); }
 };
