@@ -52,7 +52,13 @@ function verdict(r) {
     : '<ul class="small muted acc-why"><li>Income, interest or a refund that isn’t in the budget yet.</li><li>Spending added twice, typed and imported.</li><li>A balance that’s out of date.</li></ul>';
   // After importing everything since the budget started, the gap is the starting money being off.
   const fix = off < 100 ? '' : `<div class="acc-fix stack tight"><button type="button" class="btn small" data-action="acc-fix-start">Set starting money so they match</button><p class="tiny muted">Use this once you’ve imported every account since the budget started (${esc(budgetStart(A.budgets[A.sheet.budgetId]) ? fmtDate(budgetStart(A.budgets[A.sheet.budgetId])) : 'the beginning')}). It works out what you had then from what you have now.</p></div>`;
-  return `${head}${why}${fix}`;
+  // While a fix is in place, it can always be put back.
+  const f = A.budgets[A.sheet.budgetId]?.settings?.startFix;
+  const undo = f ? `<div class="acc-fix stack tight"><p class="small">Starting money was set to ${money(f.after)} to match${f.before === null ? '' : ` (it was ${money(f.before)})`}.</p><button type="button" class="btn small" data-action="acc-unfix-start">${f.before === null ? 'Remove that starting money' : `Put it back to ${money(f.before)}`}</button></div>` : '';
+  // Changed before this was remembered: the starting money's own history can still put it back.
+  const s0 = f ? null : liveTransactions(A.transactions[A.sheet.budgetId]).filter(isStartingMoney).find(t => t.updatedAt);
+  const older = s0 ? `<div class="acc-fix stack tight"><p class="small">Starting money is ${money(s0.amount)} and has been changed since it was first entered.</p><button type="button" class="btn small" data-action="acc-starting-back" data-id="${s0.id}">Put it back to what it was before the last change</button></div>` : '';
+  return `${head}${why}${f ? '' : fix}${undo}${older}`;
 }
 
 function drawAccounts() {
@@ -69,7 +75,9 @@ function drawAccounts() {
     ${verdict(r)}
     ${r.accounts.length ? `<section class="panel acc-list">${r.accounts.sort((x, y) => (x.kind === y.kind ? String(x.name).localeCompare(y.name) : x.kind === 'card' ? 1 : -1)).map(a => `
       <div class="acc-row">
-        <div class="grow stack tight"><strong class="wrap-any">${esc(a.name)}</strong><span class="tiny muted">${esc(ACCOUNT_KINDS[a.kind] || '')} · ${ago(a.updatedAt)}</span></div>
+        ${A.sheet.renaming === a.id
+          ? `<div class="grow stack tight"><input id="accRename" maxlength="40" value="${esc(a.name)}" autocomplete="off" aria-label="Account name"><div class="row gap8"><button type="button" class="btn small primary" data-action="acc-rename-save" data-id="${a.id}">Save</button><button type="button" class="btn small" data-action="acc-rename-cancel">Cancel</button></div></div>`
+          : `<button type="button" class="grow stack tight acc-name" data-action="acc-rename" data-id="${a.id}" aria-label="Rename ${esc(a.name)}"><strong class="wrap-any">${esc(a.name)} <span class="tiny link">Rename</span></strong><span class="tiny muted">${esc(ACCOUNT_KINDS[a.kind] || '')} · ${ago(a.updatedAt)}</span></button>`}
         <label class="money-in small-money"><span class="sr">${a.kind === 'card' ? 'Owed on' : 'Balance of'} ${esc(a.name)}</span><span aria-hidden="true">${a.kind === 'card' ? '−$' : '$'}</span><input class="amount-input" inputmode="decimal" autocomplete="off" value="${(Math.abs(a.balance || 0) / 100).toFixed(2)}" data-change="acc-balance" data-id="${a.id}"></label>
         <button type="button" class="icon-btn small" data-action="acc-remove" data-id="${a.id}" aria-label="Remove ${esc(a.name)}">×</button>
       </div>`).join('')}</section>
@@ -120,6 +128,18 @@ actions['acc-remove'] = el => {
   toast(`Removed ${a.name}`, () => send(A.repo.saveAccount(b.id, id, a)));
 };
 
+actions['acc-rename'] = el => { A.sheet.renaming = el.dataset.id; drawAccounts(); const i = document.getElementById('accRename'); i?.focus(); i?.select(); };
+actions['acc-rename-cancel'] = () => { A.sheet.renaming = null; drawAccounts(); };
+actions['acc-rename-save'] = el => {
+  const b = budget(), a = b?.accounts?.[el.dataset.id], name = val('accRename').trim().slice(0, 40);
+  if (!a) return;
+  if (!name) { toast('An account needs a name.'); return; }
+  A.sheet.renaming = null;
+  // Renaming doesn't count as updating the balance, so keep its date.
+  send(A.repo.renameAccount(b.id, el.dataset.id, name));
+  drawAccounts();
+};
+
 /** Starting money becomes whatever makes the budget equal today's balances. */
 actions['acc-fix-start'] = () => {
   const b = budget(), r = accountCheck(b, A.transactions[b.id] || [], today());
@@ -128,13 +148,38 @@ actions['acc-fix-start'] = () => {
   if (amount <= 0) { toast('That would make the starting money $0 or less. Look for something imported twice first.'); return; }
   if (start) {
     send(A.repo.updateTransaction(b.id, start, { amount }));
-    toast(`Starting money is now ${money(amount)}`, () => send(A.repo.updateTransaction(b.id, { ...start, amount }, { amount: start.amount })));
+    send(A.repo.setSetting(b.id, 'startFix', { tid: start.id, before: start.amount, after: amount, at: Date.now() }));
+    toast(`Starting money is now ${money(amount)}`, () => actions['acc-unfix-start']());
   } else {
     const date = budgetStart(b) || today();
-    const { written } = A.repo.addTransaction(b.id, { kind: 'income', amount, date, description: 'Starting money', categoryId: null });
+    const { transaction, written } = A.repo.addTransaction(b.id, { kind: 'income', amount, date, description: 'Starting money', categoryId: null });
     send(written);
-    toast(`Added starting money of ${money(amount)}`);
+    send(A.repo.setSetting(b.id, 'startFix', { tid: transaction.id, before: null, after: amount, at: Date.now() }));
+    toast(`Added starting money of ${money(amount)}`, () => actions['acc-unfix-start']());
   }
+};
+actions['acc-starting-back'] = async el => {
+  const b = budget(), t = (A.transactions[b.id] || []).find(x => x.id === el.dataset.id);
+  if (!t) return;
+  el.disabled = true;
+  try {
+    const last = (await A.repo.revisions(b.id, t.id)).at(-1)?.transaction;
+    if (!last?.amount) { toast('No earlier version to go back to.'); el.disabled = false; return; }
+    send(A.repo.updateTransaction(b.id, t, { amount: last.amount }));
+    toast(`Starting money is back to ${money(last.amount)}`, () => send(A.repo.updateTransaction(b.id, { ...t, amount: last.amount }, { amount: t.amount })));
+  } catch { el.disabled = false; toast('Couldn’t load its earlier version. Check your connection.'); }
+};
+/** Puts the starting money back to what it was before "Set starting money so they match". */
+actions['acc-unfix-start'] = () => {
+  const b = budget() || A.budgets[A.route.id], f = b?.settings?.startFix;
+  if (!f) return;
+  const t = (A.transactions[b.id] || []).find(x => x.id === f.tid);
+  if (t && !t.deleted) {
+    if (f.before === null) send(A.repo.deleteTransaction(b.id, t.id));
+    else send(A.repo.updateTransaction(b.id, t, { amount: f.before }));
+  }
+  send(A.repo.setSetting(b.id, 'startFix', undefined));
+  toast(f.before === null ? 'Removed the starting money it added' : `Starting money is back to ${money(f.before)}`);
 };
 
 registerSheet('accounts', drawAccounts);

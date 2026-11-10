@@ -160,6 +160,9 @@ export function createRepository(backend, now = () => Date.now()) {
     saveAccount(id, accountId, { name, kind, balance }) {
       return backend.update(budgetPath(id), { [`accounts.${accountId}`]: { name, kind, balance, updatedAt: now(), updatedBy: uid() }, changedBy: uid() });
     },
+    /** A transaction's earlier versions, oldest first (every edit keeps one). */
+    revisions: (id, tid) => backend.list(`${txPath(id, tid)}/revisions`, { orderBy: 'at' }),
+    renameAccount: (id, accountId, name) => backend.update(budgetPath(id), { [`accounts.${accountId}.name`]: name, changedBy: uid() }),
     removeAccount: (id, accountId) => backend.update(budgetPath(id), { [`accounts.${accountId}`]: undefined, changedBy: uid() }),
     addCategory(id, { name, group, order }) {
       const catId = randomId(8);

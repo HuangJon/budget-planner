@@ -479,6 +479,16 @@ await page.locator('dialog[open] .acc-verdict', { hasText: 'Off by $40.00' }).wa
 await tap('dialog[open] [data-action=acc-fix-start]');
 await page.getByText('starting money of $40.00').waitFor();
 await page.locator('dialog[open] .acc-verdict', { hasText: 'They match' }).waitFor();
+// It can be put back while checking things, then set again.
+await tap('dialog[open] [data-action=acc-unfix-start]');
+await page.locator('dialog[open] .acc-verdict', { hasText: 'Off by $40.00' }).waitFor();
+await tap('dialog[open] [data-action=acc-fix-start]');
+await page.locator('dialog[open] .acc-verdict', { hasText: 'They match' }).waitFor();
+// Renaming an account.
+await page.locator('.acc-row', { hasText: 'Checking' }).locator('[data-action=acc-rename]').click();
+await page.locator('#accRename').fill('Everyday checking');
+await tap('dialog[open] [data-action=acc-rename-save]');
+await page.locator('.acc-row', { hasText: 'Everyday checking' }).waitFor();
 await tap('[data-action=sheet-back]');
 await tap('[data-action=sheet-back]');
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
