@@ -421,3 +421,5 @@ a.request-note { display:flex; align-items:center; gap:12px; padding:14px 16px; 
 @media (hover:none) { .link-row { background:color-mix(in srgb, var(--surface) 55%, transparent) } }
 .by-cat .chip { font-size:.8125rem; min-height:32px }
 .plan-cat { background:none; border:0; padding:0; text-align:left; color:inherit; display:grid; gap:2px; min-width:0; font:inherit } .plan-cat .link { justify-self:start }
+.import-age { display:block; font-weight:500; color:var(--warn) }
+.search-account { width:100% }

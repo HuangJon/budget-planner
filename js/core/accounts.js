@@ -20,7 +20,9 @@ export function budgetMoney(transactionList, today, budget = {}) {
 
 /** What the accounts add up to: balances, less what's owed on cards. */
 export function accountsMoney(accounts) {
-  return Object.values(accounts || {}).reduce((a, x) => a + (x.kind === 'card' ? -Math.abs(x.balance || 0) : (x.balance || 0)), 0);
+  // An account added during an import has no balance yet (null): it's left out until it does.
+  return Object.values(accounts || {}).filter(x => Number.isInteger(x.balance))
+    .reduce((a, x) => a + (x.kind === 'card' ? -Math.abs(x.balance) : x.balance), 0);
 }
 
 /** The two totals side by side, and how far apart they are (positive: the budget shows more than the accounts hold). */
@@ -29,5 +31,6 @@ export function accountCheck(budget, transactionList, today) {
   const inAccounts = accountsMoney(budget.accounts);
   const inBudget = budgetMoney(transactionList, today, budget);
   const updated = accounts.map(a => a.updatedAt || 0);
-  return { accounts, inAccounts, inBudget, gap: inBudget - inAccounts, oldest: updated.length ? Math.min(...updated) : null };
+  const missing = accounts.filter(a => !Number.isInteger(a.balance));
+  return { accounts, inAccounts, inBudget, gap: inBudget - inAccounts, oldest: updated.length ? Math.min(...updated) : null, missing };
 }

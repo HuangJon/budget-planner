@@ -27,3 +27,10 @@ test('the check shows the gap between the two', () => {
   assert.equal(r.oldest, 3);
   assert.equal(accountCheck({}, list, '2026-11-09').accounts.length, 0);
 });
+
+test('an account without a balance yet is left out and asked for', () => {
+  const b = { accounts: { a: { name: 'Checking', kind: 'cash', balance: 500000 }, c: { name: 'Card', kind: 'card', balance: null } } };
+  const r = accountCheck(b, [], '2026-11-09');
+  assert.equal(r.inAccounts, 500000);
+  assert.deepEqual(r.missing.map(m => m.name), ['Card']);
+});

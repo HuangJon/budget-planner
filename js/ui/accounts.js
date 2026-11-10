@@ -26,23 +26,31 @@ export function openAccounts(budgetId, { afterImport = 0 } = {}) {
  * The bar under Ready to assign (and at the top of Activity): bring in transactions, then see at a
  * glance whether the budget still matches your accounts and how fresh the balances are.
  */
+/** "· 12 days ago" once the last import is a week old or more: a nudge to keep it weekly. */
+const since = b => {
+  const at = b.settings?.lastImport;
+  if (!at) return '';
+  const days = Math.floor((Date.now() - at) / 864e5);
+  return days >= 7 ? `<span class="tiny import-age"> · last ${days} days ago</span>` : '';
+};
 export function syncBar(b) {
   const r = accountCheck(b, A.transactions[b.id] || [], today());
   const age = r.oldest ? Math.floor((Date.now() - r.oldest) / 864e5) : null;
   const when = age === null ? '' : age <= 0 ? ' · today' : age === 1 ? ' · yesterday' : ` · ${age} days ago`;
-  const status = !r.accounts.length
+  const status = !r.accounts.length || r.missing.length
     ? { cls: '', text: 'Check your accounts' }
     : Math.abs(r.gap) < 100
       ? { cls: 'ok', text: `✓ Accounts match${when}` }
       : { cls: 'off', text: `Accounts off by ${money(Math.abs(r.gap))}${when}` };
   return `<div class="sync-bar">
-    <button type="button" class="btn small" data-action="open-import">Import from your bank</button>
+    <button type="button" class="btn small" data-action="open-import">Import from your bank${since(b)}</button>
     <button type="button" class="btn small acc-status ${status.cls}" data-action="open-accounts">${esc(status.text)}</button>
   </div>`;
 }
 
 function verdict(r) {
   if (!r.accounts.length) return '<p class="small muted">Add the accounts your money is in. Then you can see whether the budget matches them.</p>';
+  if (r.missing.length) return `<p class="acc-verdict off"><strong>Add today’s balance</strong> for ${r.missing.map(m => esc(m.name)).join(', ')} to check.</p>`;
   const off = Math.abs(r.gap);
   const head = off < 100
     ? '<p class="acc-verdict ok"><strong>They match.</strong> Every dollar in your accounts is in the budget.</p>'
@@ -78,7 +86,7 @@ function drawAccounts() {
         ${A.sheet.renaming === a.id
           ? `<div class="grow stack tight"><input id="accRename" maxlength="40" value="${esc(a.name)}" autocomplete="off" aria-label="Account name"><div class="row gap8"><button type="button" class="btn small primary" data-action="acc-rename-save" data-id="${a.id}">Save</button><button type="button" class="btn small" data-action="acc-rename-cancel">Cancel</button></div></div>`
           : `<button type="button" class="grow stack tight acc-name" data-action="acc-rename" data-id="${a.id}" aria-label="Rename ${esc(a.name)}"><strong class="wrap-any">${esc(a.name)}</strong><span class="tiny muted">${esc(ACCOUNT_KINDS[a.kind] || '')} · ${ago(a.updatedAt)}</span></button>`}
-        <label class="money-in small-money"><span class="sr">${a.kind === 'card' ? 'Owed on' : 'Balance of'} ${esc(a.name)}</span><span aria-hidden="true">${a.kind === 'card' ? '−$' : '$'}</span><input class="amount-input" inputmode="decimal" autocomplete="off" value="${(Math.abs(a.balance || 0) / 100).toFixed(2)}" data-change="acc-balance" data-id="${a.id}"></label>
+        <label class="money-in small-money"><span class="sr">${a.kind === 'card' ? 'Owed on' : 'Balance of'} ${esc(a.name)}</span><span aria-hidden="true">${a.kind === 'card' ? '−$' : '$'}</span><input class="amount-input" inputmode="decimal" autocomplete="off" value="${Number.isInteger(a.balance) ? (Math.abs(a.balance) / 100).toFixed(2) : ''}" placeholder="Balance" data-change="acc-balance" data-id="${a.id}"></label>
         <button type="button" class="icon-btn small" data-action="acc-remove" data-id="${a.id}" aria-label="Remove ${esc(a.name)}">×</button>
       </div>`).join('')}</section>
       <p class="tiny muted">Type each balance as your bank shows it today. For a card, type what you owe. Pending charges can make a small gap for a few days.</p>` : ''}

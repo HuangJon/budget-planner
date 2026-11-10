@@ -30,3 +30,8 @@ test('totals: spending less refunds, months covered, a monthly average, biggest 
   assert.equal(t.perMonth, Math.round(t.spent / 3));
   assert.deepEqual(t.byCategory.map(c => c.id), ['f', 's']);
 });
+
+test('filters by the account an import came from', () => {
+  const l = [{ id: 'p', kind: 'spend', amount: 100, date: '2026-01-01', description: 'X', categoryId: 's', accountId: 'card' }, { id: 'q', kind: 'spend', amount: 100, date: '2026-01-01', description: 'X', categoryId: 's', accountId: 'bank' }];
+  assert.deepEqual(searchTransactions(l, { accountId: 'card' }).map(t => t.id), ['p']);
+});

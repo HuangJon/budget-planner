@@ -245,3 +245,21 @@ test('many transactions move to another category at once, each keeping its old v
   await new Promise(r => setTimeout(r));
   assert.equal(revisions[0].transaction.categoryId, 'a');
 });
+
+test('an import is recorded with its account, and can be taken out and brought back later', async () => {
+  const { backend, repo } = fresh();
+  const { budget, written } = repo.createBudget({ name: 'Mine', categories: { a: { name: 'A' } } });
+  await written;
+  const list = [1, 2, 3].map(i => ({ id: `i-y${i}`, kind: 'spend', amount: 100 * i, date: '2026-11-02', description: `Shop ${i}`, categoryId: 'a' }));
+  const importId = await repo.importTransactions(budget.id, list, new Set(), { file: 'card.csv', accountId: 'acc1' });
+  const tx = await backend.get(`budgets/${budget.id}/transactions/i-y2`);
+  assert.deepEqual([tx.importId, tx.accountId], [importId, 'acc1']);
+  const [rec] = await repo.listImports(budget.id);
+  assert.deepEqual([rec.file, rec.count, rec.accountId, rec.undone], ['card.csv', 3, 'acc1', false]);
+  assert.ok((await backend.get(`budgets/${budget.id}`)).settings.lastImport, 'the budget knows when the last import was');
+  await repo.undoImport(budget.id, rec);
+  assert.equal((await backend.get(`budgets/${budget.id}/transactions/i-y1`)).deleted, true);
+  assert.equal((await repo.listImports(budget.id))[0].undone, true);
+  await repo.redoImport(budget.id, rec);
+  assert.equal((await backend.get(`budgets/${budget.id}/transactions/i-y1`)).deleted, false);
+});

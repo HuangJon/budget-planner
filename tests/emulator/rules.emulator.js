@@ -183,6 +183,12 @@ await ok(bob.repo.addRecurringCopies(B, due), 'repeats are added by members');
 const bank = Array.from({ length: 130 }, (_, i) => ({ id: `i-test${i}`, kind: i % 10 ? 'spend' : 'refund', amount: 100 + i, date: '2026-11-02', description: `Bank line ${i}`, categoryId: catId }));
 await ok(bob.repo.importTransactions(B, bank), 'a bank file goes in, 100 rows at a time');
 await ok(bob.repo.unimport(B, bank.map(t => t.id)), 'and Undo takes the whole import back out');
+const recs = await bob.repo.listImports(B);
+assert.ok(recs.length >= 1, 'imports are recorded');
+await ok(alice.repo.undoImport(B, recs[0]), 'any member can take a past import back out');
+await ok(alice.repo.redoImport(B, recs[0]), 'or bring it back');
+await no(carol.repo.listImports(B), "a stranger can't see a budget's imports");
+await no(bob.backend.update(`budgets/${B}/imports/${recs[0].id}`, { count: 1 }), 'an import record only changes whether it was undone');
 await ok(bob.repo.importTransactions(B, bank.slice(0, 3), new Set(bank.slice(0, 3).map(t => t.id))), 'deleted imports can be brought back');
 
 /* A member's own entry: a short name and nothing extra. */

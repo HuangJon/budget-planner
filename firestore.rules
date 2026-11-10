@@ -119,7 +119,7 @@ service cloud.firestore {
       function validTx(d, tid) {
         return d.keys().hasOnly(['id', 'budgetId', 'kind', 'amount', 'date', 'description', 'note', 'categoryId',
             'createdBy', 'createdAt', 'updatedAt', 'updatedBy', 'deleted', 'deletedAt', 'deletedBy', 'restoredAt', 'restoredBy',
-            'recurringId', 'automatic', 'movedFrom'])
+            'recurringId', 'automatic', 'movedFrom', 'importId', 'accountId', 'splits'])
           && d.id == tid && tid.size() <= 60
           && d.budgetId == budgetId
           && d.kind in ['income', 'spend', 'refund']
@@ -128,7 +128,11 @@ service cloud.firestore {
           && short(d.description, 80)
           && short(d.get('note', ''), 500)
           && (d.kind == 'income' ? d.categoryId == null : (d.categoryId is string && d.categoryId.size() <= 20))
-          && d.createdAt is number && d.createdBy is string;
+          && d.createdAt is number && d.createdBy is string
+          // Where an imported one came from, and a purchase split across categories (at most 20 parts).
+          && (!('importId' in d) || short(d.importId, 40))
+          && (!('accountId' in d) || d.accountId == null || short(d.accountId, 40))
+          && (!('splits' in d) || d.splits == null || (d.splits is list && d.splits.size() <= 20));
       }
 
       match /transactions/{tid} {
@@ -153,6 +157,23 @@ service cloud.firestore {
           allow update, delete: if false;
         }
       }
+    }
+
+    // ---------- Imports ----------
+    // One record per bank file brought in: when, by whom, which account, and which transactions,
+    // so a whole import can be taken back out (or brought back) later. Members only.
+    match /budgets/{budgetId}/imports/{iid} {
+      allow read: if signedIn() && memberOf(budgetNow(budgetId));
+      allow create: if signedIn() && memberOf(budgetNow(budgetId)) && iid.matches('^[a-z0-9]{10,40}$')
+        && request.resource.data.keys().hasOnly(['id', 'at', 'by', 'file', 'accountId', 'count', 'ids', 'undone'])
+        && request.resource.data.id == iid && request.resource.data.by == me()
+        && request.resource.data.at is number && short(request.resource.data.file, 80)
+        && (request.resource.data.accountId == null || short(request.resource.data.accountId, 40))
+        && request.resource.data.count is int && request.resource.data.ids is list && request.resource.data.ids.size() <= 1000
+        && request.resource.data.undone == false;
+      allow update: if signedIn() && memberOf(budgetNow(budgetId))
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['undone']) && request.resource.data.undone is bool;
+      allow delete: if false;
     }
 
     // ---------- You ----------

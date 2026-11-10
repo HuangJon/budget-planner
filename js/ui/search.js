@@ -36,11 +36,11 @@ export function openSearch(budgetId, preset = {}) {
 function drawSearch() {
   const S = A.sheet, b = budget();
   if (!b) return;
-  const matches = searchTransactions(A.transactions[b.id] || [], { text: S.text, categoryId: S.categoryId, kind: S.flow, ...range(S) });
+  const matches = searchTransactions(A.transactions[b.id] || [], { text: S.text, categoryId: S.categoryId, kind: S.flow, accountId: S.accountId || '', ...range(S) });
   const t = searchTotals(matches);
   // With nothing typed or picked, it lists everything: every transaction, newest first.
   const any = true;
-  const filtered = Boolean(S.text.trim() || S.categoryId || S.when || S.flow || S.from);
+  const filtered = Boolean(S.text.trim() || S.categoryId || S.when || S.flow || S.from || S.accountId);
   const cats = b.categories;
   openSheet(`<div class="sheet">${sheetHead('Search')}<div class="sheet-body">
     <input id="searchText" type="search" placeholder="Search, like coffee, gym or rent" value="${esc(S.text)}" data-input="search-text" autocomplete="off" enterkeyhint="search">
@@ -49,6 +49,7 @@ function drawSearch() {
       <select aria-label="Category" data-change="search-cat"><option value="">Any category</option>${catOptions(b, S.categoryId).replace(/^<option value="" [^>]*>Pick one<\/option>/, '')}</select>
       ${S.from ? `<button type="button" class="btn small" data-action="search-when-clear" aria-label="Any time instead">${esc(S.fromLabel || S.from)} ×</button>` : `<select aria-label="When" data-change="search-when">${WHEN.map(([k, l]) => `<option value="${k}" ${S.when === k ? 'selected' : ''}>${l}</option>`).join('')}</select>`}
     </div>
+    ${Object.keys(b.accounts || {}).length ? `<select class="search-account" aria-label="Account" data-change="search-account"><option value="">Any account</option>${Object.entries(b.accounts).map(([id, x]) => `<option value="${id}" ${S.accountId === id ? 'selected' : ''}>From ${esc(x.name)}</option>`).join('')}</select>` : ''}
     ${any ? `<section class="panel pad search-sum">
       <div class="row between"><span class="label">${filtered ? `${t.count} ${t.count === 1 ? 'match' : 'matches'}` : `All ${t.count} transactions`}</span>${t.income ? `<span class="small owed">+${money(t.income)} came in</span>` : ''}</div>
       <div class="row between"><span class="amt big-amt owe">${money(t.spent)}</span><span class="small muted">${t.months > 1 ? `${money(t.perMonth)} a month over ${t.months} months` : t.months === 1 ? 'in one month' : ''}</span></div>
@@ -58,7 +59,7 @@ function drawSearch() {
         : '<button type="button" class="link small" data-action="search-move-open">Change category for all of these</button>') : ''}
     </section>` : ''}
     ${filtered ? '' : '<p class="tiny muted">Everything in this budget, every month, history included. Type or pick above to narrow it down.</p>'}
-    ${any && matches.length ? `<div class="panel tx-list">${matches.slice(0, SHOWN).map(m => `<button type="button" class="tap tx-row" data-action="edit-tx" data-id="${m.id}"><span class="grow stack tight"><strong class="wrap-any two-lines">${esc(m.description || 'Spending')}</strong><span class="tiny muted">${fmtDate(m.date)} · ${esc(m.kind === 'income' ? 'Ready to assign' : cats[m.categoryId]?.name || 'Removed category')}${m.kind === 'refund' ? ' · Refund' : ''}${isHistory(b, m) ? ' · History' : ''}</span></span><span class="amt ${m.kind === 'spend' ? 'owe' : 'owed'}">${m.kind === 'spend' ? '−' : '+'}${money(m.amount)}</span></button>`).join('')}</div>
+    ${any && matches.length ? `<div class="panel tx-list">${matches.slice(0, SHOWN).map(m => `<button type="button" class="tap tx-row" data-action="edit-tx" data-id="${m.id}"><span class="grow stack tight"><strong class="wrap-any two-lines">${esc(m.description || 'Spending')}</strong><span class="tiny muted">${fmtDate(m.date)} · ${esc(m.kind === 'income' ? 'Ready to assign' : cats[m.categoryId]?.name || 'Removed category')}${m.kind === 'refund' ? ' · Refund' : ''}${isHistory(b, m) ? ' · History' : ''}${m.accountId && b.accounts?.[m.accountId] ? ` · ${esc(b.accounts[m.accountId].name)}` : ''}</span></span><span class="amt ${m.kind === 'spend' ? 'owe' : 'owed'}">${m.kind === 'spend' ? '−' : '+'}${money(m.amount)}</span></button>`).join('')}</div>
     ${matches.length > SHOWN ? `<p class="tiny muted">Showing the newest ${SHOWN} of ${matches.length}. The totals count them all.</p>` : ''}` : any ? '<p class="small muted">Nothing matches.</p>' : ''}
   </div></div>`);
 }
@@ -66,6 +67,7 @@ function drawSearch() {
 // Redrawn while typing, keeping the cursor in the box.
 inputs['search-text'] = el => { A.sheet.text = el.value; refreshOpenSheet(); };
 changes['search-cat'] = el => { A.sheet.categoryId = el.value; drawSearch(); };
+changes['search-account'] = el => { A.sheet.accountId = el.value; drawSearch(); };
 changes['search-when'] = el => { A.sheet.when = el.value; drawSearch(); };
 actions['search-when-clear'] = () => { A.sheet.from = ''; A.sheet.to = ''; drawSearch(); };
 // Tapping one of the biggest categories drills in: it opens as a step on top, so Back returns to
@@ -77,7 +79,7 @@ actions['search-move-cancel'] = () => { A.sheet.moving = false; drawSearch(); };
 actions['search-move'] = () => {
   const S = A.sheet, b = budget(), to = document.getElementById('moveAllTo')?.value;
   if (!to || !b.categories[to]) { toast('Pick a category.'); return; }
-  const matches = searchTransactions(A.transactions[b.id] || [], { text: S.text, categoryId: S.categoryId, kind: S.flow, ...range(S) })
+  const matches = searchTransactions(A.transactions[b.id] || [], { text: S.text, categoryId: S.categoryId, kind: S.flow, accountId: S.accountId || '', ...range(S) })
     .filter(m => m.kind !== 'income' && m.categoryId !== to);
   S.moving = false;
   if (!matches.length) { toast(`They’re all in ${b.categories[to].name} already.`); drawSearch(); return; }

@@ -206,12 +206,33 @@ export function createRepository(backend, now = () => Date.now()) {
      * line imported again is recognised. One deleted earlier comes back instead of being made twice.
      * Writes go in groups so a large file stays inside the database's limits.
      */
-    async importTransactions(id, list, deletedIds = new Set()) {
+    async importTransactions(id, list, deletedIds = new Set(), { file = '', accountId = null } = {}) {
+      // Every row remembers which import (and which account) it came from, and the import itself
+      // is recorded, so it can be taken back out later as a whole.
+      const importId = randomId(16);
+      const tag = { importId, accountId: accountId || null };
       for (let i = 0; i < list.length; i += 100) {
         await batch(list.slice(i, i + 100).map(t => (deletedIds.has(t.id)
-          ? { op: 'update', path: txPath(id, t.id), value: { kind: t.kind, amount: t.amount, date: t.date, description: t.description, categoryId: t.categoryId ?? null, deleted: false, restoredAt: now(), restoredBy: uid() } }
-          : { op: 'set', path: txPath(id, t.id), value: { note: '', ...t, categoryId: t.categoryId ?? null, budgetId: id, createdBy: uid(), createdAt: now() } })));
+          ? { op: 'update', path: txPath(id, t.id), value: { kind: t.kind, amount: t.amount, date: t.date, description: t.description, categoryId: t.categoryId ?? null, ...tag, deleted: false, restoredAt: now(), restoredBy: uid() } }
+          : { op: 'set', path: txPath(id, t.id), value: { note: '', ...t, ...tag, categoryId: t.categoryId ?? null, budgetId: id, createdBy: uid(), createdAt: now() } })));
       }
+      await batch([
+        { op: 'set', path: `${budgetPath(id)}/imports/${importId}`, value: { id: importId, at: now(), by: uid(), file: String(file).slice(0, 80), accountId: accountId || null, count: list.length, ids: list.map(t => t.id), undone: false } },
+        { op: 'update', path: budgetPath(id), value: { 'settings.lastImport': now(), changedBy: uid() } },
+      ]);
+      return importId;
+    },
+    listImports: id => backend.list(`${budgetPath(id)}/imports`, { orderBy: 'at' }),
+    /** Takes a past import back out, or brings it back, as a whole. */
+    async undoImport(id, rec) {
+      await this.unimport(id, rec.ids);
+      await backend.update(`${budgetPath(id)}/imports/${rec.id}`, { undone: true });
+    },
+    async redoImport(id, rec) {
+      for (let i = 0; i < rec.ids.length; i += 100) {
+        await batch(rec.ids.slice(i, i + 100).map(tid => ({ op: 'update', path: txPath(id, tid), value: { deleted: false, restoredAt: now(), restoredBy: uid() } })));
+      }
+      await backend.update(`${budgetPath(id)}/imports/${rec.id}`, { undone: false });
     },
     /** Takes a whole import back out (only marks them, like any delete). */
     async unimport(id, ids) {

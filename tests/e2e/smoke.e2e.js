@@ -445,6 +445,43 @@ await page.locator('#importFile').setInputFiles({ name: 'again.csv', mimeType: '
 await page.locator('[data-action=import-save]', { hasText: 'Nothing ticked' }).waitFor();
 await tap('[data-action=sheet-back]');
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
+// Each file says which account it's from (a new one can be added right there), and past imports
+// can be taken out and brought back later.
+await tap('#app [data-action=open-import]');
+await page.locator('#importFile').setInputFiles({ name: 'card-nov.csv', mimeType: 'text/csv', buffer: Buffer.from('Transaction Date,Post Date,Description,Category,Type,Amount,Memo\n11/06/2026,11/07/2026,ACCOUNT TAG SHOP,Shopping,Sale,-37.21,\n') });
+await page.locator('dialog[open] [data-change=import-account]').selectOption({ label: '+ Add an account…' });
+await page.locator('#impAccName').fill('Sample card');
+await tap('dialog[open] [data-action=imp-acc-add]');
+await eventually(async () => (await page.locator('dialog[open] [data-change=import-account] option:checked').innerText()) === 'Sample card', 'The new account should be picked');
+await page.locator('.import-row').first().locator('select').selectOption({ label: 'Clothes' });
+await tap('[data-action=import-save]');
+await page.getByText('Last step').waitFor();
+await page.getByText('Add today’s balance').waitFor();
+await tap('[data-action=sheet-back]');
+await page.locator('dialog[open]').waitFor({ state: 'detached' });
+await tap('#app [data-action=open-import]');
+const past = page.locator('.past-row', { hasText: 'card-nov.csv' });
+await past.waitFor();
+await past.getByText('Sample card').waitFor();
+await past.locator('[data-action=import-undo]').click();
+await page.getByText('Took out 1 from card-nov.csv').waitFor();
+await past.locator('[data-action=import-redo]').click();
+await page.getByText('Brought back 1').waitFor();
+await tap('[data-action=sheet-back]');
+await page.locator('dialog[open]').waitFor({ state: 'detached' });
+await page.locator('.tx-row', { hasText: 'ACCOUNT TAG SHOP' }).waitFor();
+// Search can narrow to that account.
+await tap('#app [data-action=open-search]');
+await page.locator('dialog[open] [data-change=search-account]').selectOption({ label: 'From Sample card' });
+await page.locator('.search-sum', { hasText: '1 match' }).waitFor();
+await tap('[data-action=sheet-back]');
+// Tidy up: the later accounts check starts with none.
+await tap('#app [data-action=open-accounts]');
+await page.locator('.acc-row', { hasText: 'Sample card' }).locator('[data-action=acc-remove]').click();
+await page.getByText('Add the accounts your money is in').waitFor();
+await tap('[data-action=sheet-back]');
+await page.locator('dialog[open]').waitFor({ state: 'detached' });
+
 // A PDF gets a clear message.
 await tap('[data-action=open-import]');
 await page.locator('#importFile').setInputFiles({ name: 'statement.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4') });

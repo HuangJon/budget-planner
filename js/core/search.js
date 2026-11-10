@@ -7,10 +7,11 @@ import { liveTransactions, monthOf } from './budget.js';
 const norm = s => String(s || '').toLowerCase();
 
 /** { text, categoryId, kind: 'spend' | 'income' | '', from: 'YYYY-MM-DD', to } → matching transactions. */
-export function searchTransactions(list, { text = '', categoryId = '', kind = '', from = '', to = '' } = {}) {
+export function searchTransactions(list, { text = '', categoryId = '', kind = '', from = '', to = '', accountId = '' } = {}) {
   const words = norm(text).split(/\s+/).filter(Boolean);
   return liveTransactions(list).filter(t => {
-    if (categoryId && t.categoryId !== categoryId) return false;
+    if (categoryId && t.categoryId !== categoryId && !(t.splits || []).some(p => p.categoryId === categoryId)) return false;
+    if (accountId && t.accountId !== accountId) return false;
     if (kind === 'spend' && t.kind === 'income') return false;
     if (kind === 'income' && t.kind !== 'income') return false;
     if (from && t.date < from) return false;
