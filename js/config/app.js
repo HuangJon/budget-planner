@@ -1,7 +1,7 @@
 /** Tunable values and lists. Nothing here touches the page or storage. */
 export const SCHEMA_VERSION = 1;
 /** Shown on the owner page and in error reports; bump with the offline cache in sw.js. */
-export const APP_VERSION = 'wmm-v3';
+export const APP_VERSION = 'wmm-v4';
 export const APP_NAME = "Where's my money";
 export const CURRENCY = 'USD';
 
