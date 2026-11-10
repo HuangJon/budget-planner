@@ -204,6 +204,12 @@ const firstCat = page.locator('dialog[open] .by-cat .chip').first();
 const catName = (await firstCat.innerText()).split(' · ')[0];
 await firstCat.click();
 await eventually(async () => (await page.locator('dialog[open] [data-change=search-cat] option:checked').innerText()) === catName, 'Tapping a category should narrow the list to it');
+// Back steps out of the category to the whole month, then the next Back closes the popup.
+await tap('[data-action=sheet-back]');
+await eventually(async () => (await page.locator('dialog[open] [data-change=search-cat] option:checked').innerText()) === 'Any category', 'Back should return to the whole month');
+await page.locator('dialog[open] .by-cat .chip').nth(1).click();
+await tap('[data-action=sheet-back]');
+await page.locator('dialog[open] .by-cat .chip').first().waitFor();
 await tap('[data-action=sheet-back]');
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
 // A month's "Came in" opens exactly what came in that month.

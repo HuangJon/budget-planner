@@ -68,7 +68,9 @@ inputs['search-text'] = el => { A.sheet.text = el.value; refreshOpenSheet(); };
 changes['search-cat'] = el => { A.sheet.categoryId = el.value; drawSearch(); };
 changes['search-when'] = el => { A.sheet.when = el.value; drawSearch(); };
 actions['search-when-clear'] = () => { A.sheet.from = ''; A.sheet.to = ''; drawSearch(); };
-actions['search-pick-cat'] = el => { A.sheet.categoryId = el.dataset.id; drawSearch(); };
+// Tapping one of the biggest categories drills in: it opens as a step on top, so Back returns to
+// the list before it (and from there, Back closes the popup).
+actions['search-pick-cat'] = el => openChild({ ...A.sheet, categoryId: el.dataset.id, moving: false }, drawSearch);
 actions['search-flow'] = el => { A.sheet.flow = el.dataset.id; if (el.dataset.id === 'income') A.sheet.categoryId = ''; drawSearch(); };
 actions['search-move-open'] = () => { A.sheet.moving = true; drawSearch(); };
 actions['search-move-cancel'] = () => { A.sheet.moving = false; drawSearch(); };
