@@ -20,18 +20,23 @@ function byMonthCategory(transactions, uptoDay = 31) {
   return out;
 }
 
-/** Income and spending for each of the last `count` months, oldest first. */
-export function monthTotals(transactionList, month, count = 6) {
+/**
+ * Income and spending for each of the last `count` months, oldest first. With the budget, `saved`
+ * is the part of spending that went to saving groups (an emergency fund, a brokerage transfer).
+ */
+export function monthTotals(transactionList, month, count = 6, budget = null) {
   const transactions = liveTransactions(transactionList);
+  const saving = id => Boolean(budget && isSavingGroup(budget.categories?.[id]?.group));
   const rows = [];
   for (let i = count - 1; i >= 0; i -= 1) {
     const m = addMonths(month, -i);
-    let income = 0, spent = 0;
+    let income = 0, spent = 0, saved = 0;
     for (const t of transactions) {
       if (monthOf(t.date) !== m) continue;
-      if (t.kind === 'income') income += t.amount; else spent += net(t);
+      if (t.kind === 'income') income += t.amount;
+      else { spent += net(t); if (saving(t.categoryId)) saved += net(t); }
     }
-    rows.push({ month: m, income, spent: Math.max(0, spent) });
+    rows.push({ month: m, income, spent: Math.max(0, spent), saved: Math.max(0, saved) });
   }
   return rows;
 }

@@ -25,7 +25,7 @@ const transactions = [
 test('month totals count income and spending minus refunds', () => {
   const rows = monthTotals(transactions, '2026-11', 4);
   assert.deepEqual(rows.map(r => r.month), ['2026-08', '2026-09', '2026-10', '2026-11']);
-  assert.deepEqual(rows.at(-1), { month: '2026-11', income: 400000, spent: 38000 });
+  assert.deepEqual(rows.at(-1), { month: '2026-11', income: 400000, spent: 38000, saved: 0 });
   assert.equal(rows[0].spent, 50000);
 });
 
@@ -189,4 +189,13 @@ test('biggest purchases and spending by person can cover several months', async 
   assert.deepEqual(biggestPurchases(list, '2026-11').map(t => t.id), ['c']);
   assert.deepEqual(biggestPurchases(list, ['2026-09', '2026-10', '2026-11']).map(t => t.id), ['b', 'a', 'c']);
   assert.deepEqual(byPerson({ members: {} }, list, ['2026-09', '2026-10', '2026-11']).map(r => [r.uid, r.spent]), [['u2', 900], ['u1', 600]]);
+});
+
+test('month totals say how much of the spending went to saving groups', () => {
+  const b = { categories: { inv: { name: 'Investing', group: 'Saving for' }, g: { name: 'Groceries', group: 'Everyday' } } };
+  const list = [
+    { id: 'a', kind: 'spend', amount: 1000000, date: '2026-09-18', categoryId: 'inv' },
+    { id: 'b', kind: 'spend', amount: 5000, date: '2026-09-20', categoryId: 'g' },
+  ];
+  assert.deepEqual(monthTotals(list, '2026-09', 1, b)[0], { month: '2026-09', income: 0, spent: 1005000, saved: 1000000 });
 });

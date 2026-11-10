@@ -132,10 +132,14 @@ function overview(rows, before, label) {
   const active = rows.filter(r => r.income || r.spent);
   if (!active.length) return '';
   const income = sum(rows, 'income'), spent = sum(rows, 'spent'), left = income - spent;
+  const saved = rows.reduce((a, r) => a + (r.saved || 0), 0);
   const kept = income > 0 ? Math.round((left / income) * 100) : null;
   const n = active.length;
   const prev = before.filter(r => r.income || r.spent);
-  const prevSpent = prev.length ? sum(prev, 'spent') / prev.length : null;
+  // Only compare with a stretch before that has real data: most of its months, not a stray
+  // transaction or two from the edge of an import (which made "up 9,663%").
+  const enoughBefore = prev.length >= Math.max(2, Math.ceil(n / 2)) && prev.every(r => r.spent > 0);
+  const prevSpent = enoughBefore ? sum(prev, 'spent') / prev.length : null;
   const change = prevSpent ? Math.round(((spent / n - prevSpent) / prevSpent) * 100) : null;
   // A month still under way isn't a fair "best", so only finished months count.
   const done = active.filter(r => r.month < today().slice(0, 7));
@@ -143,7 +147,7 @@ function overview(rows, before, label) {
   return `<div class="overview">
     <div class="ov-grid">
       <div><span class="label">Came in</span><span class="amt owed">${dollars(income)}</span><span class="tiny muted">${dollars(income / n)} a month</span></div>
-      <div><span class="label">Spent</span><span class="amt owe">${dollars(spent)}</span><span class="tiny muted">${dollars(spent / n)} a month</span></div>
+      <div><span class="label">Spent</span><span class="amt owe">${dollars(spent)}</span><span class="tiny muted">${dollars(spent / n)} a month${saved ? `, incl. ${dollars(saved)} saved or invested` : ''}</span></div>
       <div><span class="label">${left >= 0 ? 'Left over' : 'Short'}</span><span class="amt ${left < 0 ? 'owe' : 'left'}">${dollars(left)}</span><span class="tiny muted">${kept !== null && left >= 0 ? `${kept}% of what came in` : 'more out than in'}</span></div>
     </div>
     <p class="small muted">${esc(label[0].toUpperCase() + label.slice(1))}${n < rows.length ? ` (${n} month${n === 1 ? '' : 's'} with activity)` : ''}.${change !== null && Math.abs(change) >= 5 ? ` Spending is ${change > 0 ? 'up' : 'down'} ${Math.abs(change)}% a month on the stretch before.` : prevSpent !== null ? ' Spending is about the same as the stretch before.' : ''}${best && done.length > 1 && best.income - best.spent > 0 ? ` Most left over: ${esc(fmtMonth(best.month))}.` : ''}</p>
@@ -237,7 +241,7 @@ export function trendsScreen(b) {
   const r = range();
   const months = rangeFor(r, list);
   const compare = categoryCompare(b, list, A.month, now);
-  const all = monthTotals(list, months.at(-1), months.length);
+  const all = monthTotals(list, months.at(-1), months.length, b);
   const first = all.findIndex(x => x.income || x.spent);
   const totals = first > 0 && all.length - first >= 2 ? all.slice(first) : all;
   const enough = all.filter(x => x.income || x.spent).length;
