@@ -3,8 +3,8 @@
  * down as you type. Each box saves when you leave it.
  */
 import { A, actions, inputs, changes, render } from './state.js';
-import { esc, svg, ICON, fmtMonth, toast, send, today } from './dom.js';
-import { groupedCategories, copyLastMonth, fundTargets, addMonths, thisMonth, backfillPlan } from '../core/budget.js';
+import { esc, svg, ICON, fmtMonth, toast } from './dom.js';
+import { groupedCategories, copyLastMonth, fundTargets, addMonths, thisMonth } from '../core/budget.js';
 import { money, toCents, fromCents } from '../core/money.js';
 import { helpButton, describe } from './help.js';
 import { summaryFor, catStatus, groupTab, totalNeeded, hasTargets, writeAssigned, isFolded } from './budget.js';
@@ -50,7 +50,6 @@ export function planScreen(b) {
     </header>
     ${describe('plan')}
     ${past ? `<p class="notice">${esc(monthName(A.month))} is over. Changes here also change what carried into the months after it.</p>` : ''}
-    ${backfillCard(b)}
     <section class="plan-bar" aria-live="polite">
       <div class="row between"><span class="label">Ready to assign</span><span class="amt plan-ready ${s.readyToAssign < 0 ? 'owe' : ''}" id="planReady" data-saved="${s.readyToAssign}">${money(s.readyToAssign)}</span></div>
       ${copyCount ? `<button type="button" class="btn" data-action="plan-copy">Copy ${esc(monthName(addMonths(A.month, -1)))}'s plan · ${money(copyTotal)} for ${copyCount} ${copyCount === 1 ? 'category' : 'categories'}</button>` : ''}
@@ -109,28 +108,3 @@ changes.plan = el => {
   setTimeout(() => writeAssigned(b, A.month, { ...(b.assigned?.[A.month] || {}), [id]: cents }));
 };
 
-/**
- * After importing past months: plan each of them to cover what was really spent, in one tap, so
- * nothing from earlier shows as overspent. What's left over stays in Ready to assign.
- */
-function backfillCard(b) {
-  const { changes, total, months } = backfillPlan(b, A.transactions[b.id] || [], today());
-  if (!months) return '';
-  const list = Object.keys(changes).sort();
-  const span = list.length === 1 ? fmtMonth(list[0]) : `${fmtMonth(list[0])} to ${fmtMonth(list.at(-1))}`;
-  return `<section class="panel pad stack backfill">
-    <strong>Fill in past months</strong>
-    <p class="small">Spending from ${esc(span)} has no plan to cover it, so it shows as overspent. This plans each of those months with what was spent: ${money(total)} across ${months} ${months === 1 ? 'month' : 'months'}. Whatever is left over stays in Ready to assign for you to plan now.</p>
-    <button type="button" class="btn primary" data-action="plan-backfill">Fill in ${esc(span)}</button>
-  </section>`;
-}
-actions['plan-backfill'] = () => {
-  const b = A.budgets[A.route.id];
-  const { changes, months } = backfillPlan(b, A.transactions[b.id] || [], today());
-  if (!months) return;
-  // Undo puts each month's plan back exactly as it was.
-  const before = {};
-  for (const [m, cats] of Object.entries(changes)) for (const id of Object.keys(cats)) (before[m] ||= {})[id] = b.assigned?.[m]?.[id] ?? undefined;
-  send(A.repo.setAssignedMany(b.id, changes));
-  toast(`Filled in ${months} ${months === 1 ? 'month' : 'months'}`, () => send(A.repo.setAssignedMany(b.id, before)));
-};

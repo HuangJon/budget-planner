@@ -88,6 +88,29 @@ export function exampleData(uid, now = new Date()) {
       t('spend', cents(5400), `${mm}-14`, 'fun', 'Movies'),
     );
   }
+  // The budget started four months ago. Before that is history from the bank files, from January
+  // (or at least six months back): it shows in Trends and Search, but never moves any money.
+  const start = addMonths(m, -4);
+  budget.settings = { startDate: `${start}-01` };
+  let first = `${start.slice(0, 4)}-01`;
+  if (first >= addMonths(start, -2)) first = addMonths(start, -6);
+  const wave = [1, 0.92, 1.1, 0.97, 1.18, 0.88, 1.04, 0.95, 1.12, 0.9, 1.06, 0.99];
+  let k = 0;
+  for (let mm = first; mm < start; mm = addMonths(mm, 1)) {
+    const w = wave[k++ % wave.length], c = v => Math.round(v * w);
+    transactions.push(
+      t('income', 260000, `${mm}-01`, null, 'ACME CORP PAYROLL'), t('income', 180000, `${mm}-01`, null, 'Sam’s paycheck', 'sam'),
+      t('spend', 180000, `${mm}-01`, 'rent', 'Rent'), t('spend', c(11500), `${mm}-12`, 'power', 'Con Edison'),
+      t('spend', 6500, `${mm}-18`, 'phone', 'Phone bill'), t('spend', 3499, `${mm}-22`, 'subs', 'Streaming'),
+      t('spend', c(19800), `${mm}-05`, 'groceries', 'Trader Joe\'s'), t('spend', c(24300), `${mm}-19`, 'groceries', 'Whole Foods', 'sam'),
+      t('spend', c(650), `${mm}-08`, 'eating', 'Corner coffee'), t('spend', c(720), `${mm}-15`, 'eating', 'Corner coffee'),
+      t('spend', c(4800), `${mm}-10`, 'eating', 'Tacos'), t('spend', c(12900), `${mm}-24`, 'eating', 'Dinner out', 'sam'),
+      t('spend', 13200, `${mm}-02`, 'transport', 'MetroCard'), t('spend', c(3900), `${mm}-11`, 'household', 'Online order'),
+      t('spend', c(2650), `${mm}-20`, 'household', 'Online order'), t('spend', c(6100), `${mm}-14`, 'fun', 'Movies'),
+    );
+    if (k % 3 === 1) transactions.push(t('spend', c(15800), `${mm}-16`, 'clothes', 'Online order'));
+    if (k % 4 === 2) transactions.push(t('spend', c(8500), `${mm}-27`, 'gifts', 'Birthday present'));
+  }
   const docs = {
     [`budgets/${id}`]: budget,
     [`users/${uid}/budgets/${id}`]: { budgetId: id, at: 0 },

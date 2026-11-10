@@ -536,28 +536,6 @@ await eventually(async () => (await page.locator('dialog[open] .tx-row', { hasTe
 await tap('[data-action=sheet-back]');
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
 
-// Backfilling: start in October, import an October purchase into an unplanned category, then
-// Plan money offers to fill October in so nothing shows overspent.
-await tap('[data-action=account]');
-await page.locator('dialog[open] [data-change=budget-start]').fill('2026-10-01');
-await page.locator('dialog[open] [data-change=budget-start]').dispatchEvent('change');
-await page.getByText('Budget start saved').waitFor();
-await tap('[data-action=sheet-back]');
-await tap('#app [data-action=open-import]');
-await page.locator('#importFile').setInputFiles({ name: 'oct.csv', mimeType: 'text/csv', buffer: Buffer.from('Transaction Date,Post Date,Description,Category,Type,Amount,Memo\n10/20/2026,10/21/2026,BACKFILL SAMPLE,,Sale,-50.00,\n') });
-await page.locator('.import-row').first().locator('select').selectOption({ label: 'Hobbies' });
-await tap('[data-action=import-save]');
-await page.getByText('Last step').waitFor();
-await tap('[data-action=sheet-back]');
-await page.locator('dialog[open]').waitFor({ state: 'detached' });
-await page.locator('.hero-actions a.hero-btn').click();
-await page.locator('.backfill', { hasText: 'October 2026' }).waitFor();
-await shot('backfill');
-await tap('[data-action=plan-backfill]');
-await page.getByText('Filled in 1 month').waitFor();
-await page.locator('.backfill').waitFor({ state: 'detached' });
-await page.locator('.topbar a.btn').click();
-
 // Arranging categories on the budget screen: arrows, then dragging by the handle.
 await page.goto(pathToFileURL(resolve('preview-test.html')).href + '#home');
 await tap('a.budget-row');

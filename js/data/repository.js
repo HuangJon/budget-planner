@@ -116,11 +116,6 @@ export function createRepository(backend, now = () => Date.now()) {
     restoreBudget: id => backend.update(budgetPath(id), { deleted: false, deletedAt: undefined, deletedBy: undefined, changedBy: uid() }),
 
     /** Sets what's assigned to some categories in one month. Pass { catId: cents }. */
-    /** Plans for several months in one save: { month: { categoryId: cents (or undefined to clear) } }. */
-    setAssignedMany: (id, byMonth) => backend.update(budgetPath(id), {
-      ...Object.fromEntries(Object.entries(byMonth).flatMap(([m, cats]) => Object.entries(cats).map(([cat, v]) => [`assigned.${m}.${cat}`, v]))),
-      changedBy: uid(),
-    }),
     setAssigned: (id, month, byCategory) => backend.update(budgetPath(id), {
       ...Object.fromEntries(Object.entries(byCategory).map(([cat, v]) => [`assigned.${month}.${cat}`, v])),
       changedBy: uid(),
