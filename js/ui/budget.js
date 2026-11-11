@@ -1,6 +1,6 @@
 /** The budget screen: Ready to assign, anything overspent, and every category with what's left. */
 import { A, actions, changes, render } from './state.js';
-import { esc, svg, ICON, fmtMonth, ordinal, openSheet, closeSheet, sheetHead, toast, send, val, fmtDate, registerSheet } from './dom.js';
+import { esc, svg, ICON, fmtMonth, ordinal, openSheet, closeSheet, sheetHead, toast, send, val, fmtDate, registerSheet, openChild } from './dom.js';
 import { monthSummary, groupedCategories, fundTargets, coverOverspending, moveMoney, addMonths, thisMonth, monthOf, liveTransactions, targetType } from '../core/budget.js';
 import { money, toCents, fromCents } from '../core/money.js';
 import { openTxForm } from './tx-form.js';
@@ -308,7 +308,7 @@ function monthPicker() {
     return `<button type="button" class="month-cell ${key === A.month ? 'on' : ''} ${key === now ? 'now' : ''}" data-action="month-go" data-id="${key}" aria-pressed="${key === A.month}" aria-label="${esc(fmtMonth(key))}${n ? `, ${n} transactions` : ''}"><strong>${m}</strong><span class="tiny muted">${n || '–'}</span></button>`;
   }).join('')}</div></section>`).join('')}<p class="tiny muted">The number is how many transactions each month has.</p></div></div>`);
 }
-actions['month-pick'] = () => { A.sheet = { kind: 'month-pick' }; monthPicker(); };
+actions['month-pick'] = () => openChild({ kind: 'month-pick' }, monthPicker);
 actions['month-go'] = el => { A.month = el.dataset.id; closeSheet(); render(); };
 registerSheet('month-pick', monthPicker);
 

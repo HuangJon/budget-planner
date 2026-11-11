@@ -175,6 +175,12 @@ await ok(alice.repo.updateTransaction(B, t1, { amount: 1900 }), "anyone in the b
 await ok(alice.repo.updateTransaction(B, t1, { splits: [{ categoryId: catId, amount: 900 }, { categoryId: catId, amount: 1000 }] }), 'a purchase can be split');
 await no(alice.repo.updateTransaction(B, t1, { splits: Array.from({ length: 21 }, () => ({ categoryId: catId, amount: 1 })) }), 'but not into more than 20 parts');
 await ok(alice.repo.recategorize(B, [t1], catId), 'moving it clears the split');
+await ok(alice.repo.tagAccount(B, [t1.id], 'acct1'), 'a transaction can be marked with an account');
+await ok(alice.repo.tagAccount(B, [t1.id], null), 'and unmarked');
+await no(alice.repo.tagAccount(B, [t1.id], 'x'.repeat(41)), 'but not with a very long account id');
+const ruleId = alice.repo.newRuleId();
+await ok(alice.repo.saveRule(B, { id: ruleId, kind: 'spend', amount: 1549, description: 'Streaming', categoryId: catId, every: 'month', day: 12, start: '2026-12' }), 'a suggested repeat can be added');
+await ok(alice.repo.removeRule(B, ruleId), 'and taken away again with Undo');
 await ok(alice.repo.deleteTransaction(B, t1.id), 'deleting only marks it');
 await no(alice.backend.remove(`budgets/${B}/transactions/${t1.id}`), 'nothing is deleted outright');
 await no(bob.backend.set(`budgets/${B}/transactions/${randomId()}`, { id: 'x', budgetId: B, kind: 'spend', amount: 12.5, date: '2026-11-07', description: 'x', categoryId: catId, createdBy: bob.uid, createdAt: 1 }), 'amounts are whole cents');

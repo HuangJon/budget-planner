@@ -3,7 +3,7 @@
  * in the rest from the same place), untick anything to leave out, then add them all at once.
  * The file is read on this device; only the transactions are saved, like typing them in.
  */
-import { A, actions, changes, inputs } from './state.js';
+import { A, actions, changes, inputs, render } from './state.js';
 import { openSearch } from './search.js';
 import { LIMITS } from '../config/app.js';
 import { groupedCategories, budgetStart } from '../core/budget.js';
@@ -323,7 +323,7 @@ actions['import-rename-cancel'] = () => { A.sheet.renaming = null; drawImport();
 actions['import-rename-save'] = el => {
   const b = budget(), rec = A.sheet.past?.find(p => p.id === el.dataset.id), name = val('impRename').trim().slice(0, 80);
   A.sheet.renaming = null;
-  if (rec && name && name !== rec.file) { rec.file = name; if (A.importNames?.[b.id]) A.importNames[b.id][rec.id] = name; send(A.repo.renameImport(b.id, rec.id, name)); toast('Renamed'); }
+  if (rec && name && name !== rec.file) { rec.file = name; if (A.importNames?.[b.id]) A.importNames[b.id][rec.id] = name; render(); send(A.repo.renameImport(b.id, rec.id, name)); toast('Renamed'); }
   drawImport();
 };
 // Enter saves the new name, Escape leaves it as it was.
