@@ -88,6 +88,10 @@ function drawImport() {
   const start = budgetStart(b);
   const history = start ? adding.filter(r => r.date < start).length : 0;
   const retag = untagged(b, rows, S.accountId, A.transactions[b.id]);
+  // Without an account picked, say how many could be marked once one is.
+  const couldTag = S.accountId ? 0 : Object.keys(b.accounts || {}).length ? untagged(b, rows, Object.keys(b.accounts)[0], A.transactions[b.id]).length : 0;
+  const tickable = rows.filter(r => r.skip !== 'imported' && (!r.skip || S.showSkipped));
+  const allTicked = tickable.length && tickable.every(r => r.include);
   const accName = b.accounts?.[S.accountId]?.name || '';
   const label = adding.length ? `Add ${adding.length}` : retag.length ? `Tag ${retag.length} as ${accName}` : 'Nothing ticked';
   openSheet(`<div class="sheet">${sheetHead('Check and add')}<div class="sheet-body">
@@ -98,8 +102,10 @@ function drawImport() {
       <option value="${NEW}">+ Add an account…</option></select></label>
     ${S.addingAccount ? `<div class="panel pad stack tight"><input id="impAccName" maxlength="40" placeholder="Name, like Chase card" autocomplete="off"><div class="seg" role="group" aria-label="Kind of account"><button type="button" data-action="imp-acc-kind" data-id="cash" aria-pressed="${S.accKind !== 'card'}">Bank or cash</button><button type="button" data-action="imp-acc-kind" data-id="card" aria-pressed="${S.accKind === 'card'}">Credit card</button></div><div class="row gap8"><button type="button" class="btn small primary" data-action="imp-acc-add">Add</button><button type="button" class="btn small" data-action="imp-acc-cancel">Cancel</button></div><p class="tiny muted">Its balance can go in later, in Check your accounts.</p></div>` : ''}
     ${retag.length ? `<p class="notice">${retag.length} from this file ${retag.length === 1 ? 'is' : 'are'} already here without an account. Saving marks ${retag.length === 1 ? 'it' : 'them'} as ${esc(accName)}.</p>` : ''}
+    ${couldTag ? `<p class="notice">${couldTag} from this file ${couldTag === 1 ? 'is' : 'are'} already here without an account. Pick the account above to mark ${couldTag === 1 ? 'it' : 'them'}.</p>` : ''}
     ${history ? `<p class="notice">${history} ${history === 1 ? 'is' : 'are'} from before your budget started (${fmtDate(start)}). ${history === 1 ? 'It’s' : 'They’re'} kept as history for Trends and search, and won’t change your money.</p>` : ''}
     ${needCat ? `<p class="small owe">${needCat} still need${needCat === 1 ? 's' : ''} a category.</p>` : '<p class="small muted">Categories are guessed from what you picked before. Changing one changes the rest from the same place.</p>'}
+    ${tickable.length > 1 ? `<label class="row gap8 small tick-all"><input type="checkbox" data-change="import-tick-all" ${allTicked ? 'checked' : ''}>${allTicked ? 'Untick all' : 'Tick all'} ${tickable.length}</label>` : ''}
     <div class="panel import-list">${shown.map(([r, i]) => row(b, r, i)).join('')}</div>
     ${skipped.length ? `<button type="button" class="link small" data-action="import-skipped">${S.showSkipped ? 'Hide the ones left out' : `Show ${skipped.length} left out`}</button>` : ''}
   </div><div class="sheet-foot"><button type="button" class="btn primary" data-action="import-save" ${adding.length || retag.length ? '' : 'disabled'}>${esc(label)}</button></div></div>`);
@@ -147,6 +153,11 @@ changes['import-file'] = async el => {
   drawImport();
 };
 
+// Ticks (or unticks) every row shown. Rows already imported from this same file stay out.
+changes['import-tick-all'] = el => {
+  for (const r of A.sheet.rows) if (r.skip !== 'imported' && (!r.skip || A.sheet.showSkipped)) r.include = el.checked;
+  drawImport();
+};
 changes['import-tick'] = el => {
   const r = A.sheet.rows[+el.dataset.id];
   r.include = el.checked;
@@ -248,6 +259,7 @@ actions['import-save'] = () => {
 changes['import-account'] = el => {
   if (el.value === NEW) { A.sheet.addingAccount = true; A.sheet.accKind = A.sheet.format === 'chase-card' ? 'card' : 'cash'; drawImport(); document.getElementById('impAccName')?.focus(); return; }
   A.sheet.accountId = el.value;
+  drawImport();
 };
 actions['imp-acc-kind'] = el => { const n = val('impAccName'); A.sheet.accKind = el.dataset.id; drawImport(); const i = document.getElementById('impAccName'); if (i) i.value = n; };
 actions['imp-acc-cancel'] = () => { A.sheet.addingAccount = false; drawImport(); };

@@ -428,3 +428,5 @@ a.request-note { display:flex; align-items:center; gap:12px; padding:14px 16px; 
 .split-row select { flex:1; min-width:0 }
 .split-amt { flex:none; width:118px }
 .split-open { justify-self:start }
+.tick-all { padding:2px 12px; cursor:pointer }
+.tick-all input { width:auto }
