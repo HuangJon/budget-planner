@@ -3,11 +3,12 @@
  * in the rest from the same place), untick anything to leave out, then add them all at once.
  * The file is read on this device; only the transactions are saved, like typing them in.
  */
-import { A, actions, changes } from './state.js';
+import { A, actions, changes, inputs } from './state.js';
+import { openSearch } from './search.js';
 import { LIMITS } from '../config/app.js';
 import { groupedCategories, budgetStart } from '../core/budget.js';
 import { esc, openSheet, closeSheet, sheetHead, toast, send, fmtDate, openChild, registerSheet, val } from './dom.js';
-import { readStatement, markExisting, guessCategory, SKIP } from '../core/import.js';
+import { readStatement, markExisting, guessCategory, SKIP, importName } from '../core/import.js';
 import { money } from '../core/money.js';
 import { catOptions } from './tx-form.js';
 import { openAccounts } from './accounts.js';
@@ -40,10 +41,21 @@ function pastList(b) {
   const past = A.sheet.past;
   if (!past?.length) return '';
   const acc = id => b.accounts?.[id]?.name;
-  return `<section class="stack tight past-imports"><h3 class="date-head">Past imports</h3><div class="panel tx-list">${past.slice(0, 12).map(p => `<div class="tx-row past-row ${p.undone ? 'off' : ''}">
-      <span class="grow stack tight"><strong class="wrap-any">${esc(p.file || 'Bank file')}</strong><span class="tiny muted">${fmtDate(new Date(p.at).toISOString().slice(0, 10))} · ${p.count} ${p.count === 1 ? 'row' : 'rows'}${acc(p.accountId) ? ` · ${esc(acc(p.accountId))}` : ''}${p.undone ? ' · Taken out' : ''}</span></span>
-      <button type="button" class="btn small" data-action="${p.undone ? 'import-redo' : 'import-undo'}" data-id="${esc(p.id)}">${p.undone ? 'Bring back' : 'Undo'}</button>
-    </div>`).join('')}</div><p class="tiny muted">Undo takes every row from that file back out. Edits you made to them come back with Bring back.</p></section>`;
+  const item = p => {
+    const meta = `<span class="tiny muted">${fmtDate(new Date(p.at).toISOString().slice(0, 10))} · ${p.count} ${p.count === 1 ? 'row' : 'rows'}${acc(p.accountId) ? ` · ${esc(acc(p.accountId))}` : ''}${p.undone ? ' · Taken out' : ''}</span>`;
+    if (A.sheet.renaming === p.id) {
+      return `<div class="tx-row past-row"><span class="grow stack tight">
+        <input id="impRename" maxlength="80" value="${esc(p.file || '')}" data-key="import-rename" data-id="${esc(p.id)}" aria-label="Name of this import" autocomplete="off">${meta}
+        <span class="row gap8"><button type="button" class="btn small primary" data-action="import-rename-save" data-id="${esc(p.id)}">Save</button><button type="button" class="btn small" data-action="import-rename-cancel">Cancel</button></span>
+      </span></div>`;
+    }
+    return `<div class="tx-row past-row ${p.undone ? 'off' : ''}">
+      <span class="grow stack tight"><button type="button" class="link wrap-any imp-name" data-action="import-open" data-id="${esc(p.id)}">${esc(p.file || 'Bank file')} ›</button>${meta}</span>
+      <span class="stack tight past-acts"><button type="button" class="btn small" data-action="import-rename" data-id="${esc(p.id)}">Rename</button><button type="button" class="btn small" data-action="${p.undone ? 'import-redo' : 'import-undo'}" data-id="${esc(p.id)}">${p.undone ? 'Bring back' : 'Undo'}</button></span>
+    </div>`;
+  };
+  return `<section class="stack tight past-imports"><h3 class="date-head">Past imports</h3><div class="panel tx-list">${past.slice(0, 12).map(item).join('')}</div>
+    <p class="tiny muted">Tap a name to see everything that came in with it. Undo takes those rows back out; Bring back returns them with your edits.</p></section>`;
 }
 
 /**
@@ -60,6 +72,9 @@ export function untagged(b, rows, accountId, existing) {
   }
   return [...ids];
 }
+
+const nameFor = (S, b) => (S.nameTyped ? S.name : importName(b.accounts?.[S.accountId]?.name, S.fileName, S.rows.map(r => r.date)));
+inputs['import-name'] = el => { A.sheet.name = el.value; A.sheet.nameTyped = true; };
 
 function drawImport() {
   const S = A.sheet, b = budget();
@@ -111,6 +126,7 @@ function drawImport() {
       <option value="" ${S.accountId ? '' : 'selected'}>Not one of my accounts</option>
       ${Object.entries(b.accounts || {}).map(([id, a]) => `<option value="${id}" ${S.accountId === id ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}
       <option value="${NEW}">+ Add an account…</option></select></label>
+    ${fresh.length ? '' : '<!--'}<label class="form-row bordered"><span class="form-row-label">Name</span><input id="impName" maxlength="80" value="${esc(nameFor(S, b))}" data-input="import-name" aria-label="Name for this import" autocomplete="off"></label>${fresh.length ? '' : '-->'}
     ${S.addingAccount ? `<div class="panel pad stack tight"><input id="impAccName" maxlength="40" placeholder="Name, like Chase card" autocomplete="off"><div class="seg" role="group" aria-label="Kind of account"><button type="button" data-action="imp-acc-kind" data-id="cash" aria-pressed="${S.accKind !== 'card'}">Bank or cash</button><button type="button" data-action="imp-acc-kind" data-id="card" aria-pressed="${S.accKind === 'card'}">Credit card</button></div><div class="row gap8"><button type="button" class="btn small primary" data-action="imp-acc-add">Add</button><button type="button" class="btn small" data-action="imp-acc-cancel">Cancel</button></div><p class="tiny muted">Its balance can go in later, in Check your accounts.</p></div>` : ''}
     <section class="stack tight">
       <div class="row between"><h3 class="date-head">${fresh.length ? `New · ${fresh.length}` : 'Nothing new in this file'}</h3>${fresh.length > 1 ? `<label class="row gap8 small tick-all"><input type="checkbox" data-change="import-tick-all" ${allTicked ? 'checked' : ''}>${allTicked ? 'Untick all' : 'Tick all'}</label>` : ''}</div>
@@ -261,7 +277,8 @@ actions['import-save'] = () => {
   const list = adding.map(r => ({ id: r.key, kind: r.kind, amount: r.amount, date: r.date, description: r.description, categoryId: r.kind === 'income' ? null : r.categoryId }));
   const ids = list.map(t => t.id);
   if (S.accountId) remember(S.format, S.accountId);
-  send(A.repo.importTransactions(b.id, list, S.deleted, { file: S.fileName, accountId: S.accountId || null }));
+  if (A.importNames) delete A.importNames[b.id];
+  send(A.repo.importTransactions(b.id, list, S.deleted, { file: nameFor(S, b).trim() || S.fileName, accountId: S.accountId || null }));
   closeSheet();
   // The last step of an import: check the budget still matches the accounts.
   openAccounts(b.id, { afterImport: list.length });
@@ -300,6 +317,25 @@ actions['import-redo'] = el => {
   send(A.repo.redoImport(b.id, rec));
   toast(`Brought back ${rec.count}`);
   drawImport();
+};
+actions['import-rename'] = el => { A.sheet.renaming = el.dataset.id; drawImport(); const i = document.getElementById('impRename'); i?.focus(); i?.select(); };
+actions['import-rename-cancel'] = () => { A.sheet.renaming = null; drawImport(); };
+actions['import-rename-save'] = el => {
+  const b = budget(), rec = A.sheet.past?.find(p => p.id === el.dataset.id), name = val('impRename').trim().slice(0, 80);
+  A.sheet.renaming = null;
+  if (rec && name && name !== rec.file) { rec.file = name; if (A.importNames?.[b.id]) A.importNames[b.id][rec.id] = name; send(A.repo.renameImport(b.id, rec.id, name)); toast('Renamed'); }
+  drawImport();
+};
+// Enter saves the new name, Escape leaves it as it was.
+addEventListener('keydown', ev => {
+  if (ev.target?.id !== 'impRename') return;
+  if (ev.key === 'Enter') { ev.preventDefault(); document.querySelector('[data-action=import-rename-save]')?.click(); }
+  else if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); actions['import-rename-cancel'](); }
+}, true);
+// Everything that came in with one import, in Search (Back returns here).
+actions['import-open'] = el => {
+  const b = budget(), rec = A.sheet.past?.find(p => p.id === el.dataset.id);
+  if (rec) openSearch(b.id, { importId: rec.id, importName: rec.file || 'Bank file' });
 };
 actions['open-import'] = () => openImport(A.route.id);
 registerSheet('import', drawImport);

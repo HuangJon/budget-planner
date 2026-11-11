@@ -7,6 +7,7 @@ import { amountBox, monthBar, summaryFor } from './budget.js';
 import { liveTransactions, monthOf, budgetStart, isHistory, categoryLabel } from '../core/budget.js';
 import { money } from '../core/money.js';
 import { syncBar } from './accounts.js';
+import { accountBadge } from './search.js';
 
 export const signed = t => `<span class="amt ${t.kind === 'spend' ? 'owe' : 'owed'}">${t.kind === 'spend' ? '−' : '+'}${money(t.amount)}</span>`;
 
@@ -31,7 +32,7 @@ export function transactionsScreen(b) {
     ${list.length ? [...days].map(([day, items]) => `<section class="stack tight"><h3 class="date-head">${fmtDate(day)}</h3><div class="panel tx-list">${items.map(t => {
       const cat = categoryLabel(b, t);
       const who = shared ? ` · ${esc(t.createdBy === A.user?.uid ? 'You' : b.members[t.createdBy]?.name || 'Former member')}` : '';
-      return `<button type="button" class="tap tx-row" data-action="edit-tx" data-id="${t.id}"><span class="grow stack tight"><strong class="wrap-any two-lines">${esc(t.description || (t.kind === 'income' ? 'Income' : t.kind === 'refund' ? 'Refund' : 'Spending'))}</strong><span class="tiny muted">${esc(cat)}${who}${t.kind === 'refund' ? ' · Refund' : ''}${isHistory(b, t) ? ' · History' : ''}${t.accountId && b.accounts?.[t.accountId] ? ` · ${esc(b.accounts[t.accountId].name)}` : ''}</span></span>${signed(t)}</button>`;
+      return `<button type="button" class="tap tx-row" data-action="edit-tx" data-id="${t.id}"><span class="grow stack tight"><strong class="wrap-any two-lines">${esc(t.description || (t.kind === 'income' ? 'Income' : t.kind === 'refund' ? 'Refund' : 'Spending'))}</strong><span class="tiny muted">${esc(cat)}${who}${t.kind === 'refund' ? ' · Refund' : ''}${isHistory(b, t) ? ' · History' : ''}</span>${accountBadge(b, t)}</span>${signed(t)}</button>`;
     }).join('')}</div></section>`).join('')
     : `<section class="panel empty"><h2>Nothing this month yet</h2><p class="muted">Tap Spent to record a purchase, or import from your bank. Income goes in from the Budget tab.</p><button type="button" class="btn primary" data-action="add-tx">Add spending</button></section>`}`;
 }

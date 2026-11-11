@@ -228,6 +228,7 @@ export function createRepository(backend, now = () => Date.now()) {
         await batch(ids.slice(i, i + 100).map(tid => ({ op: 'update', path: txPath(id, tid), value: { accountId: accountId || null, updatedAt: now(), updatedBy: uid() } })));
       }
     },
+    renameImport: (id, iid, name) => backend.update(`${budgetPath(id)}/imports/${iid}`, { file: String(name).slice(0, 80) }),
     listImports: id => backend.list(`${budgetPath(id)}/imports`, { orderBy: 'at' }),
     /** Takes a past import back out, or brings it back, as a whole. */
     async undoImport(id, rec) {

@@ -184,3 +184,15 @@ export function guessCategory(row, categories, past) {
   for (const n of BANK[norm(row.bankCategory)] || []) if (byName.has(n)) return byName.get(n);
   return null;
 }
+
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** A name for an import, like "Chase card May – Oct 2026", until one is typed. */
+export function importName(accountName, fileName, dates) {
+  const who = accountName || String(fileName || 'Bank file').replace(/\.(csv|txt)$/i, '');
+  const sorted = [...dates].sort(), a = sorted[0], z = sorted.at(-1);
+  if (!a) return who;
+  const m = d => MON[Number(d.slice(5, 7)) - 1];
+  const span = a.slice(0, 7) === z.slice(0, 7) ? `${m(a)} ${a.slice(0, 4)}`
+    : a.slice(0, 4) === z.slice(0, 4) ? `${m(a)} – ${m(z)} ${z.slice(0, 4)}` : `${m(a)} ${a.slice(0, 4)} – ${m(z)} ${z.slice(0, 4)}`;
+  return `${who} ${span}`.slice(0, 80);
+}

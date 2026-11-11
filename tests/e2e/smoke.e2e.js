@@ -516,13 +516,24 @@ await page.getByText('Add today’s balance').waitFor();
 await tap('[data-action=sheet-back]');
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
 await tap('#app [data-action=open-import]');
-const past = page.locator('.past-row', { hasText: 'card-nov.csv' });
+const past = page.locator('.past-row', { hasText: 'Sample card Nov 2026' });
 await past.waitFor();
-await past.getByText('Sample card').waitFor();
+await past.locator('.tiny', { hasText: 'Sample card' }).waitFor();
 await past.locator('[data-action=import-undo]').click();
-await page.getByText('Took out 1 from card-nov.csv').waitFor();
+await page.getByText('Took out 1 from Sample card Nov 2026').waitFor();
 await past.locator('[data-action=import-redo]').click();
 await page.getByText('Brought back 1').waitFor();
+// An import can be renamed, and tapping its name lists what came in with it.
+await past.locator('[data-action=import-rename]').click();
+await page.locator('#impRename').fill('Chase May – Oct 2026');
+await page.locator('#impRename').press('Enter');
+const renamed = page.locator('.past-row', { hasText: 'Chase May – Oct 2026' });
+await renamed.waitFor();
+await renamed.locator('[data-action=import-open]').click();
+await page.locator('dialog[open] .search-import', { hasText: 'Chase May – Oct 2026' }).waitFor();
+await page.locator('.search-sum', { hasText: '1 match' }).waitFor();
+await tap('[data-action=sheet-back]');
+await renamed.waitFor();
 await tap('[data-action=sheet-back]');
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
 await page.locator('.tx-row', { hasText: 'ACCOUNT TAG SHOP' }).waitFor();
@@ -531,8 +542,17 @@ await tap('#app [data-action=open-search]');
 await page.locator('dialog[open] [data-change=search-account]').selectOption({ label: 'From Sample card' });
 await page.locator('.search-sum', { hasText: '1 match' }).waitFor();
 await tap('[data-action=sheet-back]');
-// Activity shows the account, and a purchase's account can be changed or cleared in its form.
-await page.locator('.tx-row', { hasText: 'ACCOUNT TAG SHOP' }).getByText('Sample card').waitFor();
+// Activity shows the account as a badge; tapping it lists everything from that account.
+await page.locator('.tx-row', { hasText: 'ACCOUNT TAG SHOP' }).locator('.acc-badge', { hasText: 'Sample card' }).click();
+await page.locator('dialog[open] [data-change=search-account] option:checked', { hasText: 'From Sample card' }).waitFor({ state: 'attached' });
+await page.locator('.search-sum', { hasText: '1 match' }).waitFor();
+await tap('[data-action=sheet-back]');
+await page.locator('dialog[open]').waitFor({ state: 'detached' });
+// Its form says which import it came in with, and the account can be changed or cleared there.
+await page.locator('.tx-row', { hasText: 'ACCOUNT TAG SHOP' }).click();
+await page.locator('dialog[open] [data-action=open-import-search]', { hasText: 'Chase May – Oct 2026' }).waitFor();
+await tap('[data-action=sheet-back]');
+await page.locator('dialog[open]').waitFor({ state: 'detached' });
 await page.locator('.tx-row', { hasText: 'ACCOUNT TAG SHOP' }).click();
 await page.locator('#fAccount').selectOption({ label: 'None' });
 await page.locator('dialog[open] .sheet-head h2').click();

@@ -1,5 +1,5 @@
 import test from 'node:test'; import assert from 'node:assert/strict';
-import { parseCsv, readStatement, markExisting, guessCategory, readDate, cleanDescription } from '../../js/core/import.js';
+import { parseCsv, readStatement, markExisting, guessCategory, readDate, cleanDescription, importName } from '../../js/core/import.js';
 
 // Made-up rows in the layouts Chase uses. No real statements live in this repo.
 const CARD = `Transaction Date,Post Date,Description,Category,Type,Amount,Memo
@@ -128,4 +128,11 @@ test('moving money between the bank and your own Venmo is left out', () => {
 2026-11-04,10:00:00,-30.00,Withdrawal,VENMO PAYMENT 1234
 `);
   assert.deepEqual(rows.map(r => r.skip), ['transfer', 'transfer', null], 'paying someone through Venmo from the bank is still spending');
+});
+
+test('an import is named after its account and months until one is typed', () => {
+  assert.equal(importName('Chase card', 'Chase1234.CSV', ['2026-10-03', '2026-05-01', '2026-07-09']), 'Chase card May – Oct 2026');
+  assert.equal(importName('', 'Chase1234.CSV', ['2026-11-02']), 'Chase1234 Nov 2026');
+  assert.equal(importName('Ally', 'x.csv', ['2025-12-30', '2026-01-02']), 'Ally Dec 2025 – Jan 2026');
+  assert.equal(importName('', '', []), 'Bank file');
 });

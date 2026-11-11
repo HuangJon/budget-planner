@@ -172,7 +172,8 @@ service cloud.firestore {
         && request.resource.data.count is int && request.resource.data.ids is list && request.resource.data.ids.size() <= 1000
         && request.resource.data.undone == false;
       allow update: if signedIn() && memberOf(budgetNow(budgetId))
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['undone']) && request.resource.data.undone is bool;
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['undone', 'file'])
+        && request.resource.data.undone is bool && short(request.resource.data.file, 80);
       allow delete: if false;
     }
 

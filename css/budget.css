@@ -434,3 +434,13 @@ a.request-note { display:flex; align-items:center; gap:12px; padding:14px 16px; 
 .imp-head { width:100%; text-align:left; padding:10px 12px; border:1px solid var(--line); border-radius:12px; background:var(--card, transparent); color:inherit; font:inherit; cursor:pointer; gap:10px }
 .imp-head:hover { border-color:var(--accent) }
 .imp-gap { width:22px; flex:none }
+.imp-name { text-align:left; font-weight:700; padding:0 }
+.past-acts { flex:none; align-items:stretch }
+#impName { text-align:right; min-width:0; flex:1; border:0; background:transparent; font:inherit; color:inherit }
+/* Where a transaction came from: a small badge that opens Search for that account. */
+.acc-badge { align-self:flex-start; display:inline-block; margin-top:3px; padding:1px 8px; border-radius:999px; font-size:11px; font-weight:600; line-height:18px; color:var(--accent); background:color-mix(in srgb, var(--accent) 12%, transparent); border:1px solid color-mix(in srgb, var(--accent) 30%, transparent); cursor:pointer; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.acc-badge:hover, .acc-badge:focus-visible { background:color-mix(in srgb, var(--accent) 22%, transparent); outline:none }
+.acc-badge { justify-self:start; width:fit-content }
+.past-row { display:flex; align-items:center; gap:10px; padding:12px 14px }
+.past-row .imp-name { font-size:15px }
+.past-acts { display:flex; flex-direction:row; gap:6px }

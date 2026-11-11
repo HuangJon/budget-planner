@@ -191,7 +191,9 @@ assert.ok(recs.length >= 1, 'imports are recorded');
 await ok(alice.repo.undoImport(B, recs[0]), 'any member can take a past import back out');
 await ok(alice.repo.redoImport(B, recs[0]), 'or bring it back');
 await no(carol.repo.listImports(B), "a stranger can't see a budget's imports");
-await no(bob.backend.update(`budgets/${B}/imports/${recs[0].id}`, { count: 1 }), 'an import record only changes whether it was undone');
+await no(bob.backend.update(`budgets/${B}/imports/${recs[0].id}`, { count: 1 }), 'an import record only changes its name and whether it was undone');
+await ok(alice.repo.renameImport(B, recs[0].id, 'Chase May – Oct 2026'), 'any member can rename an import');
+await no(alice.backend.update(`budgets/${B}/imports/${recs[0].id}`, { file: 'x'.repeat(81) }), 'but not to a very long name');
 await ok(bob.repo.importTransactions(B, bank.slice(0, 3), new Set(bank.slice(0, 3).map(t => t.id))), 'deleted imports can be brought back');
 
 /* A member's own entry: a short name and nothing extra. */
