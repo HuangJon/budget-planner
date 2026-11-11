@@ -444,3 +444,4 @@ a.request-note { display:flex; align-items:center; gap:12px; padding:14px 16px; 
 .past-row { display:flex; align-items:center; gap:10px; padding:12px 14px }
 .past-row .imp-name { font-size:15px }
 .past-acts { display:flex; flex-direction:row; gap:6px }
+.imp-badge { color:var(--muted); background:transparent; border-style:dashed; border-color:var(--line) }

@@ -10,6 +10,7 @@ import { suggestCategory } from '../core/categorize.js';
 import { recurringId, DAY_MAX, EVERY, howOften } from '../core/recurring.js';
 import { toCents, fromCents, money } from '../core/money.js';
 import { LIMITS } from '../config/app.js';
+import { loadImportNames } from './search.js';
 
 /** Today, or the same day in the month being looked at, so a purchase lands where you're looking. */
 export const defaultDate = (viewing = A.month) => defaultDateFor(today(), viewing);
@@ -20,18 +21,8 @@ export function openTxForm(budgetId, editing = null, preset = {}) {
       splits: parts(editing).length > 1 ? parts(editing).map(p => ({ categoryId: p.categoryId, amount: fromCents(p.amount) })) : null }
     : { budgetId, editing: null, kind: preset.kind || 'spend', amount: '', description: '', categoryId: preset.categoryId || '', date: defaultDate(), note: '', showNote: false, accountId: '', touchedCat: Boolean(preset.categoryId), repeat: false, every: 'month' };
   openChild({ kind: 'tx' }, drawForm);
-  if (editing?.importId) importNames(budgetId);
+  if (editing?.importId) loadImportNames(budgetId);
   if (!editing) document.getElementById('fAmount')?.focus();
-}
-
-/** The names of a budget's imports, loaded once and kept, for "Came in with". */
-async function importNames(budgetId) {
-  if (A.importNames?.[budgetId]) return;
-  try {
-    const list = await A.repo.listImports(budgetId);
-    A.importNames = { ...A.importNames, [budgetId]: Object.fromEntries(list.map(r => [r.id, r.file || 'Bank file'])) };
-    if (A.sheet?.kind === 'tx') drawForm();
-  } catch { /* the plain wording stays */ }
 }
 
 export const catOptions = (b, selected) => `<option value="" ${selected ? '' : 'selected'} disabled>Pick one</option>${groupedCategories(b).map(g => `<optgroup label="${esc(g.name)}">${g.categories.map(c => `<option value="${c.id}" ${c.id === selected ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</optgroup>`).join('')}${selected && b.categories[selected]?.hidden ? `<option value="${selected}" selected>${esc(b.categories[selected].name)} (hidden)</option>` : ''}`;

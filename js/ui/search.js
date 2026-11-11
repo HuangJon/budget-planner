@@ -3,7 +3,7 @@
  * pick a category or a time, and see the matches with what they add up to. "Change category"
  * moves all of the matches at once, past ones included, and can be undone.
  */
-import { A, actions, changes, inputs } from './state.js';
+import { A, actions, changes, inputs, render } from './state.js';
 import { esc, openSheet, sheetHead, openChild, registerSheet, toast, send, fmtDate, today, refreshOpenSheet } from './dom.js';
 import { searchTransactions, searchTotals } from '../core/search.js';
 import { money } from '../core/money.js';
@@ -29,20 +29,42 @@ function datesFor(when) {
 /** The dates searched: a month picked from Trends (from/to), or one of the choices in the list. */
 const range = S => (S.from ? { from: S.from, to: S.to || '' } : datesFor(S.when));
 
+/** The names of a budget's imports, loaded once and kept, for badges and "Came in with". */
+let loading = null;
+export async function loadImportNames(budgetId) {
+  if (A.importNames?.[budgetId] || loading === budgetId) return;
+  loading = budgetId;
+  try {
+    const list = await A.repo.listImports(budgetId);
+    A.importNames = { ...A.importNames, [budgetId]: Object.fromEntries(list.map(r => [r.id, r.file || 'Bank file'])) };
+    render(); if (A.sheet?.kind === 'tx' || A.sheet?.kind === 'search') refreshOpenSheet();
+  } catch { /* badges just wait */ } finally { loading = null; }
+}
+
 /**
  * A small badge with the account a transaction came from. Tapping it shows everything from that
  * account in Search (or narrows the Search already open).
  */
-export const accountBadge = (b, t) => (t.accountId && b.accounts?.[t.accountId]
-  ? `<span class="acc-badge" data-action="open-acc-tag" data-id="${esc(t.accountId)}" title="Everything from ${esc(b.accounts[t.accountId].name)}">${esc(b.accounts[t.accountId].name)}</span>`
-  : '');
+export function accountBadge(b, t) {
+  if (t.accountId && b.accounts?.[t.accountId]) {
+    return `<span class="acc-badge" data-action="open-acc-tag" data-id="${esc(t.accountId)}" title="Everything from ${esc(b.accounts[t.accountId].name)}">${esc(b.accounts[t.accountId].name)}</span>`;
+  }
+  // No account picked: it still shows which import it came in with.
+  if (t.importId) {
+    const names = A.importNames?.[b.id];
+    if (!names) { loadImportNames(b.id); return ''; }
+    const name = names[t.importId] || 'Bank file';
+    return `<span class="acc-badge imp-badge" data-action="open-import-search" data-id="${esc(t.importId)}" data-budget="${esc(b.id)}" title="Everything from this import">${esc(name)}</span>`;
+  }
+  return '';
+}
 actions['open-acc-tag'] = el => {
   if (A.sheet?.kind === 'search') { openChild({ ...A.sheet, accountId: el.dataset.id, moving: false }, drawSearch); return; }
   openSearch(A.route.id || A.sheet?.budgetId, { accountId: el.dataset.id });
 };
 
 actions['open-import-search'] = el => {
-  const budgetId = A.form?.budgetId || A.route.id;
+  const budgetId = el.dataset.budget || A.form?.budgetId || A.route.id;
   openSearch(budgetId, { importId: el.dataset.id, importName: A.importNames?.[budgetId]?.[el.dataset.id] || 'Bank file' });
 };
 

@@ -470,6 +470,8 @@ await tap('[data-action=sheet-back]');
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
 await page.locator('.tx-row', { hasText: 'SAMPLE NOODLE BAR' }).waitFor();
 await page.locator('.tx-row', { hasText: 'SAMPLE NOODLE BAR' }).getByText('Noodles').waitFor();
+// Without an account, the badge says which import it came in with.
+await page.locator('.tx-row', { hasText: 'SAMPLE NOODLE BAR' }).locator('.imp-badge', { hasText: 'Chase_Activity Nov 2026' }).waitFor();
 await page.locator('.tx-row', { hasText: '<img src=x onerror=window.__xss=1>' }).waitFor();
 if (await page.evaluate(() => window.__xss || document.querySelectorAll('img[src=x]').length)) fail('HTML in a description must never run');
 // The same file again: everything is already in.
