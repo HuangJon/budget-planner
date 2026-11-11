@@ -78,3 +78,47 @@ export function howOften(rule, ordinal) {
   const weekday = new Date(`${rule.anchor}T12:00:00`).toLocaleDateString('en', { weekday: 'long' });
   return every(rule) === 'week' ? `every ${weekday}` : `every other ${weekday}`;
 }
+
+/** A plain key for a payee, so "NETFLIX.COM 866-579" and "Netflix.com 1234" group together. */
+export const payeeKey = s => String(s || '').toLowerCase().replace(/[0-9#*]+/g, ' ').replace(/\b(com|inc|llc|www|pos|purchase|debit|card|ach|the)\b/g, ' ').replace(/[^a-z]+/g, ' ').trim().split(' ').slice(0, 3).join(' ');
+
+/**
+ * Things that look like they repeat every month (a subscription, rent, a paycheck) and aren't a
+ * repeat yet: seen in at least 3 of the last 6 months, about the same amount, and seen lately.
+ * Each comes with a ready rule to add (it starts with the next copy that isn't in yet).
+ */
+export function suggestRepeats(list, rules, today, dismissed = []) {
+  const month = today.slice(0, 7), first = addMonths(month, -5);
+  const have = new Set(Object.values(rules || {}).filter(r => !r.stopped).map(r => payeeKey(r.description)));
+  const no = new Set(dismissed);
+  const groups = new Map();
+  for (const t of list || []) {
+    if (t.deleted || t.recurringId || !t.date || t.date.slice(0, 7) < first || t.date > today) continue;
+    if (t.kind !== 'spend' && t.kind !== 'income') continue;
+    const key = `${t.kind}:${payeeKey(t.description)}`;
+    if (key.endsWith(':')) continue;
+    (groups.get(key) || groups.set(key, []).get(key)).push(t);
+  }
+  const out = [];
+  for (const [key, ts] of groups) {
+    if (no.has(key) || have.has(key.split(':')[1])) continue;
+    const byMonth = new Map();
+    for (const t of ts.sort((a, b) => a.date.localeCompare(b.date))) byMonth.set(t.date.slice(0, 7), t);
+    // Once a month: at least 3 months, and never more than one in a month.
+    if (byMonth.size < 3 || ts.length > byMonth.size) continue;
+    const last = ts.at(-1);
+    if (last.date.slice(0, 7) < addMonths(month, -1)) continue;
+    const amounts = [...byMonth.values()].map(t => t.amount);
+    if (Math.max(...amounts) > Math.min(...amounts) * 1.15) continue;
+    const days = [...byMonth.values()].map(t => Number(t.date.slice(8, 10))).sort((a, b) => a - b);
+    if (days.at(-1) - days[0] > 8) continue;
+    const day = Math.min(days[Math.floor(days.length / 2)], DAY_MAX);
+    // Start with the next copy that isn't in yet: this month if it's still to come, else next month.
+    const start = byMonth.has(month) || Number(today.slice(8, 10)) >= day ? addMonths(month, 1) : month;
+    out.push({
+      key, count: byMonth.size, last,
+      rule: { kind: last.kind, amount: last.amount, description: last.description || '', ...(last.kind === 'income' ? {} : { categoryId: last.categoryId }), every: 'month', day, start },
+    });
+  }
+  return out.sort((a, b) => b.count - a.count || b.last.amount - a.last.amount).slice(0, 5);
+}

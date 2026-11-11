@@ -251,6 +251,8 @@ export function createRepository(backend, now = () => Date.now()) {
     /* ---------- Repeats ---------- */
     newRuleId: () => randomId(10),
     saveRule: (id, rule) => backend.update(budgetPath(id), { [`recurring.${rule.id}`]: rule, changedBy: uid() }),
+    /** Takes a repeat away entirely (for Undo right after adding one). */
+    removeRule: (id, ruleId) => backend.update(budgetPath(id), { [`recurring.${ruleId}`]: undefined, changedBy: uid() }),
     stopRule: (id, ruleId) => backend.update(budgetPath(id), { [`recurring.${ruleId}.stopped`]: true, changedBy: uid() }),
     /** Starting again from `month` means months it was stopped aren't filled in afterwards. */
     resumeRule: (id, ruleId, month) => backend.update(budgetPath(id), { [`recurring.${ruleId}.stopped`]: false, ...(month ? { [`recurring.${ruleId}.start`]: month } : {}), changedBy: uid() }),

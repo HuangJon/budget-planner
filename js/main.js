@@ -218,6 +218,10 @@ setRender(render);
 actions['close-sheet'] = () => closeSheet();
 actions.reload = () => location.reload();
 actions['sheet-back'] = () => sheetBack();
+// The header's Save (shown while typing on a phone) presses the footer's button.
+actions['head-save'] = el => el.closest('dialog')?.querySelector('.sheet-foot .btn.primary')?.click();
+// Pressing it mustn't close the keyboard first, or it would hide before the tap lands.
+document.addEventListener('pointerdown', e => { if (e.target.closest?.('.head-save')) e.preventDefault(); });
 actions['edit-cats'] = () => openCatEditor();
 actions['preview-reset'] = () => { backend.reset(exampleData(A.user.uid)); closeSheet(); location.hash = '#home'; location.reload(); };
 actions.undo = () => { const u = A.undo; A.undo = null; document.getElementById('toast').hidden = true; u?.(); };

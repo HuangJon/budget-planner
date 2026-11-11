@@ -47,14 +47,14 @@ export async function loadImportNames(budgetId) {
  */
 export function accountBadge(b, t) {
   if (t.accountId && b.accounts?.[t.accountId]) {
-    return `<span class="acc-badge" data-action="open-acc-tag" data-id="${esc(t.accountId)}" title="Everything from ${esc(b.accounts[t.accountId].name)}">${esc(b.accounts[t.accountId].name)}</span>`;
+    return `<button type="button" class="acc-badge" data-action="open-acc-tag" data-id="${esc(t.accountId)}" aria-label="Everything from ${esc(b.accounts[t.accountId].name)}">${esc(b.accounts[t.accountId].name)}</button>`;
   }
   // No account picked: it still shows which import it came in with.
   if (t.importId) {
     const names = A.importNames?.[b.id];
     if (!names) { loadImportNames(b.id); return ''; }
     const name = names[t.importId] || 'Bank file';
-    return `<span class="acc-badge imp-badge" data-action="open-import-search" data-id="${esc(t.importId)}" data-budget="${esc(b.id)}" title="Everything from this import">${esc(name)}</span>`;
+    return `<button type="button" class="acc-badge imp-badge" data-action="open-import-search" data-id="${esc(t.importId)}" data-budget="${esc(b.id)}" aria-label="Everything from the import ${esc(name)}">${esc(name)}</button>`;
   }
   return '';
 }
@@ -67,6 +67,12 @@ actions['open-import-search'] = el => {
   const budgetId = el.dataset.budget || A.form?.budgetId || A.route.id;
   openSearch(budgetId, { importId: el.dataset.id, importName: A.importNames?.[budgetId]?.[el.dataset.id] || 'Bank file' });
 };
+
+/**
+ * One transaction in a list. The whole row opens it; the badge on it is its own button on top
+ * (a button can't hold another button), so both work by tap and by keyboard.
+ */
+export const txRow = (b, t, meta, amount) => `<div class="tap tx-row tx-line"><span class="grow stack tight"><button type="button" class="tx-main" data-action="edit-tx" data-id="${esc(t.id)}"><strong class="wrap-any two-lines">${esc(t.description || (t.kind === 'income' ? 'Income' : t.kind === 'refund' ? 'Refund' : 'Spending'))}</strong></button><span class="tiny muted">${meta}</span>${accountBadge(b, t)}</span>${amount}</div>`;
 
 export function openSearch(budgetId, preset = {}) {
   openChild({ kind: 'search', budgetId, text: '', categoryId: '', when: '', flow: '', moving: false, ...preset }, drawSearch);
@@ -97,9 +103,12 @@ function drawSearch() {
       ${filtered && matches.some(m => m.kind !== 'income') ? (S.moving
         ? `<div class="move-all stack tight"><label class="small">Move all ${matches.filter(m => m.kind !== 'income').length} to</label><div class="row gap8"><select id="moveAllTo">${catOptions(b, '')}</select><button type="button" class="btn small primary" data-action="search-move">Move</button><button type="button" class="btn small" data-action="search-move-cancel">Cancel</button></div><p class="tiny muted">Past ones too. Each keeps its old version, and you can undo.</p></div>`
         : '<button type="button" class="link small" data-action="search-move-open">Change category for all of these</button>') : ''}
+      ${filtered && matches.length && Object.keys(b.accounts || {}).length ? (S.tagging
+        ? `<div class="move-all stack tight"><label class="small" for="tagAllTo">Set the account for all ${matches.length}</label><div class="row gap8"><select id="tagAllTo"><option value="">No account</option>${Object.entries(b.accounts).map(([id, a]) => `<option value="${id}">${esc(a.name)}</option>`).join('')}</select><button type="button" class="btn small primary" data-action="search-tag">Set</button><button type="button" class="btn small" data-action="search-tag-cancel">Cancel</button></div><p class="tiny muted">Past ones too, and you can undo.</p></div>`
+        : '<button type="button" class="link small" data-action="search-tag-open">Set the account for all of these</button>') : ''}
     </section>` : ''}
     ${filtered ? '' : '<p class="tiny muted">Everything in this budget, every month, history included. Type or pick above to narrow it down.</p>'}
-    ${any && matches.length ? `<div class="panel tx-list">${matches.slice(0, SHOWN).map(m => `<button type="button" class="tap tx-row" data-action="edit-tx" data-id="${m.id}"><span class="grow stack tight"><strong class="wrap-any two-lines">${esc(m.description || 'Spending')}</strong><span class="tiny muted">${fmtDate(m.date)} · ${esc(categoryLabel(b, m))}${m.kind === 'refund' ? ' · Refund' : ''}${isHistory(b, m) ? ' · History' : ''}</span>${accountBadge(b, m)}</span><span class="amt ${m.kind === 'spend' ? 'owe' : 'owed'}">${m.kind === 'spend' ? '−' : '+'}${money(m.amount)}</span></button>`).join('')}</div>
+    ${any && matches.length ? `<div class="panel tx-list">${matches.slice(0, SHOWN).map(m => txRow(b, m, `${fmtDate(m.date)} · ${esc(categoryLabel(b, m))}${m.kind === 'refund' ? ' · Refund' : ''}${isHistory(b, m) ? ' · History' : ''}`, `<span class="amt ${m.kind === 'spend' ? 'owe' : 'owed'}">${m.kind === 'spend' ? '−' : '+'}${money(m.amount)}</span>`)).join('')}</div>
     ${matches.length > SHOWN ? `<p class="tiny muted">Showing the newest ${SHOWN} of ${matches.length}. The totals count them all.</p>` : ''}` : any ? '<p class="small muted">Nothing matches.</p>' : ''}
   </div></div>`);
 }
@@ -115,7 +124,7 @@ actions['search-when-clear'] = () => { A.sheet.from = ''; A.sheet.to = ''; drawS
 // the list before it (and from there, Back closes the popup).
 actions['search-pick-cat'] = el => openChild({ ...A.sheet, categoryId: el.dataset.id, moving: false }, drawSearch);
 actions['search-flow'] = el => { A.sheet.flow = el.dataset.id; if (el.dataset.id === 'income') A.sheet.categoryId = ''; drawSearch(); };
-actions['search-move-open'] = () => { A.sheet.moving = true; drawSearch(); };
+actions['search-move-open'] = () => { A.sheet.moving = true; A.sheet.tagging = false; drawSearch(); };
 actions['search-move-cancel'] = () => { A.sheet.moving = false; drawSearch(); };
 actions['search-move'] = () => {
   const S = A.sheet, b = budget(), to = document.getElementById('moveAllTo')?.value;
@@ -132,6 +141,22 @@ actions['search-move'] = () => {
   const back = {};
   for (const m of matches) (back[m.categoryId] ||= []).push({ ...m, categoryId: to });
   toast(`Moved ${matches.length} to ${b.categories[to].name}${splitOnes.length ? `; ${splitOnes.length} split ${splitOnes.length === 1 ? 'one' : 'ones'} left as they are` : ''}`, () => { for (const [cat, list] of Object.entries(back)) send(A.repo.recategorize(b.id, list, cat)); });
+  drawSearch();
+};
+actions['search-tag-open'] = () => { A.sheet.tagging = true; A.sheet.moving = false; drawSearch(); };
+actions['search-tag-cancel'] = () => { A.sheet.tagging = false; drawSearch(); };
+actions['search-tag'] = () => {
+  const S = A.sheet, b = budget(), to = document.getElementById('tagAllTo')?.value || null;
+  const matches = searchTransactions(A.transactions[b.id] || [], { text: S.text, categoryId: S.categoryId, kind: S.flow, accountId: S.accountId || '', importId: S.importId || '', ...range(S) })
+    .filter(m => (m.accountId || null) !== to);
+  S.tagging = false;
+  const name = to ? b.accounts[to]?.name : 'no account';
+  if (!matches.length) { toast(`They’re all ${to ? `from ${name}` : 'without an account'} already.`); drawSearch(); return; }
+  send(A.repo.tagAccount(b.id, matches.map(m => m.id), to));
+  // Undo puts each one back to the account it had.
+  const back = {};
+  for (const m of matches) (back[m.accountId || ''] ||= []).push(m.id);
+  toast(`Set ${matches.length} to ${name}`, () => { for (const [acc, ids] of Object.entries(back)) send(A.repo.tagAccount(b.id, ids, acc || null)); });
   drawSearch();
 };
 actions['open-search'] = () => openSearch(A.route.id);

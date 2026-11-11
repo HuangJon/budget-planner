@@ -77,3 +77,22 @@ test('next date and how often, in words', () => {
   assert.equal(howOften(weekly, n => `${n}th`), 'every Monday');
   assert.equal(howOften(rent, n => (n === 1 ? '1st' : `${n}th`)), 'monthly on the 1st');
 });
+
+test('spots things that come every month and are not repeats yet', async () => {
+  const { suggestRepeats, payeeKey } = await import('../../js/core/recurring.js');
+  const tx = (id, date, amount, description, kind = 'spend') => ({ id, date, amount, description, kind, categoryId: 'c1' });
+  const list = [
+    tx('a', '2026-08-12', 1549, 'NETFLIX.COM 866-579'), tx('b', '2026-09-12', 1549, 'Netflix.com 1234'), tx('c', '2026-10-13', 1549, 'NETFLIX.COM'),
+    tx('d', '2026-08-03', 900, 'COFFEE'), tx('e', '2026-08-09', 450, 'COFFEE'), tx('f', '2026-09-04', 700, 'COFFEE'), tx('g', '2026-10-02', 600, 'COFFEE'),
+    tx('h', '2026-08-01', 200000, 'RENT', 'spend'), tx('i', '2026-09-01', 200000, 'RENT'), tx('j', '2026-10-01', 200000, 'RENT'), tx('k', '2026-11-01', 200000, 'RENT'),
+    tx('l', '2026-05-20', 999, 'OLD GYM'), tx('m', '2026-06-20', 999, 'OLD GYM'), tx('n', '2026-07-20', 999, 'OLD GYM'),
+  ];
+  const s = suggestRepeats(list, {}, '2026-11-07');
+  assert.deepEqual(s.map(x => x.key), ['spend:rent', 'spend:netflix']);
+  const netflix = s.find(x => x.key === 'spend:netflix').rule;
+  assert.equal(netflix.day, 12); assert.equal(netflix.start, '2026-11'); assert.equal(netflix.amount, 1549);
+  assert.equal(s.find(x => x.key === 'spend:rent').rule.start, '2026-12', 'this month is in already');
+  assert.deepEqual(suggestRepeats(list, { r: { description: 'Netflix', stopped: false } }, '2026-11-07').map(x => x.key), ['spend:rent'], 'already a repeat');
+  assert.deepEqual(suggestRepeats(list, {}, '2026-11-07', ['spend:rent']).map(x => x.key), ['spend:netflix'], 'dismissed');
+  assert.equal(payeeKey('POS DEBIT SPOTIFY USA #123'), 'spotify usa');
+});

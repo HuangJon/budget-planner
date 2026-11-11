@@ -41,6 +41,9 @@ export function openSheet(html) {
   const before = d.open ? { title: d.querySelector('.sheet-head h2')?.textContent, top: d.querySelector('.sheet-body')?.scrollTop || 0 } : null;
   const tpl = document.createElement('template');
   tpl.innerHTML = html;
+  // On a phone the footer steps aside for the keyboard; a small copy of its button waits in the header.
+  const foot = tpl.content.querySelector('.sheet-foot .btn.primary'), right = tpl.content.querySelector('.sheet-right');
+  if (foot && right && !right.children.length) right.innerHTML = `<button type="button" class="btn small primary head-save" data-action="head-save"${foot.disabled ? ' disabled' : ''}>${foot.textContent.length > 12 ? 'Save' : esc(foot.textContent)}</button>`;
   for (const child of [...d.childNodes]) if (child !== t) child.remove();
   d.prepend(tpl.content);
   if (!d.open) d.showModal();

@@ -14,7 +14,7 @@ export function monthBar() {
   const now = thisMonth();
   return `<div class="monthbar">
     <button type="button" class="icon-btn" data-action="month" data-id="-1" aria-label="Previous month">${svg(ICON.back)}</button>
-    <div class="monthbar-mid"><h2>${esc(fmtMonth(A.month))}</h2>${A.month !== now ? `<button type="button" class="away-pill" data-action="month" data-id="now">${A.month < now ? 'Past' : 'Future'} month · Back to ${esc(shortMonth(now))}</button>` : ''}</div>
+    <div class="monthbar-mid"><h2><button type="button" class="month-title" data-action="month-pick" aria-label="${esc(fmtMonth(A.month))}. Pick a month">${esc(fmtMonth(A.month))}</button></h2>${A.month !== now ? `<button type="button" class="away-pill" data-action="month" data-id="now">${A.month < now ? 'Past' : 'Future'} month · Back to ${esc(shortMonth(now))}</button>` : ''}</div>
     <button type="button" class="icon-btn" data-action="month" data-id="1" aria-label="Next month">${svg(ICON.next)}</button>
   </div>`;
 }
@@ -292,6 +292,25 @@ export const writeAssigned = (b, month, next, message) => {
 };
 const refreshSheet = () => { if (A.sheet?.kind === 'cat') catSheet(); };
 const toggle = key => { A.sheet.open = { ...(A.sheet.open || {}), [key]: !A.sheet.open?.[key] }; catSheet(); };
+
+/** Every month at a glance, back to the oldest transaction: tap one to go straight there. */
+function monthPicker() {
+  const b = A.budgets[A.route.id], now = thisMonth();
+  const counts = new Map();
+  for (const t of liveTransactions(A.transactions[b?.id])) counts.set(monthOf(t.date), (counts.get(monthOf(t.date)) || 0) + 1);
+  const oldest = [...counts.keys(), A.month, now].sort()[0];
+  const years = [];
+  for (let y = Number(now.slice(0, 4)) + (now.slice(5) === '12' ? 1 : 0); y >= Number(oldest.slice(0, 4)); y--) years.push(y);
+  const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  openSheet(`<div class="sheet">${sheetHead('Go to a month')}<div class="sheet-body">${years.map(y => `<section class="stack tight"><h3 class="date-head">${y}</h3><div class="month-grid">${MON.map((m, i) => {
+    const key = `${y}-${String(i + 1).padStart(2, '0')}`, n = counts.get(key) || 0;
+    if (key < oldest.slice(0, 7) || key > addMonths(now, 1)) return '<span></span>';
+    return `<button type="button" class="month-cell ${key === A.month ? 'on' : ''} ${key === now ? 'now' : ''}" data-action="month-go" data-id="${key}" aria-pressed="${key === A.month}" aria-label="${esc(fmtMonth(key))}${n ? `, ${n} transactions` : ''}"><strong>${m}</strong><span class="tiny muted">${n || '–'}</span></button>`;
+  }).join('')}</div></section>`).join('')}<p class="tiny muted">The number is how many transactions each month has.</p></div></div>`);
+}
+actions['month-pick'] = () => { A.sheet = { kind: 'month-pick' }; monthPicker(); };
+actions['month-go'] = el => { A.month = el.dataset.id; closeSheet(); render(); };
+registerSheet('month-pick', monthPicker);
 
 actions.month = el => {
   A.month = el.dataset.id === 'now' ? thisMonth() : addMonths(A.month, Number(el.dataset.id));

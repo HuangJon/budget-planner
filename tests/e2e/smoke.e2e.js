@@ -180,12 +180,35 @@ await page.locator('.repeats-head', { hasText: 'Next:' }).waitFor();
 await tap('[data-action=toggle-repeats]');
 await eventually(async () => !(!(await page.locator('[data-action=open-rule]', { hasText: 'Music app' }).count())), 'New repeat missing from Every month');
 await shot('activity');
-const count = await page.locator('.tx-list:not(:first-of-type) .tx-row, [data-action=edit-tx].tx-row').count();
-await tap('[data-action=edit-tx].tx-row');
+const count = await page.locator('.tx-row:has([data-action=edit-tx])').count();
+await tap('.tx-row:has([data-action=edit-tx])');
 await tap('[data-action=tx-delete]');
-await eventually(async () => !(await page.locator('[data-action=edit-tx].tx-row').count() !== count - 1), 'Delete did not remove the row');
+await eventually(async () => !(await page.locator('.tx-row:has([data-action=edit-tx])').count() !== count - 1), 'Delete did not remove the row');
 await tap('#toast [data-action=undo]');
-await eventually(async () => !(await page.locator('[data-action=edit-tx].tx-row').count() !== count), 'Undo did not restore the row');
+await eventually(async () => !(await page.locator('.tx-row:has([data-action=edit-tx])').count() !== count), 'Undo did not restore the row');
+
+// Something that comes every month but isn't a repeat yet is suggested; Add makes it one, Undo takes it away.
+await page.locator('.repeats-fold .suggest-note').waitFor();
+if ((await page.locator('[data-action=toggle-repeats]').getAttribute('aria-expanded')) !== 'true') await tap('[data-action=toggle-repeats]');
+const idea = page.locator('.suggest-row', { hasText: 'MetroCard' });
+await idea.locator('[data-action=repeat-suggest-add]').click();
+await page.getByText('Added MetroCard as a repeat').waitFor();
+await page.locator('.repeats-fold [data-action=open-rule]', { hasText: 'MetroCard' }).waitFor();
+if (await idea.count()) fail('An added suggestion should go away');
+await tap('#toast [data-action=undo]');
+await idea.waitFor();
+await idea.locator('[data-action=repeat-suggest-no]').click();
+await idea.waitFor({ state: 'detached' });
+if (await page.locator('.repeats-fold [data-action=open-rule]', { hasText: 'MetroCard' }).count()) fail('Undo should take the repeat away');
+
+// Tapping the month opens every month at a glance.
+const monthNow = await page.locator('.monthbar h2').innerText();
+await tap('[data-action=month-pick]');
+await page.locator('dialog[open] .month-cell').first().click();
+await eventually(async () => (await page.locator('.monthbar h2').innerText()) !== monthNow, 'Picking a month should go there');
+await tap('[data-action=month-pick]');
+await page.locator('dialog[open] .month-cell.now').click();
+await eventually(async () => (await page.locator('.monthbar h2').innerText()) === monthNow, 'And back');
 
 // Stop a repeat from the Every month list.
 await page.locator('[data-action=open-rule]', { hasText: 'Music app' }).click();
@@ -548,6 +571,26 @@ await tap('[data-action=sheet-back]');
 await page.locator('.tx-row', { hasText: 'ACCOUNT TAG SHOP' }).locator('.acc-badge', { hasText: 'Sample card' }).click();
 await page.locator('dialog[open] [data-change=search-account] option:checked', { hasText: 'From Sample card' }).waitFor({ state: 'attached' });
 await page.locator('.search-sum', { hasText: '1 match' }).waitFor();
+await tap('[data-action=sheet-back]');
+await page.locator('dialog[open]').waitFor({ state: 'detached' });
+// Activity can show just one account's transactions.
+await page.locator('.acc-chips [data-action=acc-filter]', { hasText: 'Sample card' }).click();
+await eventually(async () => {
+  const rows = await page.locator('.tx-row:has([data-action=edit-tx])').allInnerTexts();
+  return rows.length >= 1 && rows.every(r => r.includes('Sample card'));
+}, 'Only that account should show');
+await tap('.acc-chips [data-action=acc-filter][data-id=""]');
+await eventually(async () => (await page.locator('.tx-row:has([data-action=edit-tx])').count()) > 1, 'All should show again');
+// Search can set the account for everything it found, and undo it.
+await tap('#app [data-action=open-search]');
+await page.fill('#searchText', 'ACCOUNT TAG SHOP');
+await tap('[data-action=search-tag-open]');
+await page.locator('#tagAllTo').selectOption({ label: 'No account' });
+await tap('[data-action=search-tag]');
+await page.getByText('Set 1 to no account').waitFor();
+await eventually(async () => !(await page.locator('dialog[open] .tx-row .acc-badge:not(.imp-badge)').count()), 'The badge should go');
+await tap('#toast [data-action=undo]');
+await page.locator('dialog[open] .tx-row .acc-badge', { hasText: 'Sample card' }).waitFor();
 await tap('[data-action=sheet-back]');
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
 // Its form says which import it came in with, and the account can be changed or cleared there.
