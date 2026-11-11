@@ -435,6 +435,9 @@ await page.locator('dialog[open] [data-change=import-tick-all]').uncheck();
 await page.locator('[data-action=import-save]', { hasText: 'Nothing ticked' }).waitFor();
 await page.locator('dialog[open] [data-change=import-tick-all]').check();
 await page.locator('[data-action=import-save]', { hasText: 'Add 5' }).waitFor();
+await tap('[data-action=import-section][data-id=out]');
+if (await page.locator('dialog[open] .import-row:has(input:checked)', { hasText: /Payment|PAYMENT/ }).count()) fail('Tick all should leave the card payment out');
+await tap('[data-action=import-section][data-id=out]');
 await page.getByText('2 still need a category').waitFor();
 await page.locator('[data-action=import-save]').click();
 await page.getByText('Pick a category for each one').waitFor();
@@ -447,7 +450,7 @@ await page.locator('#impNewName').fill('Noodles');
 await tap('[data-action=import-newcat]');
 await page.getByText('Added Noodles').waitFor();
 await eventually(async () => (await page.locator('.import-row', { hasText: 'SAMPLE NOODLE BAR' }).locator('select').evaluate(el => el.selectedOptions[0]?.text)) === 'Noodles', 'The new category should be picked on that row');
-await tap('[data-action=import-skipped]');
+await tap('[data-action=import-section][data-id=out]');
 await page.getByText('Paying the card off').waitFor();
 await shot('import');
 // Text from a bank file is shown as text, never run as code.
@@ -472,16 +475,16 @@ if (await page.evaluate(() => window.__xss || document.querySelectorAll('img[src
 // The same file again: everything is already in.
 await tap('[data-action=open-import]');
 await page.locator('#importFile').setInputFiles({ name: 'again.csv', mimeType: 'text/csv', buffer: Buffer.from(CSV) });
-await page.locator('[data-action=import-save]', { hasText: 'Nothing ticked' }).waitFor();
+await page.locator('[data-action=import-save]', { hasText: 'Nothing new' }).waitFor();
 // Picking its account marks the ones already in (imported before they knew their account).
 await page.locator('dialog[open] [data-change=import-account]').selectOption({ label: '+ Add an account…' });
 await page.locator('#impAccName').fill('Old card');
 await tap('dialog[open] [data-action=imp-acc-add]');
 // Picking it from the list (not only adding it) offers the marking too.
 await page.locator('dialog[open] [data-change=import-account]').selectOption({ label: 'Not one of my accounts' });
-await page.getByText(/already here without an account. Pick the account above/).waitFor();
+await page.getByText(/Pick the account above to mark/).waitFor();
 await page.locator('dialog[open] [data-change=import-account]').selectOption({ label: 'Old card' });
-await page.locator('[data-action=import-save]', { hasText: /Tag \d+ as Old card/ }).click();
+await page.locator('[data-action=import-save]', { hasText: /^Mark \d+ as Old card$/ }).click();
 await page.getByText(/Marked \d+ as Old card/).waitFor();
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
 await tap('[data-action=open-search]');
@@ -493,8 +496,10 @@ await page.locator('dialog[open]').waitFor({ state: 'detached' });
 await tap('[data-action=open-import]');
 await page.locator('#importFile').setInputFiles({ name: 'again.csv', mimeType: 'text/csv', buffer: Buffer.from(CSV) });
 await page.locator('dialog[open] [data-change=import-account]').selectOption({ label: 'Old card' });
-await page.locator('[data-action=import-save]', { hasText: 'Nothing ticked' }).waitFor();
-await tap('[data-action=sheet-back]');
+await page.getByText('Already marked.').waitFor();
+// Tick all only touches the new ones, never the card payment left out.
+if (await page.locator('dialog[open] [data-change=import-tick-all]').count()) fail('Nothing new, so nothing to tick');
+await page.locator('[data-action=import-save]', { hasText: 'Nothing new. Close' }).click();
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
 // Each file says which account it's from (a new one can be added right there), and past imports
 // can be taken out and brought back later.

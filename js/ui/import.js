@@ -23,7 +23,7 @@ const NEW = '__new';
 const norm = s => String(s || '').trim().toLowerCase();
 
 export function openImport(budgetId) {
-  openChild({ kind: 'import', budgetId, step: 'pick', rows: [], error: '', showSkipped: false, past: null }, drawImport);
+  openChild({ kind: 'import', budgetId, step: 'pick', rows: [], error: '', open: {}, past: null }, drawImport);
   loadPast();
 }
 /** Past imports, newest first, for undoing or bringing one back. */
@@ -79,21 +79,32 @@ function drawImport() {
     </div></div>`);
     return;
   }
-  const rows = S.rows;
-  const adding = rows.filter(r => r.include);
+  const rows = S.rows.map((r, i) => [r, i]);
+  // Three plain sections: new rows to add, rows already in the budget, and rows left out on purpose.
+  const fresh = rows.filter(([r]) => !r.skip);
+  const already = rows.filter(([r]) => r.skip === 'imported' || r.skip === 'already');
+  const out = rows.filter(([r]) => r.skip && r.skip !== 'imported' && r.skip !== 'already');
+  const adding = S.rows.filter(r => r.include);
   const needCat = adding.filter(r => r.kind !== 'income' && !b.categories[r.categoryId]).length;
-  const skipped = rows.filter(r => r.skip);
-  const shown = rows.map((r, i) => [r, i]).filter(([r]) => !r.skip || S.showSkipped);
-  const dates = rows.map(r => r.date).sort();
+  const dates = S.rows.map(r => r.date).sort();
   const start = budgetStart(b);
   const history = start ? adding.filter(r => r.date < start).length : 0;
-  const retag = untagged(b, rows, S.accountId, A.transactions[b.id]);
-  // Without an account picked, say how many could be marked once one is.
-  const couldTag = S.accountId ? 0 : Object.keys(b.accounts || {}).length ? untagged(b, rows, Object.keys(b.accounts)[0], A.transactions[b.id]).length : 0;
-  const tickable = rows.filter(r => r.skip !== 'imported' && (!r.skip || S.showSkipped));
-  const allTicked = tickable.length && tickable.every(r => r.include);
+  const txs = A.transactions[b.id];
   const accName = b.accounts?.[S.accountId]?.name || '';
-  const label = adding.length ? `Add ${adding.length}` : retag.length ? `Tag ${retag.length} as ${accName}` : 'Nothing ticked';
+  const retag = untagged(b, S.rows, S.accountId, txs);
+  const anyAccount = Object.keys(b.accounts || {})[0];
+  const couldTag = !S.accountId && anyAccount ? untagged(b, S.rows, anyAccount, txs).length : 0;
+  const allTicked = fresh.length && fresh.every(([r]) => r.include);
+  const label = adding.length && retag.length ? `Add ${adding.length} and mark ${retag.length} as ${accName}`
+    : adding.length ? `Add ${adding.length}` : retag.length ? `Mark ${retag.length} as ${accName}` : fresh.length ? 'Nothing ticked' : 'Nothing new. Close';
+  const alreadyNote = !already.length ? ''
+    : retag.length ? `${retag.length === already.length ? 'They' : `${retag.length} of them`} will be marked as ${esc(accName)}.`
+    : couldTag ? `Pick the account above to mark ${couldTag === 1 ? 'it' : 'these'}.`
+    : S.accountId ? `Already marked.` : '';
+  const section = (key, title, note, list) => `<section class="imp-section stack tight">
+      <button type="button" class="imp-head row between" data-action="import-section" data-id="${key}" aria-expanded="${Boolean(S.open?.[key])}"><span class="stack tight"><strong>${title}</strong>${note ? `<span class="tiny muted">${note}</span>` : ''}</span><span class="muted" aria-hidden="true">${S.open?.[key] ? '▾' : '▸'}</span></button>
+      ${S.open?.[key] ? `<div class="panel import-list">${list.map(([r, i]) => row(b, r, i)).join('')}</div>` : ''}
+    </section>`;
   openSheet(`<div class="sheet">${sheetHead('Check and add')}<div class="sheet-body">
     <p class="small muted">${esc(S.fileName)} · ${fmtDate(dates[0])} to ${fmtDate(dates.at(-1))}</p>
     <label class="form-row bordered"><span class="form-row-label">From</span><select data-change="import-account" aria-label="Which account this file is from">
@@ -101,14 +112,15 @@ function drawImport() {
       ${Object.entries(b.accounts || {}).map(([id, a]) => `<option value="${id}" ${S.accountId === id ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}
       <option value="${NEW}">+ Add an account…</option></select></label>
     ${S.addingAccount ? `<div class="panel pad stack tight"><input id="impAccName" maxlength="40" placeholder="Name, like Chase card" autocomplete="off"><div class="seg" role="group" aria-label="Kind of account"><button type="button" data-action="imp-acc-kind" data-id="cash" aria-pressed="${S.accKind !== 'card'}">Bank or cash</button><button type="button" data-action="imp-acc-kind" data-id="card" aria-pressed="${S.accKind === 'card'}">Credit card</button></div><div class="row gap8"><button type="button" class="btn small primary" data-action="imp-acc-add">Add</button><button type="button" class="btn small" data-action="imp-acc-cancel">Cancel</button></div><p class="tiny muted">Its balance can go in later, in Check your accounts.</p></div>` : ''}
-    ${retag.length ? `<p class="notice">${retag.length} from this file ${retag.length === 1 ? 'is' : 'are'} already here without an account. Saving marks ${retag.length === 1 ? 'it' : 'them'} as ${esc(accName)}.</p>` : ''}
-    ${couldTag ? `<p class="notice">${couldTag} from this file ${couldTag === 1 ? 'is' : 'are'} already here without an account. Pick the account above to mark ${couldTag === 1 ? 'it' : 'them'}.</p>` : ''}
-    ${history ? `<p class="notice">${history} ${history === 1 ? 'is' : 'are'} from before your budget started (${fmtDate(start)}). ${history === 1 ? 'It’s' : 'They’re'} kept as history for Trends and search, and won’t change your money.</p>` : ''}
-    ${needCat ? `<p class="small owe">${needCat} still need${needCat === 1 ? 's' : ''} a category.</p>` : '<p class="small muted">Categories are guessed from what you picked before. Changing one changes the rest from the same place.</p>'}
-    ${tickable.length > 1 ? `<label class="row gap8 small tick-all"><input type="checkbox" data-change="import-tick-all" ${allTicked ? 'checked' : ''}>${allTicked ? 'Untick all' : 'Tick all'} ${tickable.length}</label>` : ''}
-    <div class="panel import-list">${shown.map(([r, i]) => row(b, r, i)).join('')}</div>
-    ${skipped.length ? `<button type="button" class="link small" data-action="import-skipped">${S.showSkipped ? 'Hide the ones left out' : `Show ${skipped.length} left out`}</button>` : ''}
-  </div><div class="sheet-foot"><button type="button" class="btn primary" data-action="import-save" ${adding.length || retag.length ? '' : 'disabled'}>${esc(label)}</button></div></div>`);
+    <section class="stack tight">
+      <div class="row between"><h3 class="date-head">${fresh.length ? `New · ${fresh.length}` : 'Nothing new in this file'}</h3>${fresh.length > 1 ? `<label class="row gap8 small tick-all"><input type="checkbox" data-change="import-tick-all" ${allTicked ? 'checked' : ''}>${allTicked ? 'Untick all' : 'Tick all'}</label>` : ''}</div>
+      ${fresh.length ? `${needCat ? `<p class="small owe">${needCat} still need${needCat === 1 ? 's' : ''} a category.</p>` : '<p class="tiny muted">Categories are guessed from what you picked before. Changing one changes the rest from the same place.</p>'}
+      ${history ? `<p class="notice">${history} ${history === 1 ? 'is' : 'are'} from before your budget started (${fmtDate(start)}). ${history === 1 ? 'It’s' : 'They’re'} kept as history for Trends and search, and won’t change your money.</p>` : ''}
+      <div class="panel import-list">${fresh.map(([r, i]) => row(b, r, i)).join('')}</div>` : ''}
+    </section>
+    ${already.length ? section('in', `Already in your budget · ${already.length}`, alreadyNote, already) : ''}
+    ${out.length ? section('out', `Left out · ${out.length}`, 'Card payments and moving money between your accounts. Tick one only if it’s really spending.', out) : ''}
+  </div><div class="sheet-foot"><button type="button" class="btn primary" data-action="import-save" ${!adding.length && !retag.length && fresh.length ? 'disabled' : ''}>${esc(label)}</button></div></div>`);
 }
 
 function row(b, r, i) {
@@ -118,11 +130,11 @@ function row(b, r, i) {
     : A.sheet.making === i ? newCatForm(b, r, i)
     : `<select aria-label="Category for ${esc(r.description)}" data-change="import-cat" data-id="${i}" class="${r.include && !b.categories[r.categoryId] ? 'needs' : ''}">${catOptions(b, b.categories[r.categoryId] ? r.categoryId : '')}<option value="${NEW}">+ New category…</option></select>`;
   return `<div class="import-row ${r.include ? '' : 'off'}">
-    <input type="checkbox" aria-label="Add ${esc(r.description)}" ${r.include ? 'checked' : ''} data-change="import-tick" data-id="${i}">
+    ${r.skip === 'imported' ? '<span class="imp-gap" aria-hidden="true"></span>' : `<input type="checkbox" aria-label="Add ${esc(r.description)}" ${r.include ? 'checked' : ''} data-change="import-tick" data-id="${i}">`}
     <div class="grow stack tight">
       <div class="row between gap8"><strong class="wrap-any two-lines">${esc(r.description)}</strong><span class="amt ${r.kind === 'spend' ? 'owe' : 'owed'}">${sign}${money(r.amount)}</span></div>
       <span class="tiny muted">${fmtDate(r.date)}${r.kind === 'refund' ? ' · Refund' : ''}</span>
-      ${r.skip ? `<span class="tiny muted">${esc(SKIP[r.skip])}</span>` : ''}
+      ${r.skip && r.skip !== 'imported' ? `<span class="tiny muted">${esc(SKIP[r.skip])}</span>` : ''}
       ${r.include || !r.skip ? where : ''}
     </div>
   </div>`;
@@ -153,9 +165,9 @@ changes['import-file'] = async el => {
   drawImport();
 };
 
-// Ticks (or unticks) every row shown. Rows already imported from this same file stay out.
+// Ticks (or unticks) every new row. Rows already in, or left out on purpose, are never touched.
 changes['import-tick-all'] = el => {
-  for (const r of A.sheet.rows) if (r.skip !== 'imported' && (!r.skip || A.sheet.showSkipped)) r.include = el.checked;
+  for (const r of A.sheet.rows) if (!r.skip) r.include = el.checked;
   drawImport();
 };
 changes['import-tick'] = el => {
@@ -225,7 +237,7 @@ changes['import-cat'] = el => {
   drawImport();
 };
 
-actions['import-skipped'] = () => { A.sheet.showSkipped = !A.sheet.showSkipped; drawImport(); };
+actions['import-section'] = el => { const S = A.sheet; S.open = { ...S.open, [el.dataset.id]: !S.open?.[el.dataset.id] }; drawImport(); };
 
 actions['import-save'] = () => {
   const S = A.sheet, b = budget();
@@ -238,7 +250,7 @@ actions['import-save'] = () => {
   }
   const retag = untagged(b, S.rows, S.accountId, A.transactions[b.id]);
   if (!adding.length) {
-    if (!retag.length) return;
+    if (!retag.length) { closeSheet(); return; }
     remember(S.format, S.accountId);
     send(A.repo.tagAccount(b.id, retag, S.accountId));
     closeSheet();

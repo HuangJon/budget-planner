@@ -430,3 +430,7 @@ a.request-note { display:flex; align-items:center; gap:12px; padding:14px 16px; 
 .split-open { justify-self:start }
 .tick-all { padding:2px 12px; cursor:pointer }
 .tick-all input { width:auto }
+.imp-section { margin-top:4px }
+.imp-head { width:100%; text-align:left; padding:10px 12px; border:1px solid var(--line); border-radius:12px; background:var(--card, transparent); color:inherit; font:inherit; cursor:pointer; gap:10px }
+.imp-head:hover { border-color:var(--accent) }
+.imp-gap { width:22px; flex:none }
