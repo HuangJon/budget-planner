@@ -4,7 +4,7 @@
  * When you add a file under css/ or js/, add it to APP_FILES (a unit test checks this), and bump
  * CACHE together with APP_VERSION in js/config/app.js for every release.
  */
-const CACHE = 'wmm-v7';
+const CACHE = 'wmm-v8';
 const APP_FILES = [
   './', './index.html', './manifest.webmanifest',
   './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png',
