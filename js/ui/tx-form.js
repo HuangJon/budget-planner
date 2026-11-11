@@ -16,9 +16,9 @@ export const defaultDate = (viewing = A.month) => defaultDateFor(today(), viewin
 
 export function openTxForm(budgetId, editing = null, preset = {}) {
   A.form = editing
-    ? { budgetId, editing, kind: editing.kind, amount: fromCents(editing.amount), description: editing.description || '', categoryId: editing.categoryId || '', date: editing.date, note: editing.note || '', showNote: Boolean(editing.note), touchedCat: true, repeat: false, every: 'month',
+    ? { budgetId, editing, kind: editing.kind, amount: fromCents(editing.amount), description: editing.description || '', categoryId: editing.categoryId || '', date: editing.date, note: editing.note || '', showNote: Boolean(editing.note), accountId: editing.accountId || '', touchedCat: true, repeat: false, every: 'month',
       splits: parts(editing).length > 1 ? parts(editing).map(p => ({ categoryId: p.categoryId, amount: fromCents(p.amount) })) : null }
-    : { budgetId, editing: null, kind: preset.kind || 'spend', amount: '', description: '', categoryId: preset.categoryId || '', date: defaultDate(), note: '', showNote: false, touchedCat: Boolean(preset.categoryId), repeat: false, every: 'month' };
+    : { budgetId, editing: null, kind: preset.kind || 'spend', amount: '', description: '', categoryId: preset.categoryId || '', date: defaultDate(), note: '', showNote: false, accountId: '', touchedCat: Boolean(preset.categoryId), repeat: false, every: 'month' };
   openChild({ kind: 'tx' }, drawForm);
   if (!editing) document.getElementById('fAmount')?.focus();
 }
@@ -68,6 +68,7 @@ function drawForm() {
           ? '<div class="form-row"><span class="form-row-label">Goes to</span><span class="form-row-value">Ready to assign</span></div>'
           : F.splits ? splitRows(b, F) : `<label class="form-row"><span class="form-row-label">Category <span class="tiny muted" id="catHint">${F.suggested ? 'Suggested' : ''}</span></span><select id="fCat" data-change="tx-cat">${catOptions(b, F.categoryId)}</select></label>`}
         <label class="form-row form-row-date"><span class="form-row-label">Date</span><span class="form-row-value" id="fDateShown">${esc(fmtDate(F.date))}</span><input id="fDate" type="date" required value="${esc(F.date)}" data-change="tx-date"></label>
+        ${Object.keys(b.accounts || {}).length || F.accountId ? `<label class="form-row"><span class="form-row-label">Account</span><select id="fAccount" data-change="tx-account"><option value="" ${F.accountId ? '' : 'selected'}>None</option>${Object.entries(b.accounts || {}).map(([id, a]) => `<option value="${id}" ${F.accountId === id ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}${F.accountId && !b.accounts?.[F.accountId] ? `<option value="${esc(F.accountId)}" selected>Removed account</option>` : ''}</select></label>` : ''}
         ${income ? '' : `<label class="form-row switch-row"><span class="form-row-label">This was a refund</span><input type="checkbox" id="fRefund" role="switch" ${refund ? 'checked' : ''} data-change="tx-refund"></label>`}
         ${F.editing
           ? (isRepeatCopy ? `<div class="form-row"><span class="form-row-label">Repeats ${rule ? esc(howOften(rule, ordinal)) : ''}</span>${rule && !rule.stopped ? '<button type="button" class="link small" data-action="tx-stop-repeat">Stop repeating</button>' : '<span class="small muted">Stopped</span>'}</div>` : '')
@@ -153,6 +154,7 @@ changes['tx-date'] = el => {
   const shown = document.getElementById('fDateShown'); if (shown) shown.textContent = fmtDate(A.form.date);
   if (A.form.repeat) { keepTyped(); drawForm(); }
 };
+changes['tx-account'] = el => { A.form.accountId = el.value; };
 changes['tx-refund'] = el => { keepTyped(); A.form.kind = el.checked ? 'refund' : 'spend'; if (el.checked) A.form.repeat = false; drawForm(); };
 changes['tx-repeat'] = el => { keepTyped(); A.form.repeat = el.checked; drawForm(); };
 changes['tx-every'] = el => { keepTyped(); A.form.every = el.value; drawForm(); };
@@ -197,6 +199,8 @@ actions['tx-save'] = () => {
   const fields = {
     kind: F.kind, amount, date: F.date, description: F.description.trim(), note: F.note.trim(),
     categoryId: F.kind === 'income' ? null : F.categoryId,
+    // Which account it's from; on an edit, clearing it is saved too.
+    ...(F.accountId ? { accountId: F.accountId } : F.editing?.accountId ? { accountId: null } : {}),
     // Split into parts, or explicitly not (so turning a split off on an edit clears it).
     ...(splits ? { splits } : F.editing?.splits ? { splits: null } : {}),
   };

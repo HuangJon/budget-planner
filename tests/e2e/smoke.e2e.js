@@ -526,6 +526,20 @@ await tap('#app [data-action=open-search]');
 await page.locator('dialog[open] [data-change=search-account]').selectOption({ label: 'From Sample card' });
 await page.locator('.search-sum', { hasText: '1 match' }).waitFor();
 await tap('[data-action=sheet-back]');
+// Activity shows the account, and a purchase's account can be changed or cleared in its form.
+await page.locator('.tx-row', { hasText: 'ACCOUNT TAG SHOP' }).getByText('Sample card').waitFor();
+await page.locator('.tx-row', { hasText: 'ACCOUNT TAG SHOP' }).click();
+await page.locator('#fAccount').selectOption({ label: 'None' });
+await page.locator('dialog[open] .sheet-head h2').click();
+await tap('[data-action=tx-save]');
+await page.locator('dialog[open]').waitFor({ state: 'detached' });
+await eventually(async () => !(await page.locator('.tx-row', { hasText: 'ACCOUNT TAG SHOP' }).innerText()).includes('Sample card'), 'Clearing the account should show');
+await page.locator('.tx-row', { hasText: 'ACCOUNT TAG SHOP' }).click();
+await page.locator('#fAccount').selectOption({ label: 'Sample card' });
+await page.locator('dialog[open] .sheet-head h2').click();
+await tap('[data-action=tx-save]');
+await page.locator('dialog[open]').waitFor({ state: 'detached' });
+await page.locator('.tx-row', { hasText: 'ACCOUNT TAG SHOP' }).getByText('Sample card').waitFor();
 // Tidy up: the later accounts check starts with none.
 await tap('#app [data-action=open-accounts]');
 await page.locator('.acc-row', { hasText: 'Sample card' }).locator('[data-action=acc-remove]').click();
