@@ -15,6 +15,8 @@ import './ui/report.js';
 import './ui/arrange.js';
 import './ui/search.js';
 import './ui/accounts.js';
+import './ui/imports.js';
+import './ui/closeout.js';
 import { startIdleWatch, forgetActivity } from './ui/idle.js';
 import { openCatEditor } from './ui/cat-edit.js';
 import { createLocalBackend } from './data/backend-local.js';
@@ -63,7 +65,9 @@ function follow(id) {
   };
   const s1 = watch((ok, err) => A.repo.watchBudget(id, ok, err), b => { A.budgets[id] = b; addDueCopies(id); render(); }, () => { A.budgets[id] = null; render(); });
   const s2 = watch((ok, err) => A.repo.watchTransactions(id, ok, err), list => { A.transactions[id] = list; addDueCopies(id); render(); }, () => {});
-  stops.set(id, () => { s1(); s2(); });
+  // Imports too, so one made on another phone shows up here right away.
+  const s3 = watch((ok, err) => A.repo.watchImports(id, ok, err), list => { A.imports = { ...A.imports, [id]: [...list].sort((x, y) => y.at - x.at) }; render(); if (A.sheet) refreshOpenSheet(); }, () => {});
+  stops.set(id, () => { s1(); s2(); s3(); });
 }
 
 let started = false;

@@ -5,7 +5,9 @@
  */
 import { A, actions, changes } from './state.js';
 import { esc, openSheet, sheetHead, openChild, registerSheet, toast, send, val, today, fmtDate } from './dom.js';
-import { budgetStart, isStartingMoney, liveTransactions } from '../core/budget.js';
+import { budgetStart, isStartingMoney, liveTransactions, thisMonth } from '../core/budget.js';
+import { importGrid } from '../core/imports.js';
+import { importsOf } from './imports.js';
 import { money, toCents } from '../core/money.js';
 import { accountCheck, ACCOUNT_KINDS, MAX_ACCOUNTS } from '../core/accounts.js';
 import { randomId } from '../core/ids.js';
@@ -33,6 +35,19 @@ const since = b => {
   const days = Math.floor((Date.now() - at) / 864e5);
   return days >= 7 ? `<span class="tiny import-age"> · last ${days} days ago</span>` : '';
 };
+/** Statements not in yet for the month being looked at, for accounts that have them. */
+function missingNow(b) {
+  const recs = importsOf(b.id);
+  if (!recs?.length) return [];
+  const g = importGrid(recs, A.transactions[b.id], b.accounts, A.month > thisMonth() ? A.month : thisMonth());
+  return g.columns.filter(c => c !== '' && !g.at(A.month, c).some(r => !r.undone) && (g.gap(A.month, c) || A.month === thisMonth()));
+}
+function importLabel(b) {
+  const m = missingNow(b);
+  if (!m.length) return `Import from your bank${since(b)}`;
+  return m.length === 1 ? `Import · ${esc(b.accounts[m[0]].name)} missing` : `Import · ${m.length} missing`;
+}
+
 export function syncBar(b) {
   const r = accountCheck(b, A.transactions[b.id] || [], today());
   const age = r.oldest ? Math.floor((Date.now() - r.oldest) / 864e5) : null;
@@ -43,7 +58,7 @@ export function syncBar(b) {
       ? { cls: 'ok', text: `✓ Accounts match${when}` }
       : { cls: 'off', text: `Accounts off by ${money(Math.abs(r.gap))}${when}` };
   return `<div class="sync-bar">
-    <button type="button" class="btn small" data-action="open-import">Import from your bank${since(b)}</button>
+    <button type="button" class="btn small ${missingNow(b).length ? 'imp-missing' : ''}" data-action="open-import">${importLabel(b)}</button>
     <button type="button" class="btn small acc-status ${status.cls}" data-action="open-accounts">${esc(status.text)}</button>
   </div>`;
 }

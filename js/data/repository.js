@@ -50,6 +50,7 @@ export function createRepository(backend, now = () => Date.now()) {
     watchMyBudgets: (cb, err) => backend.watchCollection(`users/${uid()}/budgets`, list => cb(list.map(b => b.budgetId)), err),
     watchBudget: (id, cb, err) => backend.watchDoc(budgetPath(id), cb, err),
     /** Calls back with readable transactions and how many were too damaged to use. */
+    watchImports: (id, cb, err) => backend.watchCollection(`${budgetPath(id)}/imports`, cb, err),
     watchTransactions: (id, cb, err) => backend.watchCollection(txCol(id), list => {
       const good = list.filter(isValidTransaction);
       cb(good, list.length - good.length);

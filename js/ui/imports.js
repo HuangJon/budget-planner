@@ -92,7 +92,9 @@ function drawImports() {
         ${open ? months.map(m => `<div class="ig-row"><button type="button" class="ig-month" data-action="import-month" data-id="${m}">${shortMonth(m).slice(0, 3)}</button>${grid.columns.map(c => cell(m, c)).join('')}</div>`).join('') : ''}`;
   }).join('') : '';
   openSheet(`<div class="sheet">${sheetHead('Imports')}<div class="sheet-body">
-    <label class="btn primary file-btn">Import a file${S.forName ? ` from ${esc(S.forName)}` : ''}<input type="file" id="importFile" accept=".csv,text/csv,text/plain" data-change="import-file"></label>
+    ${doneNote(b, S)}
+    <label class="btn primary file-btn">${S.forName ? `Import a file from ${esc(S.forName)}` : 'Import files'}<input type="file" id="importFile" accept=".csv,text/csv,text/plain" data-change="import-file" ${S.forName ? '' : 'multiple'}></label>
+    ${S.forName ? '' : '<p class="tiny muted center">Pick one file or several at once, like this month’s statements from each account.</p>'}
     ${S.error ? `<p class="small owe" role="alert">${esc(S.error)}</p>` : ''}
     <details class="how small"><summary>How to download a file from your bank</summary>
       <ol class="how-steps"><li>In your bank, open the card or account.</li><li>Choose <strong>Download account activity</strong> (or statements).</li><li>Pick <strong>CSV</strong> or <strong>Spreadsheet</strong> and the dates, then download.</li></ol>
@@ -103,6 +105,21 @@ function drawImports() {
       <p class="ig-key tiny muted"><span><span class="ig-cell in mini">${ICON.in}</span> In, tap to open</span><span><span class="ig-cell gap mini">${ICON.gap}</span> Missing, tap to import</span><span><span class="ig-cell out mini">${ICON.out}</span> Taken out</span></p></section>`}
     ${loose ? `<p class="notice">${loose} ${loose === 1 ? 'transaction came' : 'transactions came'} from files before imports were kept here. Import those files again and they’ll be filed in this grid. Nothing gets added twice.</p>` : ''}
   </div></div>`);
+}
+
+/**
+ * After files are checked: what came in, and (only if account balances are kept) a nudge to
+ * check they still match. No extra screen to get through.
+ */
+function doneNote(b, S) {
+  const d = S.summary;
+  if (!d || S.queue?.length || (!d.files && !d.skipped)) return '';
+  const said = [d.added && `added ${d.added}`, d.filed && `filed ${d.filed}`].filter(Boolean).join(', ');
+  const bits = said && said[0].toUpperCase() + said.slice(1);
+  const from = `${d.files} ${d.files === 1 ? 'file' : 'files'}${d.skipped ? `, skipped ${d.skipped}` : ''}`;
+  const balances = Object.values(b.accounts || {}).some(a => a.balance != null);
+  return `<div class="notice done-note stack tight" role="status"><span><strong>${bits || 'Nothing new'}</strong> from ${from}.</span>
+    ${balances && d.added ? '<span class="row between gap8"><span class="small">Update your balances to see if your accounts still match.</span><button type="button" class="btn small" data-action="open-accounts">Check accounts</button></span>' : ''}</div>`;
 }
 
 actions['import-year'] = el => { A.sheet.years = { ...A.sheet.years, [el.dataset.id]: !A.sheet.years[el.dataset.id] }; drawImports(); };
@@ -251,28 +268,7 @@ registerSheet('imports', drawImports);
 registerSheet('import-view', drawImportView);
 registerSheet('import-month', drawImportMonth);
 
-/* ---------- On Activity: this month's statements at a glance ---------- */
-
-/** "November statements: Chase ✓ · Ally – " for the accounts that have imports. */
-export function monthStatements(b, month) {
-  const recs = importsOf(b.id);
-  if (!recs?.length) return '';
-  const grid = importGrid(recs, A.transactions[b.id], b.accounts, month > thisMonth() ? month : thisMonth());
-  const cols = grid.columns.filter(c => c !== '');
-  if (!cols.length) return '';
-  const bits = cols.map(c => {
-    const here = grid.at(month, c).filter(r => !r.undone);
-    if (here.length) return `<button type="button" class="chip st-in" data-action="import-view" data-id="${esc(here[0].id)}">${ICON.in}${esc(accName(b, c))}</button>`;
-    return grid.gap(month, c) || month === thisMonth() ? `<button type="button" class="chip st-gap" data-action="open-imports-for" data-col="${esc(c)}">${ICON.gap}${esc(accName(b, c))}: not yet</button>` : '';
-  }).filter(Boolean);
-  if (!bits.length) return '';
-  return `<div class="statements"><span class="tiny muted">${esc(SHORT[Number(month.slice(5, 7)) - 1])} statements</span><div class="chips">${bits.join('')}</div></div>`;
-}
 actions['open-imports'] = () => openImports(A.route.id);
-actions['open-imports-for'] = el => {
-  const b = A.budgets[A.route.id], c = el.dataset.col;
-  openImports(b.id, { forAccount: c, forName: b.accounts?.[c]?.name || '' });
-};
 
 // Enter in the name box saves it (by leaving the box, which saves on change).
 addEventListener('keydown', ev => {

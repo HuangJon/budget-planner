@@ -479,16 +479,9 @@ await shot('import');
 // Text from a bank file is shown as text, never run as code.
 await page.locator('.import-row', { hasText: '<img src=x' }).locator('select').selectOption({ label: 'Clothes' });
 await page.locator('[data-action=import-save]', { hasText: 'Add 5' }).click();
-// The last step of an import is checking the accounts.
-await page.getByText('Added 5. Last step').waitFor();
-// Adding an account right there works (the popup that came before had just closed).
-await page.waitForTimeout(100);
-await tap('dialog[open] [data-action=acc-add-open]');
-await page.locator('#accName').fill('Imported check');
-await page.locator('#accBalance').fill('10');
-await tap('dialog[open] [data-action=acc-add]');
-await page.locator('.acc-row', { hasText: 'Imported check' }).waitFor();
-await page.locator('.acc-row', { hasText: 'Imported check' }).locator('[data-action=acc-remove]').click();
+// Back on the Imports page, it says what came in: no extra screen to get through.
+await page.locator('dialog[open] .done-note', { hasText: 'Added 5 from 1 file' }).waitFor();
+if (await page.locator('dialog[open] .done-note [data-action=open-accounts]').count()) fail('No balances kept yet, so no nudge to check them');
 await tap('[data-action=sheet-back]');
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
 await page.locator('.tx-row', { hasText: 'SAMPLE NOODLE BAR' }).waitFor();
@@ -551,7 +544,8 @@ await page.getByText('1 transaction came from files before imports were kept her
 await page.locator('#importFile').setInputFiles({ name: 'again.csv', mimeType: 'text/csv', buffer: Buffer.from(CSV) });
 await page.locator('[data-action=import-save]', { hasText: 'File 1 under this import' }).click();
 await page.getByText(/Filed 1 under/).waitFor();
-await page.locator('dialog[open] .tx-row', { hasText: 'SAMPLE CLOTHES' }).waitFor();
+await page.locator('dialog[open] .done-note', { hasText: 'Filed 1 from 1 file' }).waitFor();
+await page.getByText('came from files before imports were kept here').waitFor({ state: 'detached' });
 await tap('[data-action=sheet-back]');
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
 
@@ -564,14 +558,34 @@ await tap('dialog[open] [data-action=imp-acc-add]');
 await eventually(async () => (await page.locator('dialog[open] [data-change=import-account] option:checked').innerText()) === 'Sample card', 'The new account should be picked');
 await page.locator('.import-row').first().locator('select').selectOption({ label: 'Clothes' });
 await tap('[data-action=import-save]');
-await page.getByText('Last step').waitFor();
-await page.getByText('Add today’s balance').waitFor();
+await page.locator('dialog[open] .done-note', { hasText: 'Added 1 from 1 file' }).waitFor();
 await tap('[data-action=sheet-back]');
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
-// Activity shows this month's statements.
-await page.locator('.statements .st-in', { hasText: 'Sample card' }).waitFor();
-// Opening it from there: rename, take out and bring back, change its account, delete (both ways).
-await tap('.statements .st-in:has-text("Sample card")');
+// Several files at once: each is checked in turn, its account recognised, and any can be skipped.
+const card = (d, what) => `Transaction Date,Post Date,Description,Category,Type,Amount,Memo\n${d},${d},${what},Shopping,Sale,-4.00,\n`;
+await tap('#app [data-action=open-import]');
+await page.locator('#importFile').setInputFiles([
+  { name: 'card-oct.csv', mimeType: 'text/csv', buffer: Buffer.from(card('10/08/2026', 'MULTI FILE OCT')) },
+  { name: 'card-sep.csv', mimeType: 'text/csv', buffer: Buffer.from(card('09/08/2026', 'MULTI FILE SEP')) },
+]);
+await page.getByText('File 1 of 2').waitFor();
+await page.locator('dialog[open] .import-row', { hasText: 'MULTI FILE SEP' }).waitFor();
+await page.getByText('Picked Sample card because files like this came from it before').waitFor();
+await tap('[data-action=import-skip]');
+await page.getByText('File 2 of 2').waitFor();
+await page.locator('.import-row').first().locator('select').selectOption({ label: 'Clothes' });
+await tap('[data-action=import-save]');
+await page.locator('dialog[open] .done-note', { hasText: 'Added 1 from 1 file, skipped 1' }).waitFor();
+await tap('[data-action=sheet-back]');
+await page.locator('dialog[open]').waitFor({ state: 'detached' });
+// An import opens from a transaction's form ("Came in with"): rename it, take it out and bring it
+// back, change its account, and delete it (both ways).
+const openTagImport = async () => {
+  await page.locator('.tx-row', { hasText: 'ACCOUNT TAG SHOP' }).click();
+  await page.locator('dialog[open] [data-action=open-import-view]').click();
+  await page.locator('dialog[open] #impViewName').waitFor();
+};
+await openTagImport();
 await page.locator('#impViewName').fill('Chase May – Oct 2026');
 await page.locator('#impViewName').press('Enter');
 await page.locator('dialog[open] .sheet-head h2').click(); // tap away, as with the keyboard
@@ -592,13 +606,27 @@ await tap('[data-action=impv-delete-keep]');
 await page.getByText('Removed Chase May – Oct 2026').waitFor();
 await page.locator('dialog[open] #impViewName').waitFor({ state: 'detached' });
 await tap('#toast [data-action=undo]');
-await page.locator('.statements .st-in', { hasText: 'Sample card' }).waitFor();
-await tap('.statements .st-in:has-text("Sample card")');
+await tap('[data-action=sheet-back]');
+await page.locator('dialog[open]').waitFor({ state: 'detached' });
+await openTagImport();
 await tap('[data-action=impv-delete]');
 await tap('[data-action=impv-delete-yes]');
 await page.getByText(/Deleted Chase May – Oct 2026 and took out 1/).waitFor();
 await tap('#toast [data-action=undo]');
+while (await page.locator('dialog[open]').count()) await tap('[data-action=sheet-back]');
 await page.locator('.tx-row', { hasText: 'ACCOUNT TAG SHOP' }).waitFor();
+// Closing out a month: one checklist, reached from the month.
+await tap('[data-action=month-pick]');
+await tap('dialog[open] [data-action=open-closeout]');
+await page.locator('dialog[open] h2', { hasText: 'Close out' }).waitFor();
+await page.locator('dialog[open] .co-item').first().waitFor();
+await shot('closeout');
+await tap('dialog[open] .co-item:not(.done) [data-action=closeout-plan], dialog[open] .co-item:not(.done) [data-action=closeout-budget]');
+await page.locator('dialog[open]').waitFor({ state: 'detached' });
+await tap('a.tab[href$="-activity"]');
+// It went to last month; come back to this one.
+await tap('[data-action=month-pick]');
+await tap('dialog[open] .month-cell.now');
 // The grid: months down, accounts across; a month opens its imports.
 await tap('#app [data-action=open-import]');
 await page.locator('dialog[open] .ig-col', { hasText: 'Sample card' }).waitFor();
@@ -611,21 +639,21 @@ await page.locator('dialog[open]').waitFor({ state: 'detached' });
 // Search can narrow to that account.
 await tap('#app [data-action=open-search]');
 await page.locator('dialog[open] [data-change=search-account]').selectOption({ label: 'From Sample card' });
-await page.locator('.search-sum', { hasText: '1 match' }).waitFor();
+await page.locator('.search-sum', { hasText: '2 matches' }).waitFor();
 await tap('[data-action=sheet-back]');
 // Activity shows the account as a badge; tapping it lists everything from that account.
 await page.locator('.tx-row', { hasText: 'ACCOUNT TAG SHOP' }).locator('.acc-badge', { hasText: 'Sample card' }).click();
 await page.locator('dialog[open] [data-change=search-account] option:checked', { hasText: 'From Sample card' }).waitFor({ state: 'attached' });
-await page.locator('.search-sum', { hasText: '1 match' }).waitFor();
+await page.locator('.search-sum', { hasText: '2 matches' }).waitFor();
 await tap('[data-action=sheet-back]');
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
 // Activity can show just one account's transactions.
-await page.locator('.acc-chips [data-action=acc-filter]', { hasText: 'Sample card' }).click();
+await page.locator('[data-change=acc-filter]').selectOption({ label: 'Sample card' });
 await eventually(async () => {
   const rows = await page.locator('.tx-row:has([data-action=edit-tx])').allInnerTexts();
   return rows.length >= 1 && rows.every(r => r.includes('Sample card'));
 }, 'Only that account should show');
-await tap('.acc-chips [data-action=acc-filter][data-id=""]');
+await page.locator('[data-change=acc-filter]').selectOption({ label: 'All accounts' });
 await eventually(async () => (await page.locator('.tx-row:has([data-action=edit-tx])').count()) > 1, 'All should show again');
 // Search can set the account for everything it found, and undo it.
 await tap('#app [data-action=open-search]');
@@ -669,7 +697,7 @@ await page.locator('dialog[open]').waitFor({ state: 'detached' });
 // A PDF gets a clear message.
 await tap('[data-action=open-import]');
 await page.locator('#importFile').setInputFiles({ name: 'statement.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4') });
-await page.getByText('That’s a PDF').waitFor();
+await page.getByText(/couldn’t be used: it’s a PDF/).waitFor();
 await tap('[data-action=sheet-back]');
 
 // Checking the budget against accounts.
@@ -761,7 +789,7 @@ await page.locator('#importFile').setInputFiles({ name: 'old.csv', mimeType: 'te
 await page.getByText('from before your budget started').waitFor();
 await page.locator('.import-row').first().locator('select').selectOption({ label: 'Groceries' });
 await tap('[data-action=import-save]');
-await page.getByText('Last step').waitFor();
+await page.locator('dialog[open] .done-note').waitFor();
 await tap('[data-action=sheet-back]');
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
 await page.waitForTimeout(200);

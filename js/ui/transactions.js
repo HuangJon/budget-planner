@@ -1,5 +1,5 @@
 /** Every transaction in the month, newest first, grouped by day. */
-import { A, actions, render } from './state.js';
+import { A, actions, changes, render } from './state.js';
 import { esc, fmtDate, ordinal, openSheet, closeSheet, sheetHead, toast, send, val, today as todayDate, openChild, registerSheet } from './dom.js';
 import { isValidRule, nextDate, howOften, every, EVERY, suggestRepeats } from '../core/recurring.js';
 import { toCents } from '../core/money.js';
@@ -8,7 +8,6 @@ import { liveTransactions, monthOf, budgetStart, isHistory, categoryLabel } from
 import { money } from '../core/money.js';
 import { syncBar } from './accounts.js';
 import { txRow } from './search.js';
-import { monthStatements } from './imports.js';
 
 export const signed = t => `<span class="amt ${t.kind === 'spend' ? 'owe' : 'owed'}">${t.kind === 'spend' ? '−' : '+'}${money(t.amount)}</span>`;
 
@@ -31,7 +30,6 @@ export function transactionsScreen(b) {
       <div><span class="label">Spent</span><span class="amt owe">${money(spent)}</span></div>
     </section>
     ${syncBar(b)}
-    ${monthStatements(b, A.month)}
     ${budgetStart(b) && A.month <= budgetStart(b).slice(0, 7) && list.some(t => isHistory(b, t)) ? `<p class="notice small">Your budget starts ${fmtDate(budgetStart(b))}. What’s marked History is from before then: it counts in Trends and search, not in your money.</p>` : ''}
     ${repeatsPanel(b)}
     ${accountChips(b, acc)}
@@ -55,9 +53,11 @@ function accFilter(b) {
 function accountChips(b, acc) {
   const accounts = Object.entries(b.accounts || {});
   if (!accounts.length) return '';
-  const chip = (id, label) => `<button type="button" class="chip ${acc === id ? 'on' : ''}" data-action="acc-filter" data-id="${id}" aria-pressed="${acc === id}">${esc(label)}</button>`;
-  return `<div class="chips acc-chips" role="group" aria-label="Show transactions from">${chip('', 'All')}${accounts.map(([id, a]) => chip(id, a.name)).join('')}${chip('none', 'No account')}</div>`;
+  // One small menu instead of a row of chips: the list starts higher up.
+  const opt = (id, label) => `<option value="${id}" ${acc === id ? 'selected' : ''}>${esc(label)}</option>`;
+  return `<div class="list-tools"><label class="acc-filter ${acc ? 'on' : ''}"><span class="sr">Show transactions from</span><select data-change="acc-filter">${opt('', 'All accounts')}${accounts.map(([id, a]) => opt(id, a.name)).join('')}${opt('none', 'No account')}</select></label></div>`;
 }
+changes['acc-filter'] = el => actions['acc-filter']({ dataset: { id: el.value } });
 actions['acc-filter'] = el => {
   const b = A.budgets[A.route.id], v = el.dataset.id;
   try { localStorage.setItem(`wmm:accFilter:${b.id}`, v); } catch { A.accFilter = { ...A.accFilter, [b.id]: v }; }

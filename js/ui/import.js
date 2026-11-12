@@ -4,14 +4,13 @@
  * The file is read on this device; only the transactions are saved, like typing them in.
  */
 import { A, actions, changes, inputs } from './state.js';
-import { openImports, importsChanged, findImport, openImportView } from './imports.js';
+import { openImports, importsChanged, findImport } from './imports.js';
 import { LIMITS } from '../config/app.js';
 import { groupedCategories, budgetStart } from '../core/budget.js';
 import { esc, openSheet, closeSheet, sheetHead, toast, send, fmtDate, openChild, registerSheet, val, refreshOpenSheet } from './dom.js';
 import { readStatement, markExisting, guessCategory, SKIP, importName } from '../core/import.js';
 import { money } from '../core/money.js';
 import { catOptions } from './tx-form.js';
-import { openAccounts } from './accounts.js';
 import { randomId } from '../core/ids.js';
 
 const MAX_ROWS = 1000;
@@ -88,11 +87,12 @@ function drawImport() {
       ${S.open?.[key] ? `<div class="panel import-list">${list.map(([r, i]) => row(b, r, i)).join('')}</div>` : ''}
     </section>`;
   openSheet(`<div class="sheet">${sheetHead('Check and add')}<div class="sheet-body">
-    <p class="small muted">${esc(S.fileName)} · ${fmtDate(dates[0])} to ${fmtDate(dates.at(-1))}</p>
+    <p class="small muted">${S.total > 1 ? `<strong>File ${S.pos} of ${S.total}</strong> · ` : ''}${esc(S.fileName)} · ${fmtDate(dates[0])} to ${fmtDate(dates.at(-1))}</p>
     <label class="form-row bordered"><span class="form-row-label">From</span><select data-change="import-account" aria-label="Which account this file is from">
       <option value="" ${S.accountId ? '' : 'selected'}>Not one of my accounts</option>
       ${Object.entries(b.accounts || {}).map(([id, a]) => `<option value="${id}" ${S.accountId === id ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}
       <option value="${NEW}">+ Add an account…</option></select></label>
+    ${S.why && S.accountId ? `<p class="tiny muted why">Picked ${esc(accName)} because ${esc(S.why)}.</p>` : ''}
     ${fresh.length || adopt.length ? `<label class="form-row bordered"><span class="form-row-label">Name</span><input id="impName" maxlength="80" value="${esc(nameFor(S, b))}" data-input="import-name" aria-label="Name for this import" autocomplete="off"></label>` : ''}
     ${!fresh.length && !adopt.length && owners.length ? `<div class="notice stack tight"><span>Everything in this file is already in, from ${owners.length === 1 ? 'this import' : 'these imports'}:</span>${owners.map(r => `<button type="button" class="btn small" data-action="import-view" data-id="${esc(r.id)}">Open “${esc(r.file || 'Bank file')}”</button>`).join('')}</div>` : ''}
     ${S.addingAccount ? `<div class="panel pad stack tight"><input id="impAccName" maxlength="40" placeholder="Name, like Chase card" autocomplete="off"><div class="seg" role="group" aria-label="Kind of account"><button type="button" data-action="imp-acc-kind" data-id="cash" aria-pressed="${S.accKind !== 'card'}">Bank or cash</button><button type="button" data-action="imp-acc-kind" data-id="card" aria-pressed="${S.accKind === 'card'}">Credit card</button></div><div class="row gap8"><button type="button" class="btn small primary" data-action="imp-acc-add">Add</button><button type="button" class="btn small" data-action="imp-acc-cancel">Cancel</button></div><p class="tiny muted">Its balance can go in later, in Check your accounts.</p></div>` : ''}
@@ -104,7 +104,7 @@ function drawImport() {
     </section>
     ${already.length ? section('in', `Already in your budget · ${already.length}`, alreadyNote, already) : ''}
     ${out.length ? section('out', `Left out · ${out.length}`, 'Card payments and moving money between your accounts. Tick one only if it’s really spending.', out) : ''}
-  </div><div class="sheet-foot"><button type="button" class="btn primary" data-action="import-save" ${!making && !retag.length && fresh.length ? 'disabled' : ''}>${esc(label)}</button></div></div>`);
+  </div><div class="sheet-foot row gap8">${S.total > 1 ? '<button type="button" class="btn" data-action="import-skip">Skip</button>' : ''}<button type="button" class="btn primary grow" data-action="import-save" ${!making && !retag.length && fresh.length ? 'disabled' : ''}>${esc(label)}</button></div></div>`);
 }
 
 function row(b, r, i) {
@@ -124,35 +124,83 @@ function row(b, r, i) {
   </div>`;
 }
 
-changes['import-file'] = async el => {
-  const file = el.files?.[0], hub = A.sheet, b = A.budgets[hub?.budgetId];
-  if (!file || !b) return;
-  // Checking the file happens on its own screen on top of the Imports page (Back returns there).
-  const S = { kind: 'import', budgetId: b.id, step: 'review', rows: [], open: {}, error: '' };
+/** Reads one bank file into rows, or says why it can't be read. */
+async function readFile(file) {
   try {
-    if (/\.pdf$/i.test(file.name) || file.type === 'application/pdf') throw Object.assign(new Error('That’s a PDF. Download the CSV (spreadsheet) version instead.'), { code: 'pdf' });
-    if (file.size > 2e6) throw new Error('That file is too big. Pick a shorter date range.');
+    if (/\.pdf$/i.test(file.name) || file.type === 'application/pdf') throw Object.assign(new Error('it’s a PDF. Download the CSV (spreadsheet) version instead.'), { code: 'pdf' });
+    if (file.size > 2e6) throw new Error('it’s too big. Pick a shorter date range.');
     const { format, rows } = readStatement(await file.text());
-    if (!rows.length) throw new Error('No transactions found in that file.');
-    if (rows.length > MAX_ROWS) throw new Error(`That’s ${rows.length} rows. Pick a shorter date range (up to ${MAX_ROWS}).`);
-    const existing = A.transactions[b.id] || [];
-    const past = existing.filter(t => !t.deleted);
-    S.deleted = new Set(existing.filter(t => t.deleted).map(t => t.id));
-    S.rows = markExisting(rows, existing).map(r => ({ ...r, include: !r.skip, categoryId: guessCategory(r, b.categories, past) || '' }));
-    S.fileName = file.name;
-    S.format = format;
-    const last = hub.forAccount !== undefined && b.accounts?.[hub.forAccount] ? hub.forAccount : remembered(format);
-    S.accountId = last && b.accounts?.[last] ? last : '';
-    hub.error = '';
+    if (!rows.length) throw new Error('no transactions were found in it.');
+    if (rows.length > MAX_ROWS) throw new Error(`it has ${rows.length} rows. Pick a shorter date range (up to ${MAX_ROWS}).`);
+    return { fileName: file.name, format, rows };
   } catch (e) {
-    hub.error = e.code === 'unknown-format' || e.code === 'pdf' || !e.code ? e.message : 'That file couldn’t be read.';
-    el.value = '';
-    refreshOpenSheet();
-    return;
+    return { fileName: file.name, error: e.code === 'unknown-format' || e.code === 'pdf' || !e.code ? e.message : 'it couldn’t be read.' };
   }
-  el.value = '';
+}
+
+/** The last group of 4 digits in a file name, like 1234 in "Chase1234_Activity.CSV": often the card. */
+const digitsIn = name => (String(name).match(/(\d{4})(?!.*\d{4})/) || [])[1] || '';
+
+/**
+ * Which account a file is from, and why: the account of earlier imports its rows overlap, else the
+ * one used before for files named with the same digits, else for files from the same bank layout.
+ */
+export function guessAccount(b, file, rows, txs, pick = '') {
+  const ok = id => id && b.accounts?.[id];
+  if (ok(pick)) return { accountId: pick, why: '' };
+  const counts = new Map();
+  for (const t of alreadyIn(rows, txs)) if (ok(t.accountId)) counts.set(t.accountId, (counts.get(t.accountId) || 0) + 1);
+  const top = [...counts].sort((x, y) => y[1] - x[1])[0];
+  if (top) return { accountId: top[0], why: 'its rows overlap earlier imports from it' };
+  const d = digitsIn(file.fileName);
+  if (d && ok(remembered(`${file.format}:${d}`))) return { accountId: remembered(`${file.format}:${d}`), why: `files named with ${d} came from it before` };
+  if (!d && ok(remembered(file.format))) return { accountId: remembered(file.format), why: 'files like this came from it before' };
+  return { accountId: '', why: '' };
+}
+
+/** Opens the next file waiting to be checked, on top of the Imports page. */
+function nextFile(hub) {
+  const b = A.budgets[hub.budgetId], file = hub.queue?.shift();
+  if (!file || !b) { refreshOpenSheet(); return; }
+  const existing = A.transactions[b.id] || [];
+  const past = existing.filter(t => !t.deleted);
+  const S = { kind: 'import', budgetId: b.id, step: 'review', open: {}, error: '', fileName: file.fileName, format: file.format, pos: hub.total - hub.queue.length, total: hub.total };
+  S.deleted = new Set(existing.filter(t => t.deleted).map(t => t.id));
+  S.rows = markExisting(file.rows, existing).map(r => ({ ...r, include: !r.skip, categoryId: guessCategory(r, b.categories, past) || '' }));
+  const g = guessAccount(b, file, S.rows, existing, hub.total === 1 ? hub.forAccount : '');
+  S.accountId = g.accountId;
+  S.why = g.why;
   openChild(S, drawImport);
+}
+
+// Picking one or more files on the Imports page: each is checked in turn.
+changes['import-file'] = async el => {
+  const hub = A.sheet, b = A.budgets[hub?.budgetId];
+  const files = [...(el.files || [])];
+  if (!files.length || !b) return;
+  const read = await Promise.all(files.map(readFile));
+  el.value = '';
+  const bad = read.filter(f => f.error);
+  hub.error = bad.map(f => (files.length === 1 ? `That file couldn’t be used: ${f.error}` : `${f.fileName} couldn’t be used: ${f.error}`)).join(' ');
+  hub.queue = read.filter(f => !f.error).sort((x, y) => (x.rows[0]?.date || '').localeCompare(y.rows[0]?.date || ''));
+  hub.total = hub.queue.length;
+  hub.summary = { added: 0, filed: 0, files: 0, skipped: 0 };
+  if (!hub.queue.length) { refreshOpenSheet(); return; }
+  nextFile(hub);
 };
+/** After a file is saved or skipped: back to the Imports page, then on to the next file. */
+function fileDone(kind, n = 0) {
+  actions['sheet-back']();
+  const hub = A.sheet;
+  if (hub?.kind !== 'imports') return;
+  if (hub.summary) {
+    if (kind === 'skip') hub.summary.skipped += 1;
+    else { hub.summary.files += 1; hub.summary[kind] += n; }
+  }
+  if (hub.queue?.length) nextFile(hub);
+  else refreshOpenSheet();
+}
+actions['import-skip'] = () => fileDone('skip');
 
 // Ticks (or unticks) every new row. Rows already in, or left out on purpose, are never touched.
 changes['import-tick-all'] = el => {
@@ -241,7 +289,11 @@ actions['import-save'] = () => {
   const retag = untagged(b, S.rows, S.accountId, txs);
   const adopt = [...new Set(alreadyIn(S.rows, txs).filter(t => !t.importId).map(t => t.id))];
   const accName = b.accounts?.[S.accountId]?.name;
-  if (S.accountId) remember(S.format, S.accountId);
+  if (S.accountId) {
+    // Remembered for next time: by the digits in the file name when it has some, else by layout.
+    const d = digitsIn(S.fileName);
+    remember(d ? `${S.format}:${d}` : S.format, S.accountId);
+  }
   // Imports this file's rows already belong to, with no account yet, take the one picked here.
   if (S.accountId) {
     for (const id of new Set(alreadyIn(S.rows, txs).map(t => t.importId).filter(Boolean))) {
@@ -254,7 +306,7 @@ actions['import-save'] = () => {
       send(A.repo.tagAccount(b.id, retag, S.accountId));
       toast(`Marked ${retag.length} as ${accName}`, () => send(A.repo.tagAccount(b.id, retag, null)));
     }
-    actions['sheet-back']();
+    fileDone('skip');
     return;
   }
   const list = adding.map(r => ({ id: r.key, kind: r.kind, amount: r.amount, date: r.date, description: r.description, categoryId: r.kind === 'income' ? null : r.categoryId }));
@@ -271,20 +323,14 @@ actions['import-save'] = () => {
     if (mark.length) send(A.repo.tagAccount(b.id, mark, null));
     send(A.repo.deleteImport(b.id, { id: importId, ids: [], undone: true }).then(() => importsChanged(b.id)));
   };
-  closeSheet();
-  if (list.length) {
-    // The last step of adding: check the budget still matches the accounts.
-    openAccounts(b.id, { afterImport: list.length });
-    toast(`Added ${list.length}${adopt.length ? `, filed ${adopt.length} more` : ''}`, undo);
-  } else {
-    openImportView(b.id, importId);
-    toast(`Filed ${adopt.length} under “${nameFor(S, b)}”`, undo);
-  }
+  toast(list.length ? `Added ${list.length}${adopt.length ? `, filed ${adopt.length} more` : ''}` : `Filed ${adopt.length} under “${nameFor(S, b)}”`, undo);
+  fileDone(list.length ? 'added' : 'filed', list.length || adopt.length);
 };
 
 changes['import-account'] = el => {
   if (el.value === NEW) { A.sheet.addingAccount = true; A.sheet.accKind = A.sheet.format === 'chase-card' ? 'card' : 'cash'; drawImport(); document.getElementById('impAccName')?.focus(); return; }
   A.sheet.accountId = el.value;
+  A.sheet.why = '';
   drawImport();
 };
 actions['imp-acc-kind'] = el => { const n = val('impAccName'); A.sheet.accKind = el.dataset.id; drawImport(); const i = document.getElementById('impAccName'); if (i) i.value = n; };
@@ -295,7 +341,7 @@ actions['imp-acc-add'] = () => {
   const accId = randomId(10);
   // No balance yet: the accounts check asks for it rather than counting it as $0.
   send(A.repo.saveAccount(b.id, accId, { name, kind: A.sheet.accKind === 'card' ? 'card' : 'cash', balance: null }));
-  Object.assign(A.sheet, { addingAccount: false, accountId: accId });
+  Object.assign(A.sheet, { addingAccount: false, accountId: accId, why: '' });
   toast(`Added ${name}`);
   drawImport();
 };

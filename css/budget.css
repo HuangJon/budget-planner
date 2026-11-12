@@ -507,3 +507,23 @@ button.ig-cell:focus-visible { outline:2px solid var(--accent); outline-offset:1
 .st-gap { color:var(--owe); border-style:dashed; border-color:color-mix(in srgb, var(--owe) 50%, transparent) }
 .statements .chip { display:inline-flex; align-items:center; gap:5px }
 .statements .ig-ico { width:13px; height:13px }
+/* Close out a month */
+.co-list { list-style:none; margin:0; padding:0 }
+.co-item { display:flex; align-items:center; gap:12px; padding:12px 14px; border-top:1px solid var(--line) }
+.co-item:first-child { border-top:0 }
+.co-item .tick { flex:none; width:22px; height:22px; border-radius:50%; border:2px solid var(--line); display:grid; place-items:center }
+.co-item.done .tick { background:var(--owed); border-color:var(--owed); color:var(--surface) }
+.co-item .tick svg { width:14px; height:14px }
+.co-item.done strong { color:var(--muted); font-weight:600 }
+.co-entry { display:flex; align-items:center; gap:10px; padding:12px 14px; width:100%; text-align:left }
+.ok-note { border-color:var(--owed) }
+.why { margin-top:-4px; padding:0 4px }
+.done-note .btn { flex:none }
+/* Activity: the account menu sits quietly above the list */
+.list-tools { display:flex; justify-content:flex-end; margin:-4px 0 -6px }
+.acc-filter select { width:auto; min-height:32px; padding:4px 28px 4px 12px; border-radius:999px; font-size:13px; font-weight:600; background-color:var(--surface) }
+.acc-filter.on select { border-color:var(--accent); color:var(--accent) }
+.imp-missing { color:var(--owe); border-color:color-mix(in srgb, var(--owe) 45%, transparent) }
+/* Two buttons in a popup's footer: the main one gets the room */
+.sheet-foot.row > .btn { flex:1 1 0; min-width:0; width:auto }
+.sheet-foot.row > .btn.primary { flex:2 1 0 }

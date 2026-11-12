@@ -6,6 +6,7 @@ import { money, toCents, fromCents } from '../core/money.js';
 import { openTxForm } from './tx-form.js';
 import { syncBar } from './accounts.js';
 import { arranging, arrangeList } from './arrange.js';
+import { checklist } from './closeout.js';
 
 export const summaryFor = (b, month = A.month) => monthSummary(b, A.transactions[b.id] || [], month);
 const shortMonth = m => fmtMonth(m).split(' ')[0];
@@ -59,6 +60,7 @@ function newMonthCard(b, s) {
     <ol class="nm-steps">
       ${step(s.incomeThisMonth > 0, 'Add this month\u2019s income', '<button type="button" class="btn small" data-action="add-income">Add income</button>')}
       ${step(s.assignedThisMonth > 0, 'Plan money: give every dollar a job', `<a class="btn small primary" href="#b-${b.id}-plan">Plan money</a>`)}
+      ${(() => { const last = addMonths(A.month, -1), left = checklist(b, last).left; return step(!left, `Close out ${esc(fmtMonth(last))}${left ? ` · ${left} to look at` : ''}`, `<button type="button" class="btn small" data-action="open-closeout" data-month="${last}">Close out</button>`); })()}
     </ol>
     <p class="tiny muted">Leftovers and overspending from last month are already carried over.</p>
   </section>`;
@@ -302,7 +304,9 @@ function monthPicker() {
   const years = [];
   for (let y = Number(now.slice(0, 4)) + (now.slice(5) === '12' ? 1 : 0); y >= Number(oldest.slice(0, 4)); y--) years.push(y);
   const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  openSheet(`<div class="sheet">${sheetHead('Go to a month')}<div class="sheet-body">${years.map(y => `<section class="stack tight"><h3 class="date-head">${y}</h3><div class="month-grid">${MON.map((m, i) => {
+  const closing = A.month <= now ? (A.month < now ? A.month : addMonths(now, -1)) : null;
+  openSheet(`<div class="sheet">${sheetHead('Go to a month')}<div class="sheet-body">
+    ${closing && b ? (() => { const left = checklist(b, closing).left; return `<button type="button" class="tap panel co-entry" data-action="open-closeout" data-month="${closing}"><span class="grow stack tight"><strong>Close out ${esc(fmtMonth(closing))}</strong><span class="tiny muted">${left ? `${left} ${left === 1 ? 'thing' : 'things'} to look at` : 'All done'}</span></span><span aria-hidden="true">›</span></button>`; })() : ''}${years.map(y => `<section class="stack tight"><h3 class="date-head">${y}</h3><div class="month-grid">${MON.map((m, i) => {
     const key = `${y}-${String(i + 1).padStart(2, '0')}`, n = counts.get(key) || 0;
     if (key < oldest.slice(0, 7) || key > addMonths(now, 1)) return '<span></span>';
     return `<button type="button" class="month-cell ${key === A.month ? 'on' : ''} ${key === now ? 'now' : ''}" data-action="month-go" data-id="${key}" aria-pressed="${key === A.month}" aria-label="${esc(fmtMonth(key))}${n ? `, ${n} transactions` : ''}"><strong>${m}</strong><span class="tiny muted">${n || '–'}</span></button>`;
