@@ -543,7 +543,8 @@ await page.locator('dialog[open]').waitFor({ state: 'detached' });
 await tap('#app [data-action=open-import]');
 const past = page.locator('.past-row', { hasText: 'Sample card Nov 2026' });
 await past.waitFor();
-await past.locator('.tiny', { hasText: 'Sample card' }).waitFor();
+await page.locator('.past-group', { hasText: 'Sample card' }).locator('.past-row', { hasText: 'Sample card Nov 2026' }).waitFor();
+await past.locator('[data-action=import-manage]').click();
 await past.locator('[data-action=import-undo]').click();
 await page.getByText('Took out 1 from Sample card Nov 2026').waitFor();
 await past.locator('[data-action=import-redo]').click();
@@ -558,6 +559,23 @@ await renamed.locator('[data-action=import-open]').click();
 await page.locator('dialog[open] .search-import', { hasText: 'Chase May – Oct 2026' }).waitFor();
 await page.locator('.search-sum', { hasText: '1 match' }).waitFor();
 await tap('[data-action=sheet-back]');
+await renamed.waitFor();
+// Past imports are grouped by account.
+await page.locator('.past-group', { hasText: 'Sample card' }).locator('.past-row', { hasText: 'Chase May – Oct 2026' }).waitFor();
+// Delete, keeping the rows: it leaves the list but its transactions stay. Undo brings it back.
+await renamed.locator('[data-action=import-manage]').click();
+await renamed.locator('[data-action=import-delete]').click();
+await renamed.locator('[data-action=import-delete-keep]').click();
+await page.getByText('Removed Chase May – Oct 2026 from the list').waitFor();
+await renamed.waitFor({ state: 'detached' });
+await tap('#toast [data-action=undo]');
+await renamed.waitFor();
+// Delete with its rows: they come out of the budget.
+await renamed.locator('[data-action=import-manage]').click();
+await renamed.locator('[data-action=import-delete]').click();
+await renamed.locator('[data-action=import-delete-yes]').click();
+await page.getByText(/Deleted Chase May – Oct 2026 and took out 1/).waitFor();
+await tap('#toast [data-action=undo]');
 await renamed.waitFor();
 await tap('[data-action=sheet-back]');
 await page.locator('dialog[open]').waitFor({ state: 'detached' });

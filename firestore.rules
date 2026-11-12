@@ -130,7 +130,7 @@ service cloud.firestore {
           && (d.kind == 'income' ? d.categoryId == null : (d.categoryId is string && d.categoryId.size() <= 20))
           && d.createdAt is number && d.createdBy is string
           // Where an imported one came from, and a purchase split across categories (at most 20 parts).
-          && (!('importId' in d) || short(d.importId, 40))
+          && (!('importId' in d) || d.importId == null || short(d.importId, 40))
           && (!('accountId' in d) || d.accountId == null || short(d.accountId, 40))
           && (!('splits' in d) || d.splits == null || (d.splits is list && d.splits.size() <= 20));
       }
@@ -174,6 +174,8 @@ service cloud.firestore {
       allow update: if signedIn() && memberOf(budgetNow(budgetId))
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['undone', 'file'])
         && request.resource.data.undone is bool && short(request.resource.data.file, 80);
+      // Deleting forgets the record. Its rows are taken out first, or kept and unlinked.
+      allow delete: if signedIn() && memberOf(budgetNow(budgetId));
       allow delete: if false;
     }
 

@@ -242,6 +242,27 @@ export function createRepository(backend, now = () => Date.now()) {
       await backend.update(`${budgetPath(id)}/imports/${rec.id}`, { undone: false });
     },
     /** Takes a whole import back out (only marks them, like any delete). */
+    /**
+     * Deletes an import from the list. Its rows are taken out too, unless keepRows: then they stay
+     * in the budget and just forget which import they came with.
+     */
+    async deleteImport(id, rec, { keepRows = false } = {}) {
+      if (keepRows) await this.relinkImport(id, rec.ids, null);
+      else if (!rec.undone) await this.unimport(id, rec.ids);
+      await backend.remove(`${budgetPath(id)}/imports/${rec.id}`);
+    },
+    /** Undo for deleteImport: the record comes back as it was, and so do its rows. */
+    async restoreImport(id, rec, { keepRows = false } = {}) {
+      await batch([{ op: 'set', path: `${budgetPath(id)}/imports/${rec.id}`, value: { id: rec.id, at: rec.at, by: uid(), file: String(rec.file || 'Bank file').slice(0, 80), accountId: rec.accountId || null, count: rec.count, ids: rec.ids, undone: false } }]);
+      if (keepRows) await this.relinkImport(id, rec.ids, rec.id);
+      else if (!rec.undone) await this.redoImport(id, { ...rec, undone: true });
+      if (rec.undone) await backend.update(`${budgetPath(id)}/imports/${rec.id}`, { undone: true });
+    },
+    async relinkImport(id, ids, importId) {
+      for (let i = 0; i < ids.length; i += 100) {
+        await batch(ids.slice(i, i + 100).map(tid => ({ op: 'update', path: txPath(id, tid), value: { importId: importId || null, updatedAt: now(), updatedBy: uid() } })));
+      }
+    },
     async unimport(id, ids) {
       for (let i = 0; i < ids.length; i += 100) {
         await batch(ids.slice(i, i + 100).map(tid => ({ op: 'update', path: txPath(id, tid), value: { deleted: true, deletedAt: now(), deletedBy: uid() } })));

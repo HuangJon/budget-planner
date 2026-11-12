@@ -471,3 +471,9 @@ a.request-note { display:flex; align-items:center; gap:12px; padding:14px 16px; 
 .month-cell.now { border-color:var(--accent) }
 .month-cell.on { background:var(--accent); color:var(--accent-ink); border-color:var(--accent) }
 .month-cell.on .muted { color:inherit; opacity:.85 }
+.past-row.stack { display:grid; gap:8px; align-items:stretch }
+.past-row .row.between { align-items:flex-start }
+.past-acts.wrap { flex-wrap:wrap }
+.past-delete { padding:10px; border-radius:12px; background:var(--owe-soft) }
+.past-delete .btn { justify-content:center }
+.past-group > .label { padding:0 4px }

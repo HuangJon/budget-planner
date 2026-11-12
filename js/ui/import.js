@@ -37,25 +37,59 @@ async function loadPast() {
 const remembered = key => { try { return localStorage.getItem(`wmm:importAccount:${key}`) || ''; } catch { return ''; } };
 const remember = (key, id) => { try { localStorage.setItem(`wmm:importAccount:${key}`, id); } catch { /* fine */ } };
 
+/** The dates an import covers, from its rows (taken-out ones too). */
+function covers(b, rec) {
+  const ids = new Set(rec.ids), dates = (A.transactions[b.id] || []).filter(t => ids.has(t.id)).map(t => t.date).sort();
+  return dates.length ? (dates[0] === dates.at(-1) ? fmtDate(dates[0]) : `${fmtDate(dates[0])} – ${fmtDate(dates.at(-1))}`) : '';
+}
+
+const SHOWN_PER_ACCOUNT = 3;
+
+/**
+ * Past imports, one group per account, newest first. Each group shows its newest few, with the
+ * rest folded away. Manage on a row offers Rename, Undo (or Bring back) and Delete.
+ */
 function pastList(b) {
-  const past = A.sheet.past;
+  const S = A.sheet, past = S.past;
   if (!past?.length) return '';
-  const acc = id => b.accounts?.[id]?.name;
+  const groups = new Map();
+  for (const p of past) {
+    const key = b.accounts?.[p.accountId] ? p.accountId : '';
+    (groups.get(key) || groups.set(key, []).get(key)).push(p);
+  }
+  const order = [...groups.keys()].sort((x, y) => (x === '') - (y === '') || (b.accounts[x]?.name || '').localeCompare(b.accounts[y]?.name || ''));
   const item = p => {
-    const meta = `<span class="tiny muted">${fmtDate(new Date(p.at).toISOString().slice(0, 10))} · ${p.count} ${p.count === 1 ? 'row' : 'rows'}${acc(p.accountId) ? ` · ${esc(acc(p.accountId))}` : ''}${p.undone ? ' · Taken out' : ''}</span>`;
-    if (A.sheet.renaming === p.id) {
+    const span = covers(b, p);
+    const meta = `<span class="tiny muted">${span ? `${span} · ` : ''}${p.count} ${p.count === 1 ? 'row' : 'rows'} · added ${fmtDate(new Date(p.at).toISOString().slice(0, 10))}${p.undone ? ' · <strong>Taken out</strong>' : ''}</span>`;
+    if (S.renaming === p.id) {
       return `<div class="tx-row past-row"><span class="grow stack tight">
-        <input id="impRename" maxlength="80" value="${esc(p.file || '')}" data-key="import-rename" data-id="${esc(p.id)}" aria-label="Name of this import" autocomplete="off">${meta}
+        <input id="impRename" maxlength="80" value="${esc(p.file || '')}" aria-label="Name of this import" autocomplete="off">${meta}
         <span class="row gap8"><button type="button" class="btn small primary" data-action="import-rename-save" data-id="${esc(p.id)}">Save</button><button type="button" class="btn small" data-action="import-rename-cancel">Cancel</button></span>
       </span></div>`;
     }
-    return `<div class="tx-row past-row ${p.undone ? 'off' : ''}">
-      <span class="grow stack tight"><button type="button" class="link wrap-any imp-name" data-action="import-open" data-id="${esc(p.id)}">${esc(p.file || 'Bank file')} ›</button>${meta}</span>
-      <span class="stack tight past-acts"><button type="button" class="btn small" data-action="import-rename" data-id="${esc(p.id)}">Rename</button><button type="button" class="btn small" data-action="${p.undone ? 'import-redo' : 'import-undo'}" data-id="${esc(p.id)}">${p.undone ? 'Bring back' : 'Undo'}</button></span>
+    const managing = S.managing === p.id, deleting = S.deleting === p.id;
+    return `<div class="tx-row past-row stack tight ${p.undone ? 'off' : ''}">
+      <span class="row between gap8"><span class="grow stack tight"><button type="button" class="link wrap-any imp-name" data-action="import-open" data-id="${esc(p.id)}">${esc(p.file || 'Bank file')} ›</button>${meta}</span>
+      <button type="button" class="btn small" data-action="import-manage" data-id="${esc(p.id)}" aria-expanded="${managing}">${managing ? 'Done' : 'Manage'}</button></span>
+      ${managing && !deleting ? `<span class="row gap8 wrap past-acts">
+        <button type="button" class="btn small" data-action="import-rename" data-id="${esc(p.id)}">Rename</button>
+        <button type="button" class="btn small" data-action="${p.undone ? 'import-redo' : 'import-undo'}" data-id="${esc(p.id)}">${p.undone ? 'Bring back' : 'Take out'}</button>
+        <button type="button" class="btn small danger" data-action="import-delete" data-id="${esc(p.id)}">Delete</button></span>` : ''}
+      ${deleting ? `<span class="stack tight past-delete"><span class="small">Delete “${esc(p.file || 'Bank file')}”?</span>
+        ${p.undone ? '' : `<button type="button" class="btn small danger" data-action="import-delete-yes" data-id="${esc(p.id)}">Delete it and take out its ${p.count} ${p.count === 1 ? 'row' : 'rows'}</button>`}
+        <button type="button" class="btn small" data-action="import-delete-keep" data-id="${esc(p.id)}">${p.undone ? 'Remove it from this list' : 'Keep the rows, just remove it from this list'}</button>
+        <button type="button" class="btn small" data-action="import-delete-no">Cancel</button></span>` : ''}
     </div>`;
   };
-  return `<section class="stack tight past-imports"><h3 class="date-head">Past imports</h3><div class="panel tx-list">${past.slice(0, 12).map(item).join('')}</div>
-    <p class="tiny muted">Tap a name to see everything that came in with it. Undo takes those rows back out; Bring back returns them with your edits.</p></section>`;
+  const takenOut = past.filter(p => p.undone).length;
+  return `<section class="stack tight past-imports"><div class="row between"><h3 class="date-head">Past imports · ${past.length}</h3>${takenOut ? `<button type="button" class="link small" data-action="import-clear-out">Clear ${takenOut} taken out</button>` : ''}</div>
+    ${order.map(key => {
+      const list = groups.get(key), open = S.olderOpen?.[key], shown = open ? list : list.slice(0, SHOWN_PER_ACCOUNT);
+      return `<div class="stack tight past-group"><span class="small label">${esc(key ? b.accounts[key].name : 'No account')} · ${list.length}</span>
+        <div class="panel tx-list">${shown.map(item).join('')}</div>
+        ${list.length > SHOWN_PER_ACCOUNT ? `<button type="button" class="link small" data-action="import-older" data-id="${esc(key)}">${open ? 'Show fewer' : `Show ${list.length - SHOWN_PER_ACCOUNT} older`}</button>` : ''}</div>`;
+    }).join('')}
+    <p class="tiny muted">Tap a name to see what came in with it. Take out removes its rows (Bring back returns them); Delete also removes it from this list.</p></section>`;
 }
 
 /**
@@ -307,7 +341,7 @@ actions['import-undo'] = el => {
   if (!rec) return;
   rec.undone = true;
   send(A.repo.undoImport(b.id, rec));
-  toast(`Took out ${rec.count} from ${rec.file || 'that file'}`);
+  toast(`Took out ${rec.count} from ${rec.file || 'that file'}`, () => { rec.undone = false; send(A.repo.redoImport(b.id, rec)); if (A.sheet?.kind === 'import') drawImport(); });
   drawImport();
 };
 actions['import-redo'] = el => {
@@ -318,7 +352,39 @@ actions['import-redo'] = el => {
   toast(`Brought back ${rec.count}`);
   drawImport();
 };
-actions['import-rename'] = el => { A.sheet.renaming = el.dataset.id; drawImport(); const i = document.getElementById('impRename'); i?.focus(); i?.select(); };
+actions['import-manage'] = el => { const S = A.sheet; S.managing = S.managing === el.dataset.id ? null : el.dataset.id; S.deleting = null; drawImport(); };
+actions['import-older'] = el => { const S = A.sheet; S.olderOpen = { ...S.olderOpen, [el.dataset.id]: !S.olderOpen?.[el.dataset.id] }; drawImport(); };
+actions['import-delete'] = el => { A.sheet.deleting = el.dataset.id; drawImport(); };
+actions['import-delete-no'] = () => { A.sheet.deleting = null; drawImport(); };
+function deleteImport(id, keepRows) {
+  const S = A.sheet, b = budget(), rec = S.past?.find(p => p.id === id);
+  if (!rec) return;
+  S.past = S.past.filter(p => p !== rec);
+  S.deleting = S.managing = null;
+  if (A.importNames) delete A.importNames[b.id];
+  send(A.repo.deleteImport(b.id, rec, { keepRows }));
+  toast(keepRows || rec.undone ? `Removed ${rec.file || 'it'} from the list` : `Deleted ${rec.file || 'it'} and took out ${rec.count}`, () => {
+    send(A.repo.restoreImport(b.id, rec, { keepRows }));
+    if (A.sheet?.kind === 'import' && A.sheet.past) { A.sheet.past = [...A.sheet.past, rec].sort((x, y) => y.at - x.at); drawImport(); }
+    if (A.importNames) delete A.importNames[b.id];
+  });
+  drawImport();
+}
+actions['import-delete-yes'] = el => deleteImport(el.dataset.id, false);
+actions['import-delete-keep'] = el => deleteImport(el.dataset.id, A.sheet.past?.find(p => p.id === el.dataset.id)?.undone ? false : true);
+// Taken-out imports have no rows in the budget, so clearing them just tidies the list.
+actions['import-clear-out'] = () => {
+  const S = A.sheet, b = budget(), gone = (S.past || []).filter(p => p.undone);
+  if (!gone.length) return;
+  S.past = S.past.filter(p => !p.undone);
+  for (const rec of gone) send(A.repo.deleteImport(b.id, rec));
+  toast(`Cleared ${gone.length} from the list`, () => {
+    for (const rec of gone) send(A.repo.restoreImport(b.id, rec));
+    if (A.sheet?.kind === 'import' && A.sheet.past) { A.sheet.past = [...A.sheet.past, ...gone].sort((x, y) => y.at - x.at); drawImport(); }
+  });
+  drawImport();
+};
+actions['import-rename'] = el => { A.sheet.renaming = el.dataset.id; A.sheet.managing = null; drawImport(); const i = document.getElementById('impRename'); i?.focus(); i?.select(); };
 actions['import-rename-cancel'] = () => { A.sheet.renaming = null; drawImport(); };
 actions['import-rename-save'] = el => {
   const b = budget(), rec = A.sheet.past?.find(p => p.id === el.dataset.id), name = val('impRename').trim().slice(0, 80);

@@ -200,6 +200,11 @@ await no(carol.repo.listImports(B), "a stranger can't see a budget's imports");
 await no(bob.backend.update(`budgets/${B}/imports/${recs[0].id}`, { count: 1 }), 'an import record only changes its name and whether it was undone');
 await ok(alice.repo.renameImport(B, recs[0].id, 'Chase May – Oct 2026'), 'any member can rename an import');
 await no(alice.backend.update(`budgets/${B}/imports/${recs[0].id}`, { file: 'x'.repeat(81) }), 'but not to a very long name');
+await no(carol.backend.remove(`budgets/${B}/imports/${recs[0].id}`), "a stranger can't delete a budget's import");
+await ok(alice.repo.deleteImport(B, recs[0], { keepRows: true }), 'an import can be deleted, keeping its rows (they forget it)');
+await ok(alice.repo.restoreImport(B, recs[0], { keepRows: true }), 'and Undo brings it back');
+await ok(alice.repo.deleteImport(B, recs[0]), 'or deleted with its rows taken out');
+await ok(alice.repo.restoreImport(B, recs[0]), 'and brought back again');
 await ok(bob.repo.importTransactions(B, bank.slice(0, 3), new Set(bank.slice(0, 3).map(t => t.id))), 'deleted imports can be brought back');
 
 /* A member's own entry: a short name and nothing extra. */
