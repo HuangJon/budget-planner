@@ -497,37 +497,65 @@ await page.locator('.tx-row', { hasText: 'SAMPLE NOODLE BAR' }).getByText('Noodl
 await page.locator('.tx-row', { hasText: 'SAMPLE NOODLE BAR' }).locator('.imp-badge', { hasText: 'Chase_Activity Nov 2026' }).waitFor();
 await page.locator('.tx-row', { hasText: '<img src=x onerror=window.__xss=1>' }).waitFor();
 if (await page.evaluate(() => window.__xss || document.querySelectorAll('img[src=x]').length)) fail('HTML in a description must never run');
-// The same file again: everything is already in.
+// "Import from your bank" opens the Imports page: a grid of months by accounts.
+await tap('[data-action=open-import]');
+await page.locator('dialog[open] h2', { hasText: 'Imports' }).waitFor();
+await page.locator('dialog[open] .ig-cell.in').first().click();
+// Opening one shows its transactions; nothing needs importing again to change it.
+await page.locator('dialog[open] #impViewName').waitFor();
+if ((await page.locator('#impViewName').inputValue()) !== 'Chase_Activity Nov 2026') fail('The import should open');
+await page.locator('dialog[open] .tx-row', { hasText: 'SAMPLE NOODLE BAR' }).waitFor();
+await tap('[data-action=sheet-back]');
+await tap('[data-action=sheet-back]');
+await page.locator('dialog[open]').waitFor({ state: 'detached' });
+// A badge for an import with no account opens that import.
+await page.locator('.tx-row', { hasText: 'SAMPLE NOODLE BAR' }).locator('.imp-badge').click();
+await page.locator('dialog[open] #impViewName').waitFor();
+await tap('[data-action=sheet-back]');
+await page.locator('dialog[open]').waitFor({ state: 'detached' });
+
+// The same file again: everything is already in, and it says where from.
 await tap('[data-action=open-import]');
 await page.locator('#importFile').setInputFiles({ name: 'again.csv', mimeType: 'text/csv', buffer: Buffer.from(CSV) });
 await page.locator('[data-action=import-save]', { hasText: 'Nothing new' }).waitFor();
-// Picking its account marks the ones already in (imported before they knew their account).
+await page.locator('dialog[open] [data-action=import-view]', { hasText: 'Chase_Activity Nov 2026' }).waitFor();
+// Picking its account marks the ones already in, and the import takes that account too.
 await page.locator('dialog[open] [data-change=import-account]').selectOption({ label: '+ Add an account…' });
 await page.locator('#impAccName').fill('Old card');
 await tap('dialog[open] [data-action=imp-acc-add]');
-// Picking it from the list (not only adding it) offers the marking too.
 await page.locator('dialog[open] [data-change=import-account]').selectOption({ label: 'Not one of my accounts' });
 await page.getByText(/Pick the account above to mark/).waitFor();
 await page.locator('dialog[open] [data-change=import-account]').selectOption({ label: 'Old card' });
 await page.locator('[data-action=import-save]', { hasText: /^Mark \d+ as Old card$/ }).click();
 await page.getByText(/Marked \d+ as Old card/).waitFor();
+await page.locator('dialog[open] h2', { hasText: 'Imports' }).waitFor();
+await page.locator('dialog[open] .ig-col', { hasText: 'Old card' }).waitFor();
+await tap('[data-action=sheet-back]');
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
 await tap('[data-action=open-search]');
 await page.locator('dialog[open] [data-change=search-account]').selectOption({ label: 'From Old card' });
 await page.locator('dialog[open] .tx-row', { hasText: 'SAMPLE NOODLE BAR' }).waitFor();
 await tap('[data-action=sheet-back]');
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
-// Once marked, the same file has nothing left to do.
+
+// Rows from a file brought in before imports were kept: importing it again files them.
+await page.evaluate(() => {
+  const k = 'wmm:localdb:v7', db = JSON.parse(localStorage.getItem(k));
+  for (const [p, d] of Object.entries(db.docs || db)) if (p.includes('/transactions/') && d?.description === 'SAMPLE CLOTHES') delete d.importId;
+  localStorage.setItem(k, JSON.stringify(db));
+});
+await page.reload();
+await tap('a.tab[href$="-activity"]');
 await tap('[data-action=open-import]');
+await page.getByText('1 transaction came from files before imports were kept here').waitFor();
 await page.locator('#importFile').setInputFiles({ name: 'again.csv', mimeType: 'text/csv', buffer: Buffer.from(CSV) });
-await page.locator('dialog[open] [data-change=import-account]').selectOption({ label: 'Old card' });
-await page.getByText('Already marked.').waitFor();
-// Tick all only touches the new ones, never the card payment left out.
-if (await page.locator('dialog[open] [data-change=import-tick-all]').count()) fail('Nothing new, so nothing to tick');
-await page.locator('[data-action=import-save]', { hasText: 'Nothing new. Close' }).click();
+await page.locator('[data-action=import-save]', { hasText: 'File 1 under this import' }).click();
+await page.getByText(/Filed 1 under/).waitFor();
+await page.locator('dialog[open] .tx-row', { hasText: 'SAMPLE CLOTHES' }).waitFor();
+await tap('[data-action=sheet-back]');
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
-// Each file says which account it's from (a new one can be added right there), and past imports
-// can be taken out and brought back later.
+
+// A file from a new account (added right there).
 await tap('#app [data-action=open-import]');
 await page.locator('#importFile').setInputFiles({ name: 'card-nov.csv', mimeType: 'text/csv', buffer: Buffer.from('Transaction Date,Post Date,Description,Category,Type,Amount,Memo\n11/06/2026,11/07/2026,ACCOUNT TAG SHOP,Shopping,Sale,-37.21,\n') });
 await page.locator('dialog[open] [data-change=import-account]').selectOption({ label: '+ Add an account…' });
@@ -540,46 +568,46 @@ await page.getByText('Last step').waitFor();
 await page.getByText('Add today’s balance').waitFor();
 await tap('[data-action=sheet-back]');
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
-await tap('#app [data-action=open-import]');
-const past = page.locator('.past-row', { hasText: 'Sample card Nov 2026' });
-await past.waitFor();
-await page.locator('.past-group', { hasText: 'Sample card' }).locator('.past-row', { hasText: 'Sample card Nov 2026' }).waitFor();
-await past.locator('[data-action=import-manage]').click();
-await past.locator('[data-action=import-undo]').click();
-await page.getByText('Took out 1 from Sample card Nov 2026').waitFor();
-await past.locator('[data-action=import-redo]').click();
+// Activity shows this month's statements.
+await page.locator('.statements .st-in', { hasText: 'Sample card' }).waitFor();
+// Opening it from there: rename, take out and bring back, change its account, delete (both ways).
+await tap('.statements .st-in:has-text("Sample card")');
+await page.locator('#impViewName').fill('Chase May – Oct 2026');
+await page.locator('#impViewName').press('Enter');
+await page.locator('dialog[open] .sheet-head h2').click(); // tap away, as with the keyboard
+await page.getByText('Renamed').waitFor();
+await page.locator('dialog[open] h2', { hasText: 'Chase May – Oct 2026' }).waitFor();
+await tap('[data-action=impv-undo]');
+await page.getByText('Took out 1').waitFor();
+await page.getByText('Taken out: these rows').waitFor();
+await tap('[data-action=impv-redo]');
 await page.getByText('Brought back 1').waitFor();
-// An import can be renamed, and tapping its name lists what came in with it.
-await past.locator('[data-action=import-rename]').click();
-await page.locator('#impRename').fill('Chase May – Oct 2026');
-await page.locator('#impRename').press('Enter');
-const renamed = page.locator('.past-row', { hasText: 'Chase May – Oct 2026' });
-await renamed.waitFor();
-await renamed.locator('[data-action=import-open]').click();
-await page.locator('dialog[open] .search-import', { hasText: 'Chase May – Oct 2026' }).waitFor();
-await page.locator('.search-sum', { hasText: '1 match' }).waitFor();
-await tap('[data-action=sheet-back]');
-await renamed.waitFor();
-// Past imports are grouped by account.
-await page.locator('.past-group', { hasText: 'Sample card' }).locator('.past-row', { hasText: 'Chase May – Oct 2026' }).waitFor();
-// Delete, keeping the rows: it leaves the list but its transactions stay. Undo brings it back.
-await renamed.locator('[data-action=import-manage]').click();
-await renamed.locator('[data-action=import-delete]').click();
-await renamed.locator('[data-action=import-delete-keep]').click();
-await page.getByText('Removed Chase May – Oct 2026 from the list').waitFor();
-await renamed.waitFor({ state: 'detached' });
+await page.locator('dialog[open] [data-change=impv-account]').selectOption({ label: 'No account' });
+await page.getByText('Marked as no account').waitFor();
+await eventually(async () => !(await page.locator('dialog[open] .tx-row .acc-badge:not(.imp-badge)').count()), 'Its rows should lose the account');
 await tap('#toast [data-action=undo]');
-await renamed.waitFor();
-// Delete with its rows: they come out of the budget.
-await renamed.locator('[data-action=import-manage]').click();
-await renamed.locator('[data-action=import-delete]').click();
-await renamed.locator('[data-action=import-delete-yes]').click();
+await page.locator('dialog[open] .tx-row .acc-badge', { hasText: 'Sample card' }).waitFor();
+await tap('[data-action=impv-delete]');
+await tap('[data-action=impv-delete-keep]');
+await page.getByText('Removed Chase May – Oct 2026').waitFor();
+await page.locator('dialog[open] #impViewName').waitFor({ state: 'detached' });
+await tap('#toast [data-action=undo]');
+await page.locator('.statements .st-in', { hasText: 'Sample card' }).waitFor();
+await tap('.statements .st-in:has-text("Sample card")');
+await tap('[data-action=impv-delete]');
+await tap('[data-action=impv-delete-yes]');
 await page.getByText(/Deleted Chase May – Oct 2026 and took out 1/).waitFor();
 await tap('#toast [data-action=undo]');
-await renamed.waitFor();
+await page.locator('.tx-row', { hasText: 'ACCOUNT TAG SHOP' }).waitFor();
+// The grid: months down, accounts across; a month opens its imports.
+await tap('#app [data-action=open-import]');
+await page.locator('dialog[open] .ig-col', { hasText: 'Sample card' }).waitFor();
+await shot('imports');
+await page.locator('dialog[open] .ig-month').first().click();
+await page.locator('dialog[open] .im-row', { hasText: 'Chase May – Oct 2026' }).waitFor();
+await tap('[data-action=sheet-back]');
 await tap('[data-action=sheet-back]');
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
-await page.locator('.tx-row', { hasText: 'ACCOUNT TAG SHOP' }).waitFor();
 // Search can narrow to that account.
 await tap('#app [data-action=open-search]');
 await page.locator('dialog[open] [data-change=search-account]').selectOption({ label: 'From Sample card' });
@@ -611,9 +639,11 @@ await tap('#toast [data-action=undo]');
 await page.locator('dialog[open] .tx-row .acc-badge', { hasText: 'Sample card' }).waitFor();
 await tap('[data-action=sheet-back]');
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
-// Its form says which import it came in with, and the account can be changed or cleared there.
+// Its form says which import it came in with (tap opens it), and the account can be changed there.
 await page.locator('.tx-row', { hasText: 'ACCOUNT TAG SHOP' }).click();
-await page.locator('dialog[open] [data-action=open-import-search]', { hasText: 'Chase May – Oct 2026' }).waitFor();
+await page.locator('dialog[open] [data-action=open-import-view]', { hasText: 'Chase May – Oct 2026' }).click();
+await page.locator('dialog[open] #impViewName').waitFor();
+await tap('[data-action=sheet-back]');
 await tap('[data-action=sheet-back]');
 await page.locator('dialog[open]').waitFor({ state: 'detached' });
 await page.locator('.tx-row', { hasText: 'ACCOUNT TAG SHOP' }).click();

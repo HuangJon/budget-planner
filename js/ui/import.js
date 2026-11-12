@@ -3,11 +3,11 @@
  * in the rest from the same place), untick anything to leave out, then add them all at once.
  * The file is read on this device; only the transactions are saved, like typing them in.
  */
-import { A, actions, changes, inputs, render } from './state.js';
-import { openSearch } from './search.js';
+import { A, actions, changes, inputs } from './state.js';
+import { openImports, importsChanged, findImport, openImportView } from './imports.js';
 import { LIMITS } from '../config/app.js';
 import { groupedCategories, budgetStart } from '../core/budget.js';
-import { esc, openSheet, closeSheet, sheetHead, toast, send, fmtDate, openChild, registerSheet, val } from './dom.js';
+import { esc, openSheet, closeSheet, sheetHead, toast, send, fmtDate, openChild, registerSheet, val, refreshOpenSheet } from './dom.js';
 import { readStatement, markExisting, guessCategory, SKIP, importName } from '../core/import.js';
 import { money } from '../core/money.js';
 import { catOptions } from './tx-form.js';
@@ -23,74 +23,10 @@ const budget = () => {
 const NEW = '__new';
 const norm = s => String(s || '').trim().toLowerCase();
 
-export function openImport(budgetId) {
-  openChild({ kind: 'import', budgetId, step: 'pick', rows: [], error: '', open: {}, past: null }, drawImport);
-  loadPast();
-}
-/** Past imports, newest first, for undoing or bringing one back. */
-async function loadPast() {
-  const S = A.sheet, b = budget();
-  if (!b || S?.kind !== 'import') return;
-  try { S.past = (await A.repo.listImports(b.id)).sort((x, y) => y.at - x.at); } catch { S.past = []; }
-  if (A.sheet === S && S.step === 'pick') drawImport();
-}
+/** "Import from your bank" opens the Imports page; choosing a file there leads here to check it. */
+export function openImport(budgetId) { openImports(budgetId); }
 const remembered = key => { try { return localStorage.getItem(`wmm:importAccount:${key}`) || ''; } catch { return ''; } };
 const remember = (key, id) => { try { localStorage.setItem(`wmm:importAccount:${key}`, id); } catch { /* fine */ } };
-
-/** The dates an import covers, from its rows (taken-out ones too). */
-function covers(b, rec) {
-  const ids = new Set(rec.ids), dates = (A.transactions[b.id] || []).filter(t => ids.has(t.id)).map(t => t.date).sort();
-  return dates.length ? (dates[0] === dates.at(-1) ? fmtDate(dates[0]) : `${fmtDate(dates[0])} – ${fmtDate(dates.at(-1))}`) : '';
-}
-
-const SHOWN_PER_ACCOUNT = 3;
-
-/**
- * Past imports, one group per account, newest first. Each group shows its newest few, with the
- * rest folded away. Manage on a row offers Rename, Undo (or Bring back) and Delete.
- */
-function pastList(b) {
-  const S = A.sheet, past = S.past;
-  if (!past?.length) return '';
-  const groups = new Map();
-  for (const p of past) {
-    const key = b.accounts?.[p.accountId] ? p.accountId : '';
-    (groups.get(key) || groups.set(key, []).get(key)).push(p);
-  }
-  const order = [...groups.keys()].sort((x, y) => (x === '') - (y === '') || (b.accounts[x]?.name || '').localeCompare(b.accounts[y]?.name || ''));
-  const item = p => {
-    const span = covers(b, p);
-    const meta = `<span class="tiny muted">${span ? `${span} · ` : ''}${p.count} ${p.count === 1 ? 'row' : 'rows'} · added ${fmtDate(new Date(p.at).toISOString().slice(0, 10))}${p.undone ? ' · <strong>Taken out</strong>' : ''}</span>`;
-    if (S.renaming === p.id) {
-      return `<div class="tx-row past-row"><span class="grow stack tight">
-        <input id="impRename" maxlength="80" value="${esc(p.file || '')}" aria-label="Name of this import" autocomplete="off">${meta}
-        <span class="row gap8"><button type="button" class="btn small primary" data-action="import-rename-save" data-id="${esc(p.id)}">Save</button><button type="button" class="btn small" data-action="import-rename-cancel">Cancel</button></span>
-      </span></div>`;
-    }
-    const managing = S.managing === p.id, deleting = S.deleting === p.id;
-    return `<div class="tx-row past-row stack tight ${p.undone ? 'off' : ''}">
-      <span class="row between gap8"><span class="grow stack tight"><button type="button" class="link wrap-any imp-name" data-action="import-open" data-id="${esc(p.id)}">${esc(p.file || 'Bank file')} ›</button>${meta}</span>
-      <button type="button" class="btn small" data-action="import-manage" data-id="${esc(p.id)}" aria-expanded="${managing}">${managing ? 'Done' : 'Manage'}</button></span>
-      ${managing && !deleting ? `<span class="row gap8 wrap past-acts">
-        <button type="button" class="btn small" data-action="import-rename" data-id="${esc(p.id)}">Rename</button>
-        <button type="button" class="btn small" data-action="${p.undone ? 'import-redo' : 'import-undo'}" data-id="${esc(p.id)}">${p.undone ? 'Bring back' : 'Take out'}</button>
-        <button type="button" class="btn small danger" data-action="import-delete" data-id="${esc(p.id)}">Delete</button></span>` : ''}
-      ${deleting ? `<span class="stack tight past-delete"><span class="small">Delete “${esc(p.file || 'Bank file')}”?</span>
-        ${p.undone ? '' : `<button type="button" class="btn small danger" data-action="import-delete-yes" data-id="${esc(p.id)}">Delete it and take out its ${p.count} ${p.count === 1 ? 'row' : 'rows'}</button>`}
-        <button type="button" class="btn small" data-action="import-delete-keep" data-id="${esc(p.id)}">${p.undone ? 'Remove it from this list' : 'Keep the rows, just remove it from this list'}</button>
-        <button type="button" class="btn small" data-action="import-delete-no">Cancel</button></span>` : ''}
-    </div>`;
-  };
-  const takenOut = past.filter(p => p.undone).length;
-  return `<section class="stack tight past-imports"><div class="row between"><h3 class="date-head">Past imports · ${past.length}</h3>${takenOut ? `<button type="button" class="link small" data-action="import-clear-out">Clear ${takenOut} taken out</button>` : ''}</div>
-    ${order.map(key => {
-      const list = groups.get(key), open = S.olderOpen?.[key], shown = open ? list : list.slice(0, SHOWN_PER_ACCOUNT);
-      return `<div class="stack tight past-group"><span class="small label">${esc(key ? b.accounts[key].name : 'No account')} · ${list.length}</span>
-        <div class="panel tx-list">${shown.map(item).join('')}</div>
-        ${list.length > SHOWN_PER_ACCOUNT ? `<button type="button" class="link small" data-action="import-older" data-id="${esc(key)}">${open ? 'Show fewer' : `Show ${list.length - SHOWN_PER_ACCOUNT} older`}</button>` : ''}</div>`;
-    }).join('')}
-    <p class="tiny muted">Tap a name to see what came in with it. Take out removes its rows (Bring back returns them); Delete also removes it from this list.</p></section>`;
-}
 
 /**
  * Rows from this file that are already in the budget without an account (imported before imports
@@ -107,27 +43,18 @@ export function untagged(b, rows, accountId, existing) {
   return [...ids];
 }
 
+/** The transactions already in the budget that this file's rows match. */
+function alreadyIn(rows, existing) {
+  const byId = new Map((existing || []).filter(t => !t.deleted).map(t => [t.id, t]));
+  return rows.map(r => byId.get(r.skip === 'imported' ? r.key : r.skip === 'already' ? r.twin : null)).filter(Boolean);
+}
+
 const nameFor = (S, b) => (S.nameTyped ? S.name : importName(b.accounts?.[S.accountId]?.name, S.fileName, S.rows.map(r => r.date)));
 inputs['import-name'] = el => { A.sheet.name = el.value; A.sheet.nameTyped = true; };
 
 function drawImport() {
   const S = A.sheet, b = budget();
   if (!b) { closeSheet(); return; }
-  if (S.step === 'pick') {
-    openSheet(`<div class="sheet">${sheetHead('Import from your bank')}<div class="sheet-body">
-      <p class="muted">Bring in purchases from a CSV file instead of typing them. You check everything before it’s added.</p>
-      <ol class="how-steps small">
-        <li>In Chase, open the card or account.</li>
-        <li>Choose <strong>Download account activity</strong>.</li>
-        <li>Pick <strong>Spreadsheet (Excel, CSV)</strong> and the dates, then download.</li>
-      </ol>
-      <label class="btn primary file-btn">Choose the CSV file<input type="file" id="importFile" accept=".csv,text/csv,text/plain" data-change="import-file"></label>
-      ${S.error ? `<p class="small owe" role="alert">${esc(S.error)}</p>` : ''}
-      <p class="tiny muted">The file is read on this device and isn’t uploaded. Other banks’ CSV files work too if they have a date, a description and an amount. PDF statements can’t be read yet.</p>
-      ${pastList(b)}
-    </div></div>`);
-    return;
-  }
   const rows = S.rows.map((r, i) => [r, i]);
   // Three plain sections: new rows to add, rows already in the budget, and rows left out on purpose.
   const fresh = rows.filter(([r]) => !r.skip);
@@ -144,12 +71,18 @@ function drawImport() {
   const anyAccount = Object.keys(b.accounts || {})[0];
   const couldTag = !S.accountId && anyAccount ? untagged(b, S.rows, anyAccount, txs).length : 0;
   const allTicked = fresh.length && fresh.every(([r]) => r.include);
-  const label = adding.length && retag.length ? `Add ${adding.length} and mark ${retag.length} as ${accName}`
-    : adding.length ? `Add ${adding.length}` : retag.length ? `Mark ${retag.length} as ${accName}` : fresh.length ? 'Nothing ticked' : 'Nothing new. Close';
-  const alreadyNote = !already.length ? ''
-    : retag.length ? `${retag.length === already.length ? 'They' : `${retag.length} of them`} will be marked as ${esc(accName)}.`
-    : couldTag ? `Pick the account above to mark ${couldTag === 1 ? 'it' : 'these'}.`
-    : S.accountId ? `Already marked.` : '';
+  // Rows already in that belong to no import (from before imports were kept) join this one.
+  const inTx = alreadyIn(S.rows, txs);
+  const adopt = [...new Set(inTx.filter(t => !t.importId).map(t => t.id))];
+  const owners = [...new Set(inTx.map(t => t.importId).filter(Boolean))].map(id => findImport(b.id, id)).filter(Boolean);
+  const making = adding.length || adopt.length;
+  const label = adding.length ? `Add ${adding.length}` : adopt.length ? `File ${adopt.length} under this import` : retag.length ? `Mark ${retag.length} as ${accName}` : fresh.length ? 'Nothing ticked' : 'Nothing new. Close';
+  const alreadyNote = !already.length ? '' : [
+    owners.length ? `From ${owners.map(r => `“${esc(r.file || 'Bank file')}”`).join(', ')}.` : '',
+    adopt.length ? `${adopt.length === already.length ? 'They' : `${adopt.length} of them`} will be filed under this import.` : '',
+    retag.length ? `${retag.length === already.length ? 'They' : `${retag.length} of them`} will be marked as ${esc(accName)}.`
+      : couldTag ? `Pick the account above to mark ${couldTag === 1 ? 'it' : 'these'}.` : '',
+  ].filter(Boolean).join(' ');
   const section = (key, title, note, list) => `<section class="imp-section stack tight">
       <button type="button" class="imp-head row between" data-action="import-section" data-id="${key}" aria-expanded="${Boolean(S.open?.[key])}"><span class="stack tight"><strong>${title}</strong>${note ? `<span class="tiny muted">${note}</span>` : ''}</span><span class="muted" aria-hidden="true">${S.open?.[key] ? '▾' : '▸'}</span></button>
       ${S.open?.[key] ? `<div class="panel import-list">${list.map(([r, i]) => row(b, r, i)).join('')}</div>` : ''}
@@ -160,7 +93,8 @@ function drawImport() {
       <option value="" ${S.accountId ? '' : 'selected'}>Not one of my accounts</option>
       ${Object.entries(b.accounts || {}).map(([id, a]) => `<option value="${id}" ${S.accountId === id ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}
       <option value="${NEW}">+ Add an account…</option></select></label>
-    ${fresh.length ? '' : '<!--'}<label class="form-row bordered"><span class="form-row-label">Name</span><input id="impName" maxlength="80" value="${esc(nameFor(S, b))}" data-input="import-name" aria-label="Name for this import" autocomplete="off"></label>${fresh.length ? '' : '-->'}
+    ${fresh.length || adopt.length ? `<label class="form-row bordered"><span class="form-row-label">Name</span><input id="impName" maxlength="80" value="${esc(nameFor(S, b))}" data-input="import-name" aria-label="Name for this import" autocomplete="off"></label>` : ''}
+    ${!fresh.length && !adopt.length && owners.length ? `<div class="notice stack tight"><span>Everything in this file is already in, from ${owners.length === 1 ? 'this import' : 'these imports'}:</span>${owners.map(r => `<button type="button" class="btn small" data-action="import-view" data-id="${esc(r.id)}">Open “${esc(r.file || 'Bank file')}”</button>`).join('')}</div>` : ''}
     ${S.addingAccount ? `<div class="panel pad stack tight"><input id="impAccName" maxlength="40" placeholder="Name, like Chase card" autocomplete="off"><div class="seg" role="group" aria-label="Kind of account"><button type="button" data-action="imp-acc-kind" data-id="cash" aria-pressed="${S.accKind !== 'card'}">Bank or cash</button><button type="button" data-action="imp-acc-kind" data-id="card" aria-pressed="${S.accKind === 'card'}">Credit card</button></div><div class="row gap8"><button type="button" class="btn small primary" data-action="imp-acc-add">Add</button><button type="button" class="btn small" data-action="imp-acc-cancel">Cancel</button></div><p class="tiny muted">Its balance can go in later, in Check your accounts.</p></div>` : ''}
     <section class="stack tight">
       <div class="row between"><h3 class="date-head">${fresh.length ? `New · ${fresh.length}` : 'Nothing new in this file'}</h3>${fresh.length > 1 ? `<label class="row gap8 small tick-all"><input type="checkbox" data-change="import-tick-all" ${allTicked ? 'checked' : ''}>${allTicked ? 'Untick all' : 'Tick all'}</label>` : ''}</div>
@@ -170,7 +104,7 @@ function drawImport() {
     </section>
     ${already.length ? section('in', `Already in your budget · ${already.length}`, alreadyNote, already) : ''}
     ${out.length ? section('out', `Left out · ${out.length}`, 'Card payments and moving money between your accounts. Tick one only if it’s really spending.', out) : ''}
-  </div><div class="sheet-foot"><button type="button" class="btn primary" data-action="import-save" ${!adding.length && !retag.length && fresh.length ? 'disabled' : ''}>${esc(label)}</button></div></div>`);
+  </div><div class="sheet-foot"><button type="button" class="btn primary" data-action="import-save" ${!making && !retag.length && fresh.length ? 'disabled' : ''}>${esc(label)}</button></div></div>`);
 }
 
 function row(b, r, i) {
@@ -191,8 +125,10 @@ function row(b, r, i) {
 }
 
 changes['import-file'] = async el => {
-  const file = el.files?.[0], S = A.sheet, b = budget();
+  const file = el.files?.[0], hub = A.sheet, b = A.budgets[hub?.budgetId];
   if (!file || !b) return;
+  // Checking the file happens on its own screen on top of the Imports page (Back returns there).
+  const S = { kind: 'import', budgetId: b.id, step: 'review', rows: [], open: {}, error: '' };
   try {
     if (/\.pdf$/i.test(file.name) || file.type === 'application/pdf') throw Object.assign(new Error('That’s a PDF. Download the CSV (spreadsheet) version instead.'), { code: 'pdf' });
     if (file.size > 2e6) throw new Error('That file is too big. Pick a shorter date range.');
@@ -205,14 +141,17 @@ changes['import-file'] = async el => {
     S.rows = markExisting(rows, existing).map(r => ({ ...r, include: !r.skip, categoryId: guessCategory(r, b.categories, past) || '' }));
     S.fileName = file.name;
     S.format = format;
-    const last = remembered(format);
+    const last = hub.forAccount !== undefined && b.accounts?.[hub.forAccount] ? hub.forAccount : remembered(format);
     S.accountId = last && b.accounts?.[last] ? last : '';
-    S.step = 'review';
-    S.error = '';
+    hub.error = '';
   } catch (e) {
-    S.error = e.code === 'unknown-format' || e.code === 'pdf' || !e.code ? e.message : 'That file couldn’t be read.';
+    hub.error = e.code === 'unknown-format' || e.code === 'pdf' || !e.code ? e.message : 'That file couldn’t be read.';
+    el.value = '';
+    refreshOpenSheet();
+    return;
   }
-  drawImport();
+  el.value = '';
+  openChild(S, drawImport);
 };
 
 // Ticks (or unticks) every new row. Rows already in, or left out on purpose, are never touched.
@@ -298,25 +237,49 @@ actions['import-save'] = () => {
     document.querySelector('.import-list select.needs')?.scrollIntoView({ block: 'center' });
     return;
   }
-  const retag = untagged(b, S.rows, S.accountId, A.transactions[b.id]);
-  if (!adding.length) {
-    if (!retag.length) { closeSheet(); return; }
-    remember(S.format, S.accountId);
-    send(A.repo.tagAccount(b.id, retag, S.accountId));
-    closeSheet();
-    toast(`Marked ${retag.length} as ${b.accounts[S.accountId].name}`, () => send(A.repo.tagAccount(b.id, retag, null)));
+  const txs = A.transactions[b.id];
+  const retag = untagged(b, S.rows, S.accountId, txs);
+  const adopt = [...new Set(alreadyIn(S.rows, txs).filter(t => !t.importId).map(t => t.id))];
+  const accName = b.accounts?.[S.accountId]?.name;
+  if (S.accountId) remember(S.format, S.accountId);
+  // Imports this file's rows already belong to, with no account yet, take the one picked here.
+  if (S.accountId) {
+    for (const id of new Set(alreadyIn(S.rows, txs).map(t => t.importId).filter(Boolean))) {
+      const rec = findImport(b.id, id);
+      if (rec && !rec.accountId) send(A.repo.markImportAccount(b.id, id, S.accountId).then(() => importsChanged(b.id)));
+    }
+  }
+  if (!adding.length && !adopt.length) {
+    if (retag.length) {
+      send(A.repo.tagAccount(b.id, retag, S.accountId));
+      toast(`Marked ${retag.length} as ${accName}`, () => send(A.repo.tagAccount(b.id, retag, null)));
+    }
+    actions['sheet-back']();
     return;
   }
-  if (retag.length) send(A.repo.tagAccount(b.id, retag, S.accountId));
   const list = adding.map(r => ({ id: r.key, kind: r.kind, amount: r.amount, date: r.date, description: r.description, categoryId: r.kind === 'income' ? null : r.categoryId }));
-  const ids = list.map(t => t.id);
-  if (S.accountId) remember(S.format, S.accountId);
-  if (A.importNames) delete A.importNames[b.id];
-  send(A.repo.importTransactions(b.id, list, S.deleted, { file: nameFor(S, b).trim() || S.fileName, accountId: S.accountId || null }));
+  const ids = list.map(t => t.id), dates = S.rows.map(r => r.date).sort();
+  // Rows already in get the file's account too (adopted ones get it as they join).
+  const mark = retag.filter(id => !adopt.includes(id));
+  if (mark.length) send(A.repo.tagAccount(b.id, mark, S.accountId));
+  const importId = randomId(16);
+  const seen = S.rows.filter(r => r.skip === 'imported' || r.skip === 'already').length - adopt.length;
+  send(A.repo.importTransactions(b.id, list, S.deleted, { file: nameFor(S, b).trim() || S.fileName, accountId: S.accountId || null, importId, adopt, from: dates[0], to: dates.at(-1), seen: Math.max(0, seen) }).then(() => importsChanged(b.id)));
+  const undo = () => {
+    send(A.repo.unimport(b.id, ids));
+    if (adopt.length) send(A.repo.relinkImport(b.id, adopt, null));
+    if (mark.length) send(A.repo.tagAccount(b.id, mark, null));
+    send(A.repo.deleteImport(b.id, { id: importId, ids: [], undone: true }).then(() => importsChanged(b.id)));
+  };
   closeSheet();
-  // The last step of an import: check the budget still matches the accounts.
-  openAccounts(b.id, { afterImport: list.length });
-  toast(`Added ${list.length}${retag.length ? `, marked ${retag.length} as ${b.accounts[S.accountId].name}` : ''}`, () => { send(A.repo.unimport(b.id, ids)); if (retag.length) send(A.repo.tagAccount(b.id, retag, null)); });
+  if (list.length) {
+    // The last step of adding: check the budget still matches the accounts.
+    openAccounts(b.id, { afterImport: list.length });
+    toast(`Added ${list.length}${adopt.length ? `, filed ${adopt.length} more` : ''}`, undo);
+  } else {
+    openImportView(b.id, importId);
+    toast(`Filed ${adopt.length} under “${nameFor(S, b)}”`, undo);
+  }
 };
 
 changes['import-account'] = el => {
@@ -336,72 +299,5 @@ actions['imp-acc-add'] = () => {
   toast(`Added ${name}`);
   drawImport();
 };
-actions['import-undo'] = el => {
-  const b = budget(), rec = A.sheet.past?.find(p => p.id === el.dataset.id);
-  if (!rec) return;
-  rec.undone = true;
-  send(A.repo.undoImport(b.id, rec));
-  toast(`Took out ${rec.count} from ${rec.file || 'that file'}`, () => { rec.undone = false; send(A.repo.redoImport(b.id, rec)); if (A.sheet?.kind === 'import') drawImport(); });
-  drawImport();
-};
-actions['import-redo'] = el => {
-  const b = budget(), rec = A.sheet.past?.find(p => p.id === el.dataset.id);
-  if (!rec) return;
-  rec.undone = false;
-  send(A.repo.redoImport(b.id, rec));
-  toast(`Brought back ${rec.count}`);
-  drawImport();
-};
-actions['import-manage'] = el => { const S = A.sheet; S.managing = S.managing === el.dataset.id ? null : el.dataset.id; S.deleting = null; drawImport(); };
-actions['import-older'] = el => { const S = A.sheet; S.olderOpen = { ...S.olderOpen, [el.dataset.id]: !S.olderOpen?.[el.dataset.id] }; drawImport(); };
-actions['import-delete'] = el => { A.sheet.deleting = el.dataset.id; drawImport(); };
-actions['import-delete-no'] = () => { A.sheet.deleting = null; drawImport(); };
-function deleteImport(id, keepRows) {
-  const S = A.sheet, b = budget(), rec = S.past?.find(p => p.id === id);
-  if (!rec) return;
-  S.past = S.past.filter(p => p !== rec);
-  S.deleting = S.managing = null;
-  if (A.importNames) delete A.importNames[b.id];
-  send(A.repo.deleteImport(b.id, rec, { keepRows }));
-  toast(keepRows || rec.undone ? `Removed ${rec.file || 'it'} from the list` : `Deleted ${rec.file || 'it'} and took out ${rec.count}`, () => {
-    send(A.repo.restoreImport(b.id, rec, { keepRows }));
-    if (A.sheet?.kind === 'import' && A.sheet.past) { A.sheet.past = [...A.sheet.past, rec].sort((x, y) => y.at - x.at); drawImport(); }
-    if (A.importNames) delete A.importNames[b.id];
-  });
-  drawImport();
-}
-actions['import-delete-yes'] = el => deleteImport(el.dataset.id, false);
-actions['import-delete-keep'] = el => deleteImport(el.dataset.id, A.sheet.past?.find(p => p.id === el.dataset.id)?.undone ? false : true);
-// Taken-out imports have no rows in the budget, so clearing them just tidies the list.
-actions['import-clear-out'] = () => {
-  const S = A.sheet, b = budget(), gone = (S.past || []).filter(p => p.undone);
-  if (!gone.length) return;
-  S.past = S.past.filter(p => !p.undone);
-  for (const rec of gone) send(A.repo.deleteImport(b.id, rec));
-  toast(`Cleared ${gone.length} from the list`, () => {
-    for (const rec of gone) send(A.repo.restoreImport(b.id, rec));
-    if (A.sheet?.kind === 'import' && A.sheet.past) { A.sheet.past = [...A.sheet.past, ...gone].sort((x, y) => y.at - x.at); drawImport(); }
-  });
-  drawImport();
-};
-actions['import-rename'] = el => { A.sheet.renaming = el.dataset.id; A.sheet.managing = null; drawImport(); const i = document.getElementById('impRename'); i?.focus(); i?.select(); };
-actions['import-rename-cancel'] = () => { A.sheet.renaming = null; drawImport(); };
-actions['import-rename-save'] = el => {
-  const b = budget(), rec = A.sheet.past?.find(p => p.id === el.dataset.id), name = val('impRename').trim().slice(0, 80);
-  A.sheet.renaming = null;
-  if (rec && name && name !== rec.file) { rec.file = name; if (A.importNames?.[b.id]) A.importNames[b.id][rec.id] = name; render(); send(A.repo.renameImport(b.id, rec.id, name)); toast('Renamed'); }
-  drawImport();
-};
-// Enter saves the new name, Escape leaves it as it was.
-addEventListener('keydown', ev => {
-  if (ev.target?.id !== 'impRename') return;
-  if (ev.key === 'Enter') { ev.preventDefault(); document.querySelector('[data-action=import-rename-save]')?.click(); }
-  else if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); actions['import-rename-cancel'](); }
-}, true);
-// Everything that came in with one import, in Search (Back returns here).
-actions['import-open'] = el => {
-  const b = budget(), rec = A.sheet.past?.find(p => p.id === el.dataset.id);
-  if (rec) openSearch(b.id, { importId: rec.id, importName: rec.file || 'Bank file' });
-};
-actions['open-import'] = () => openImport(A.route.id);
+actions['open-import'] = () => openImports(A.route.id);
 registerSheet('import', drawImport);

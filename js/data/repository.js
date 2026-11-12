@@ -206,10 +206,13 @@ export function createRepository(backend, now = () => Date.now()) {
      * line imported again is recognised. One deleted earlier comes back instead of being made twice.
      * Writes go in groups so a large file stays inside the database's limits.
      */
-    async importTransactions(id, list, deletedIds = new Set(), { file = '', accountId = null } = {}) {
+    async importTransactions(id, list, deletedIds = new Set(), { file = '', accountId = null, importId = randomId(16), adopt = [], from = '', to = '', seen = 0 } = {}) {
       // Every row remembers which import (and which account) it came from, and the import itself
-      // is recorded, so it can be taken back out later as a whole.
-      const importId = randomId(16);
+      // is recorded, so it can be taken back out later as a whole. Rows already in from this same
+      // file that belong to no import yet (brought in before imports were recorded) join it too.
+      for (let i = 0; i < adopt.length; i += 100) {
+        await batch(adopt.slice(i, i + 100).map(tid => ({ op: 'update', path: txPath(id, tid), value: { importId, ...(accountId ? { accountId } : {}), updatedAt: now(), updatedBy: uid() } })));
+      }
       const tag = { importId, accountId: accountId || null };
       for (let i = 0; i < list.length; i += 100) {
         await batch(list.slice(i, i + 100).map(t => (deletedIds.has(t.id)
@@ -217,7 +220,7 @@ export function createRepository(backend, now = () => Date.now()) {
           : { op: 'set', path: txPath(id, t.id), value: { note: '', ...t, ...tag, categoryId: t.categoryId ?? null, budgetId: id, createdBy: uid(), createdAt: now() } })));
       }
       await batch([
-        { op: 'set', path: `${budgetPath(id)}/imports/${importId}`, value: { id: importId, at: now(), by: uid(), file: String(file).slice(0, 80), accountId: accountId || null, count: list.length, ids: list.map(t => t.id), undone: false } },
+        { op: 'set', path: `${budgetPath(id)}/imports/${importId}`, value: { id: importId, at: now(), by: uid(), file: String(file).slice(0, 80), accountId: accountId || null, count: list.length + adopt.length, ids: [...list.map(t => t.id), ...adopt], undone: false, ...(from && to ? { from, to } : {}), seen } },
         { op: 'update', path: budgetPath(id), value: { 'settings.lastImport': now(), changedBy: uid() } },
       ]);
       return importId;
@@ -228,6 +231,18 @@ export function createRepository(backend, now = () => Date.now()) {
         await batch(ids.slice(i, i + 100).map(tid => ({ op: 'update', path: txPath(id, tid), value: { accountId: accountId || null, updatedAt: now(), updatedBy: uid() } })));
       }
     },
+    /**
+     * Changes which account an import is from. Its rows that had the old account (or none) get the
+     * new one; any marked by hand with another account keep it.
+     */
+    async setImportAccount(id, rec, accountId, txs) {
+      const ids = new Set(rec.ids), old = rec.accountId || null;
+      const rows = (txs || []).filter(t => ids.has(t.id) && ((t.accountId || null) === old || !t.accountId)).map(t => t.id);
+      await this.tagAccount(id, rows, accountId);
+      await this.markImportAccount(id, rec.id, accountId);
+      return rows;
+    },
+    markImportAccount: (id, iid, accountId) => backend.update(`${budgetPath(id)}/imports/${iid}`, { accountId: accountId || null }),
     renameImport: (id, iid, name) => backend.update(`${budgetPath(id)}/imports/${iid}`, { file: String(name).slice(0, 80) }),
     listImports: id => backend.list(`${budgetPath(id)}/imports`, { orderBy: 'at' }),
     /** Takes a past import back out, or brings it back, as a whole. */
@@ -253,7 +268,7 @@ export function createRepository(backend, now = () => Date.now()) {
     },
     /** Undo for deleteImport: the record comes back as it was, and so do its rows. */
     async restoreImport(id, rec, { keepRows = false } = {}) {
-      await batch([{ op: 'set', path: `${budgetPath(id)}/imports/${rec.id}`, value: { id: rec.id, at: rec.at, by: uid(), file: String(rec.file || 'Bank file').slice(0, 80), accountId: rec.accountId || null, count: rec.count, ids: rec.ids, undone: false } }]);
+      await batch([{ op: 'set', path: `${budgetPath(id)}/imports/${rec.id}`, value: { id: rec.id, at: rec.at, by: uid(), file: String(rec.file || 'Bank file').slice(0, 80), accountId: rec.accountId || null, count: rec.count, ids: rec.ids, undone: false, ...(rec.from && rec.to ? { from: rec.from, to: rec.to } : {}), seen: rec.seen || 0 } }]);
       if (keepRows) await this.relinkImport(id, rec.ids, rec.id);
       else if (!rec.undone) await this.redoImport(id, { ...rec, undone: true });
       if (rec.undone) await backend.update(`${budgetPath(id)}/imports/${rec.id}`, { undone: true });

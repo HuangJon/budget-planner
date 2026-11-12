@@ -201,6 +201,12 @@ await no(bob.backend.update(`budgets/${B}/imports/${recs[0].id}`, { count: 1 }),
 await ok(alice.repo.renameImport(B, recs[0].id, 'Chase May – Oct 2026'), 'any member can rename an import');
 await no(alice.backend.update(`budgets/${B}/imports/${recs[0].id}`, { file: 'x'.repeat(81) }), 'but not to a very long name');
 await no(carol.backend.remove(`budgets/${B}/imports/${recs[0].id}`), "a stranger can't delete a budget's import");
+await ok(alice.repo.markImportAccount(B, recs[0].id, 'acct1'), "an import's account can be changed");
+await ok(alice.repo.markImportAccount(B, recs[0].id, null), 'or cleared');
+await no(alice.backend.update(`budgets/${B}/imports/${recs[0].id}`, { ids: [] }), 'but not which rows it holds');
+const dated = await alice.repo.importTransactions(B, [], new Set(), { file: 'Chase Oct 2026', accountId: 'acct1', from: '2026-10-01', to: '2026-10-31', seen: 3, adopt: [t1.id] });
+assert.ok(dated, 'an import remembers the dates its file covered, and files older rows under it');
+await no(alice.backend.batch([{ op: 'set', path: `budgets/${B}/imports/zzzzzzzzzzzz`, value: { id: 'zzzzzzzzzzzz', at: 1, by: alice.uid, file: 'x', accountId: null, count: 0, ids: [], undone: false, from: 'October', to: 'x' } }]), 'dates must be dates');
 await ok(alice.repo.deleteImport(B, recs[0], { keepRows: true }), 'an import can be deleted, keeping its rows (they forget it)');
 await ok(alice.repo.restoreImport(B, recs[0], { keepRows: true }), 'and Undo brings it back');
 await ok(alice.repo.deleteImport(B, recs[0]), 'or deleted with its rows taken out');

@@ -165,15 +165,19 @@ service cloud.firestore {
     match /budgets/{budgetId}/imports/{iid} {
       allow read: if signedIn() && memberOf(budgetNow(budgetId));
       allow create: if signedIn() && memberOf(budgetNow(budgetId)) && iid.matches('^[a-z0-9]{10,40}$')
-        && request.resource.data.keys().hasOnly(['id', 'at', 'by', 'file', 'accountId', 'count', 'ids', 'undone'])
+        && request.resource.data.keys().hasOnly(['id', 'at', 'by', 'file', 'accountId', 'count', 'ids', 'undone', 'from', 'to', 'seen'])
+        && (!('from' in request.resource.data) || (request.resource.data.from is string && request.resource.data.from.size() == 10
+          && request.resource.data.to is string && request.resource.data.to.size() == 10))
+        && (!('seen' in request.resource.data) || (request.resource.data.seen is int && request.resource.data.seen >= 0))
         && request.resource.data.id == iid && request.resource.data.by == me()
         && request.resource.data.at is number && short(request.resource.data.file, 80)
         && (request.resource.data.accountId == null || short(request.resource.data.accountId, 40))
         && request.resource.data.count is int && request.resource.data.ids is list && request.resource.data.ids.size() <= 1000
         && request.resource.data.undone == false;
       allow update: if signedIn() && memberOf(budgetNow(budgetId))
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['undone', 'file'])
-        && request.resource.data.undone is bool && short(request.resource.data.file, 80);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['undone', 'file', 'accountId'])
+        && request.resource.data.undone is bool && short(request.resource.data.file, 80)
+        && (request.resource.data.accountId == null || short(request.resource.data.accountId, 40));
       // Deleting forgets the record. Its rows are taken out first, or kept and unlinked.
       allow delete: if signedIn() && memberOf(budgetNow(budgetId));
       allow delete: if false;

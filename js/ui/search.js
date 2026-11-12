@@ -3,12 +3,13 @@
  * pick a category or a time, and see the matches with what they add up to. "Change category"
  * moves all of the matches at once, past ones included, and can be undone.
  */
-import { A, actions, changes, inputs, render } from './state.js';
+import { A, actions, changes, inputs } from './state.js';
 import { esc, openSheet, sheetHead, openChild, registerSheet, toast, send, fmtDate, today, refreshOpenSheet } from './dom.js';
 import { searchTransactions, searchTotals } from '../core/search.js';
 import { money } from '../core/money.js';
 import { catOptions } from './tx-form.js';
 import { isHistory, categoryLabel, parts } from '../core/budget.js';
+import { importsOf, importLabel, openImportView } from './imports.js';
 
 const SHOWN = 150;
 const WHEN = [['', 'Any time'], ['year', 'This year'], ['12', 'Last 12 months'], ['3', 'Last 3 months'], ['month', 'This month']];
@@ -29,18 +30,6 @@ function datesFor(when) {
 /** The dates searched: a month picked from Trends (from/to), or one of the choices in the list. */
 const range = S => (S.from ? { from: S.from, to: S.to || '' } : datesFor(S.when));
 
-/** The names of a budget's imports, loaded once and kept, for badges and "Came in with". */
-let loading = null;
-export async function loadImportNames(budgetId) {
-  if (A.importNames?.[budgetId] || loading === budgetId) return;
-  loading = budgetId;
-  try {
-    const list = await A.repo.listImports(budgetId);
-    A.importNames = { ...A.importNames, [budgetId]: Object.fromEntries(list.map(r => [r.id, r.file || 'Bank file'])) };
-    render(); if (A.sheet?.kind === 'tx' || A.sheet?.kind === 'search') refreshOpenSheet();
-  } catch { /* badges just wait */ } finally { loading = null; }
-}
-
 /**
  * A small badge with the account a transaction came from. Tapping it shows everything from that
  * account in Search (or narrows the Search already open).
@@ -51,10 +40,10 @@ export function accountBadge(b, t) {
   }
   // No account picked: it still shows which import it came in with.
   if (t.importId) {
-    const names = A.importNames?.[b.id];
-    if (!names) { loadImportNames(b.id); return ''; }
-    const name = names[t.importId] || 'Bank file';
-    return `<button type="button" class="acc-badge imp-badge" data-action="open-import-search" data-id="${esc(t.importId)}" data-budget="${esc(b.id)}" aria-label="Everything from the import ${esc(name)}">${esc(name)}</button>`;
+    const recs = importsOf(b.id);
+    if (!recs) return '';
+    const name = importLabel(b.id, t.importId);
+    return `<button type="button" class="acc-badge imp-badge" data-action="open-import-view" data-id="${esc(t.importId)}" data-budget="${esc(b.id)}" aria-label="Open the import ${esc(name)}">${esc(name)}</button>`;
   }
   return '';
 }
@@ -63,10 +52,8 @@ actions['open-acc-tag'] = el => {
   openSearch(A.route.id || A.sheet?.budgetId, { accountId: el.dataset.id });
 };
 
-actions['open-import-search'] = el => {
-  const budgetId = el.dataset.budget || A.form?.budgetId || A.route.id;
-  openSearch(budgetId, { importId: el.dataset.id, importName: A.importNames?.[budgetId]?.[el.dataset.id] || 'Bank file' });
-};
+// An import badge (or "Came in with") opens that import.
+actions['open-import-view'] = el => openImportView(el.dataset.budget || A.form?.budgetId || A.route.id, el.dataset.id);
 
 /**
  * One transaction in a list. The whole row opens it; the badge on it is its own button on top

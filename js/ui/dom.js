@@ -84,7 +84,7 @@ export function redrawKeeping(box, draw) {
   }
 }
 /** Redraws the open popup with the latest data. */
-const LIVE = ['cat', 'cat-edit', 'rule', 'cat-trend', 'account', 'tx', 'import', 'accounts', 'search'];
+const LIVE = ['cat', 'cat-edit', 'rule', 'cat-trend', 'account', 'tx', 'import', 'accounts', 'search', 'imports', 'import-view', 'import-month'];
 export function refreshOpenSheet() {
   const d = sheet();
   if (!d.open || !A.sheet || !LIVE.includes(A.sheet.kind) || !drawers[A.sheet.kind]) return;

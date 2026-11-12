@@ -10,7 +10,7 @@ import { suggestCategory } from '../core/categorize.js';
 import { recurringId, DAY_MAX, EVERY, howOften } from '../core/recurring.js';
 import { toCents, fromCents, money } from '../core/money.js';
 import { LIMITS } from '../config/app.js';
-import { loadImportNames } from './search.js';
+import { loadImports, importLabel } from './imports.js';
 
 /** Today, or the same day in the month being looked at, so a purchase lands where you're looking. */
 export const defaultDate = (viewing = A.month) => defaultDateFor(today(), viewing);
@@ -21,7 +21,7 @@ export function openTxForm(budgetId, editing = null, preset = {}) {
       splits: parts(editing).length > 1 ? parts(editing).map(p => ({ categoryId: p.categoryId, amount: fromCents(p.amount) })) : null }
     : { budgetId, editing: null, kind: preset.kind || 'spend', amount: '', description: '', categoryId: preset.categoryId || '', date: defaultDate(), note: '', showNote: false, accountId: '', touchedCat: Boolean(preset.categoryId), repeat: false, every: 'month' };
   openChild({ kind: 'tx' }, drawForm);
-  if (editing?.importId) loadImportNames(budgetId);
+  if (editing?.importId) loadImports(budgetId);
   if (!editing) document.getElementById('fAmount')?.focus();
 }
 
@@ -70,7 +70,7 @@ function drawForm() {
           ? '<div class="form-row"><span class="form-row-label">Goes to</span><span class="form-row-value">Ready to assign</span></div>'
           : F.splits ? splitRows(b, F) : `<label class="form-row"><span class="form-row-label">Category <span class="tiny muted" id="catHint">${F.suggested ? 'Suggested' : ''}</span></span><select id="fCat" data-change="tx-cat">${catOptions(b, F.categoryId)}</select></label>`}
         <label class="form-row form-row-date"><span class="form-row-label">Date</span><span class="form-row-value" id="fDateShown">${esc(fmtDate(F.date))}</span><input id="fDate" type="date" required value="${esc(F.date)}" data-change="tx-date"></label>
-        ${F.editing?.importId ? `<div class="form-row"><span class="form-row-label">Came in with</span><button type="button" class="link small wrap-any" data-action="open-import-search" data-id="${esc(F.editing.importId)}">${esc(A.importNames?.[F.budgetId]?.[F.editing.importId] || 'a bank file')} ›</button></div>` : ''}
+        ${F.editing?.importId ? `<div class="form-row"><span class="form-row-label">Came in with</span><button type="button" class="link small wrap-any" data-action="open-import-view" data-id="${esc(F.editing.importId)}" data-budget="${esc(F.budgetId)}">${esc(A.imports?.[F.budgetId] ? importLabel(F.budgetId, F.editing.importId) : 'a bank file')} ›</button></div>` : ''}
         ${Object.keys(b.accounts || {}).length || F.accountId ? `<label class="form-row"><span class="form-row-label">Account</span><select id="fAccount" data-change="tx-account"><option value="" ${F.accountId ? '' : 'selected'}>None</option>${Object.entries(b.accounts || {}).map(([id, a]) => `<option value="${id}" ${F.accountId === id ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}${F.accountId && !b.accounts?.[F.accountId] ? `<option value="${esc(F.accountId)}" selected>Removed account</option>` : ''}</select></label>` : ''}
         ${income ? '' : `<label class="form-row switch-row"><span class="form-row-label">This was a refund</span><input type="checkbox" id="fRefund" role="switch" ${refund ? 'checked' : ''} data-change="tx-refund"></label>`}
         ${F.editing

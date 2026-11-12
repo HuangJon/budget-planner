@@ -477,3 +477,25 @@ a.request-note { display:flex; align-items:center; gap:12px; padding:14px 16px; 
 .past-delete { padding:10px; border-radius:12px; background:var(--owe-soft) }
 .past-delete .btn { justify-content:center }
 .past-group > .label { padding:0 4px }
+/* ---------- Imports page: months by accounts ---------- */
+.ig { padding:6px 8px; overflow-x:auto }
+.ig-row { display:grid; grid-template-columns:48px repeat(var(--cols), minmax(56px, 1fr)); align-items:center; gap:4px; padding:3px 0 }
+.ig-head { position:sticky; top:0; background:var(--surface); padding-bottom:6px; border-bottom:1px solid var(--line) }
+.ig-col { font-size:12px; font-weight:700; text-align:center; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.ig-month { all:unset; cursor:pointer; font-weight:700; font-size:14px; padding:6px 4px; border-radius:8px }
+.ig-month:hover, .ig-month:focus-visible { background:var(--sunken) }
+.ig-cell { display:grid; place-items:center; height:34px; border-radius:10px; font:inherit; font-weight:700; border:1px solid transparent; background:transparent; color:inherit; position:relative }
+button.ig-cell { cursor:pointer }
+.ig-cell.in { background:var(--owed-soft); color:var(--owed) }
+.ig-cell.out { color:var(--muted); border-color:var(--line); border-style:dashed }
+.ig-cell.gap { color:var(--owe); border:1px dashed var(--owe); background:transparent }
+button.ig-cell:hover, button.ig-cell:focus-visible { outline:2px solid var(--accent); outline-offset:1px }
+.ig-cell sup { font-size:10px; margin-left:1px }
+.ig-year { all:unset; cursor:pointer; display:block; padding:10px 4px; font-weight:700; font-size:14px; color:var(--muted); border-top:1px solid var(--line) }
+.how summary { cursor:pointer; color:var(--accent); font-weight:600; padding:6px 0 }
+.im-row { display:flex; align-items:center; gap:10px }
+/* On Activity: this month's statements */
+.statements { display:grid; gap:4px }
+.statements .chips { display:flex; flex-wrap:wrap; gap:6px }
+.st-in { color:var(--owed); border-color:color-mix(in srgb, var(--owed) 40%, transparent) }
+.st-gap { color:var(--owe); border-style:dashed; border-color:color-mix(in srgb, var(--owe) 50%, transparent) }

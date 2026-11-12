@@ -8,6 +8,7 @@ import { liveTransactions, monthOf, budgetStart, isHistory, categoryLabel } from
 import { money } from '../core/money.js';
 import { syncBar } from './accounts.js';
 import { txRow } from './search.js';
+import { monthStatements } from './imports.js';
 
 export const signed = t => `<span class="amt ${t.kind === 'spend' ? 'owe' : 'owed'}">${t.kind === 'spend' ? '−' : '+'}${money(t.amount)}</span>`;
 
@@ -30,6 +31,7 @@ export function transactionsScreen(b) {
       <div><span class="label">Spent</span><span class="amt owe">${money(spent)}</span></div>
     </section>
     ${syncBar(b)}
+    ${monthStatements(b, A.month)}
     ${budgetStart(b) && A.month <= budgetStart(b).slice(0, 7) && list.some(t => isHistory(b, t)) ? `<p class="notice small">Your budget starts ${fmtDate(budgetStart(b))}. What’s marked History is from before then: it counts in Trends and search, not in your money.</p>` : ''}
     ${repeatsPanel(b)}
     ${accountChips(b, acc)}
