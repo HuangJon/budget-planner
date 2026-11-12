@@ -43,6 +43,12 @@ export const importLabel = (budgetId, id) => findImport(budgetId, id)?.file || '
 export const importsChanged = budgetId => loadImports(budgetId, true);
 
 
+// Drawn icons (not text characters), so they sit dead centre in every font and size.
+const ICON = {
+  in: '<svg class="ig-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  out: '<svg class="ig-ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="4.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>',
+  gap: '<svg class="ig-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+};
 const accName = (b, id) => (id && b.accounts?.[id]?.name) || 'No account';
 const SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const shortMonth = m => `${SHORT[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}`;
@@ -70,9 +76,9 @@ function drawImports() {
     const here = grid.at(m, c), live = here.filter(r => !r.undone);
     if (here.length) {
       const one = here.length === 1;
-      return `<button type="button" class="ig-cell ${live.length ? 'in' : 'out'}" data-action="${one ? 'import-view' : 'import-month'}" data-id="${esc(one ? here[0].id : m)}" data-col="${esc(c)}" aria-label="${esc(accName(b, c))}, ${esc(fmtMonth(m))}: ${one ? esc(here[0].file || 'Bank file') : `${here.length} imports`}${live.length ? '' : ', taken out'}">${live.length ? '✓' : '○'}${here.length > 1 ? `<sup>${here.length}</sup>` : ''}</button>`;
+      return `<button type="button" class="ig-cell ${live.length ? 'in' : 'out'}" data-action="${one ? 'import-view' : 'import-month'}" data-id="${esc(one ? here[0].id : m)}" data-col="${esc(c)}" aria-label="${esc(accName(b, c))}, ${esc(fmtMonth(m))}: ${one ? esc(here[0].file || 'Bank file') : `${here.length} imports`}${live.length ? '' : ', taken out'}">${live.length ? ICON.in : ICON.out}${here.length > 1 ? `<span class="ig-n">${here.length}</span>` : ''}</button>`;
     }
-    if (grid.gap(m, c)) return `<button type="button" class="ig-cell gap" data-action="import-for" data-col="${esc(c)}" aria-label="${esc(accName(b, c))}, ${esc(fmtMonth(m))}: not imported yet. Import it">–</button>`;
+    if (grid.gap(m, c)) return `<button type="button" class="ig-cell gap" data-action="import-for" data-col="${esc(c)}" aria-label="${esc(accName(b, c))}, ${esc(fmtMonth(m))}: not imported yet. Import it">${ICON.gap}</button>`;
     return '<span class="ig-cell none" aria-hidden="true"></span>';
   };
   const byYear = new Map();
@@ -94,7 +100,7 @@ function drawImports() {
     ${recs === null ? '<p class="small muted">Loading your imports…</p>' : !recs.length ? '<p class="small muted">Nothing imported yet. Your imports will show here by month and account.</p>' : `
     <section class="stack tight"><div class="row between"><h3 class="date-head">By month</h3>${takenOut ? `<button type="button" class="link small" data-action="import-clear-out">Clear ${takenOut} taken out</button>` : ''}</div>
       <div class="panel ig" role="table" aria-label="Imports by month and account" style="--cols:${grid.columns.length}">${head}${rows}</div>
-      <p class="tiny muted">✓ is in (tap to open it) · – is missing (tap to import it) · ○ was taken out.</p></section>`}
+      <p class="ig-key tiny muted"><span><span class="ig-cell in mini">${ICON.in}</span> In, tap to open</span><span><span class="ig-cell gap mini">${ICON.gap}</span> Missing, tap to import</span><span><span class="ig-cell out mini">${ICON.out}</span> Taken out</span></p></section>`}
     ${loose ? `<p class="notice">${loose} ${loose === 1 ? 'transaction came' : 'transactions came'} from files before imports were kept here. Import those files again and they’ll be filed in this grid. Nothing gets added twice.</p>` : ''}
   </div></div>`);
 }
@@ -256,8 +262,8 @@ export function monthStatements(b, month) {
   if (!cols.length) return '';
   const bits = cols.map(c => {
     const here = grid.at(month, c).filter(r => !r.undone);
-    if (here.length) return `<button type="button" class="chip st-in" data-action="import-view" data-id="${esc(here[0].id)}">${esc(accName(b, c))} ✓</button>`;
-    return grid.gap(month, c) || month === thisMonth() ? `<button type="button" class="chip st-gap" data-action="open-imports-for" data-col="${esc(c)}">${esc(accName(b, c))} · not yet</button>` : '';
+    if (here.length) return `<button type="button" class="chip st-in" data-action="import-view" data-id="${esc(here[0].id)}">${ICON.in}${esc(accName(b, c))}</button>`;
+    return grid.gap(month, c) || month === thisMonth() ? `<button type="button" class="chip st-gap" data-action="open-imports-for" data-col="${esc(c)}">${ICON.gap}${esc(accName(b, c))}: not yet</button>` : '';
   }).filter(Boolean);
   if (!bits.length) return '';
   return `<div class="statements"><span class="tiny muted">${esc(SHORT[Number(month.slice(5, 7)) - 1])} statements</span><div class="chips">${bits.join('')}</div></div>`;
